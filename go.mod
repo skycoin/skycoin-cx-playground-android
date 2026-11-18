@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/0magnet/gio v0.10.4-0.20261113210149-b0467ff35c7e
-	github.com/skycoin/skycoin-cx v0.0.0-20261117152803-b91dc227cb14
+	github.com/skycoin/skycoin-cx v0.0.0-20261118154316-ee4592edeb24
 )
 
 require (

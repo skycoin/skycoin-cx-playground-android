@@ -1,9 +1,9 @@
 package cxrun
 
 import (
-	cxast "github.com/skycoin/skycoin-cx/n006_ast"
-	opcodes "github.com/skycoin/skycoin-cx/n009_opcodes"
-	actions "github.com/skycoin/skycoin-cx/n011_actions"
+	cxast "github.com/skycoin/skycoin-cx/t3-ast"
+	actions "github.com/skycoin/skycoin-cx/t4-actions"
+	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
 )
 
 // Constant codes for the app package, clear of the ranges skycoin-cx uses.

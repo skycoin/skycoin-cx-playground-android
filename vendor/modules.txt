@@ -108,27 +108,27 @@ github.com/skycoin/skycoin/src/cipher/encoder
 github.com/skycoin/skycoin/src/cipher/ripemd160
 github.com/skycoin/skycoin/src/cipher/secp256k1-go
 github.com/skycoin/skycoin/src/cipher/secp256k1-go/secp256k1-go2
-# github.com/skycoin/skycoin-cx v0.0.0-20261117152803-b91dc227cb14
+# github.com/skycoin/skycoin-cx v0.0.0-20261118154316-ee4592edeb24
 ## explicit; go 1.27.3
-github.com/skycoin/skycoin-cx/n001_types
-github.com/skycoin/skycoin-cx/n002_util
-github.com/skycoin/skycoin-cx/n003_packages
-github.com/skycoin/skycoin-cx/n004_constants
-github.com/skycoin/skycoin-cx/n005_globals
-github.com/skycoin/skycoin-cx/n006_ast
-github.com/skycoin/skycoin-cx/n007_profiling
-github.com/skycoin/skycoin-cx/n009_opcodes
-github.com/skycoin/skycoin-cx/n010_execute
-github.com/skycoin/skycoin-cx/n011_actions
-github.com/skycoin/skycoin-cx/n013_cipher
-github.com/skycoin/skycoin-cx/n014_regexp
-github.com/skycoin/skycoin-cx/n015_tcp
-github.com/skycoin/skycoin-cx/n016_cxos
-github.com/skycoin/skycoin-cx/n017_cxfx
-github.com/skycoin/skycoin-cx/n018_init
-github.com/skycoin/skycoin-cx/n019_cxpartialparsing
-github.com/skycoin/skycoin-cx/n020_cxparsingcompletor
-github.com/skycoin/skycoin-cx/n021_cxparsing
+github.com/skycoin/skycoin-cx/t0-packages
+github.com/skycoin/skycoin-cx/t0-types
+github.com/skycoin/skycoin-cx/t0-util
+github.com/skycoin/skycoin-cx/t1-constants
+github.com/skycoin/skycoin-cx/t1-profiling
+github.com/skycoin/skycoin-cx/t2-globals
+github.com/skycoin/skycoin-cx/t3-ast
+github.com/skycoin/skycoin-cx/t4-actions
+github.com/skycoin/skycoin-cx/t4-execute
+github.com/skycoin/skycoin-cx/t4-opcodes
+github.com/skycoin/skycoin-cx/t5-cipher
+github.com/skycoin/skycoin-cx/t5-cxos
+github.com/skycoin/skycoin-cx/t5-cxpartialparsing
+github.com/skycoin/skycoin-cx/t5-regexp
+github.com/skycoin/skycoin-cx/t5-tcp
+github.com/skycoin/skycoin-cx/t6-cxfx
+github.com/skycoin/skycoin-cx/t7-init
+github.com/skycoin/skycoin-cx/t8-cxparsingcompletor
+github.com/skycoin/skycoin-cx/t9-cxparsing
 # golang.org/x/exp/shiny v0.0.0-20261113113407-e3970619a1a4
 ## explicit; go 1.26.0
 golang.org/x/exp/shiny/driver/gldriver

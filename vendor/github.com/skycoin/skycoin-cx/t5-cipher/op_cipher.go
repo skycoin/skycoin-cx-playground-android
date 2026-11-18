@@ -1,0 +1,27 @@
+//go:build !nocipher
+
+package cipher
+
+import (
+	"github.com/skycoin/skycoin-cx/t3-ast"
+	"github.com/skycoin/skycoin/src/cipher"
+)
+
+// opCipherGenerateKeyPair generates a PubKey and a SecKey.
+func opCipherGenerateKeyPair(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+	pubKey, secKey := cipher.GenerateKeyPair()
+
+	bPubKey := make([]byte, len(pubKey))
+	bSecKey := make([]byte, len(secKey))
+
+	// Copying bytes
+	for i, byt := range pubKey {
+		bPubKey[i] = byt
+	}
+	for i, byt := range secKey {
+		bSecKey[i] = byt
+	}
+
+	outputs[0].Set_bytes(prgrm, bPubKey)
+	outputs[1].Set_bytes(prgrm, bSecKey)
+}
