@@ -1,6 +1,6 @@
-// Command cxplayground is the CX Playground app: a list of CX apps, each
-// identified by the hash of its manifest, and a runner that gives the
-// selected program a canvas, touch and key events and the soft keyboard.
+// Command cxplayground is the CX Playground app: a list of CX apps and a
+// runner that gives the selected program a canvas, touch and key events and
+// the soft keyboard. The UI is plain monospaced text at one size.
 package main
 
 import (
@@ -17,7 +17,7 @@ import (
 	"github.com/0magnet/gio/app"
 	"github.com/0magnet/gio/f32"
 	"github.com/0magnet/gio/font"
-	"github.com/0magnet/gio/font/gofont"
+	"github.com/0magnet/gio/font/opentype"
 	"github.com/0magnet/gio/io/event"
 	"github.com/0magnet/gio/io/key"
 	"github.com/0magnet/gio/io/pointer"
@@ -39,14 +39,20 @@ import (
 //go:embed bundle
 var bundle embed.FS
 
+// JetBrains Mono 2.304, SIL Open Font License 1.1 (font/OFL.txt).
+//
+//go:embed font/JetBrainsMono-Regular.ttf
+var monoTTF []byte
+
+// textSize is the one text size of the whole app, CX app.Text included.
+const textSize = unit.Sp(14)
+
 var (
-	bg      = color.NRGBA{R: 0x12, G: 0x14, B: 0x1c, A: 0xff}
-	panel   = color.NRGBA{R: 0x1d, G: 0x21, B: 0x2e, A: 0xff}
-	fg      = color.NRGBA{R: 0xec, G: 0xee, B: 0xf4, A: 0xff}
-	dim     = color.NRGBA{R: 0x9a, G: 0xa1, B: 0xb5, A: 0xff}
-	accent  = color.NRGBA{R: 0x4c, G: 0xc2, B: 0xff, A: 0xff}
-	hashCol = color.NRGBA{R: 0xe8, G: 0xb8, B: 0x4a, A: 0xff}
-	mono    = font.Font{Typeface: "Go Mono"}
+	bg   = color.NRGBA{R: 0x27, G: 0x28, B: 0x22, A: 0xff}
+	fg   = color.NRGBA{R: 0xf8, G: 0xf8, B: 0xf2, A: 0xff}
+	dim  = color.NRGBA{R: 0x75, G: 0x71, B: 0x5e, A: 0xff}
+	link = color.NRGBA{R: 0x66, G: 0xd9, B: 0xef, A: 0xff}
+	mono = font.Font{Typeface: "JetBrains Mono"}
 )
 
 func main() {
@@ -67,10 +73,10 @@ type ui struct {
 	src   store.Source
 	apps  []store.App
 	errs  []error
-	list  widget.List
+	list  layout.List
 	rows  []widget.Clickable
 	back  widget.Clickable
-	scrl  widget.List
+	scrl  layout.List
 	runID int
 
 	// Set while a program is selected.
@@ -91,10 +97,15 @@ func run(w *app.Window) error {
 	if err != nil {
 		return err
 	}
+	face, err := opentype.Parse(monoTTF)
+	if err != nil {
+		return err
+	}
 	u := &ui{w: w, src: store.FSSource{FS: sub}}
 	u.th = material.NewTheme()
-	u.th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
-	u.th.Palette.Fg, u.th.Palette.Bg, u.th.Palette.ContrastBg = fg, bg, accent
+	u.th.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection([]font.FontFace{{Font: mono, Face: face}}))
+	u.th.Face, u.th.TextSize = mono.Typeface, textSize
+	u.th.Palette.Fg, u.th.Palette.Bg = fg, bg
 	u.list.Axis = layout.Vertical
 	u.scrl.Axis = layout.Vertical
 	u.apps, u.errs, err = store.List(u.src)
@@ -130,11 +141,39 @@ func run(w *app.Window) error {
 	}
 }
 
-func (u *ui) label(gtx layout.Context, f font.Font, sp unit.Sp, c color.NRGBA, s string) layout.Dimensions {
-	l := material.Label(u.th, sp, s)
-	l.Font, l.Color = f, c
+// text is one line of text, or wrapped lines when wrap is set.
+func (u *ui) text(gtx layout.Context, c color.NRGBA, s string, wrap bool) layout.Dimensions {
+	l := material.Label(u.th, textSize, s)
+	l.Font, l.Color = mono, c
+	if !wrap {
+		l.MaxLines = 1
+	}
 	return l.Layout(gtx)
 }
+
+// line lays out spans side by side on one line, the last one truncated.
+func (u *ui) line(gtx layout.Context, spans ...span) layout.Dimensions {
+	ch := make([]layout.FlexChild, len(spans))
+	for i, s := range spans {
+		w := func(gtx layout.Context) layout.Dimensions { return u.text(gtx, s.c, s.s, false) }
+		if i == len(spans)-1 {
+			ch[i] = layout.Flexed(1, w)
+		} else {
+			ch[i] = layout.Rigid(w)
+		}
+	}
+	return layout.Flex{}.Layout(gtx, ch...)
+}
+
+type span struct {
+	c color.NRGBA
+	s string
+}
+
+var (
+	page = layout.Inset{Left: 12, Right: 12, Top: 8}
+	row  = layout.Inset{Top: 10, Bottom: 10}
+)
 
 func (u *ui) layoutList(gtx layout.Context) {
 	for i := range u.rows {
@@ -142,63 +181,32 @@ func (u *ui) layoutList(gtx layout.Context) {
 			u.start(&u.apps[i])
 		}
 	}
-	inset := layout.UniformInset(unit.Dp(16))
-	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return inset.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return u.label(gtx, font.Font{Weight: font.Bold}, 28, fg, "CX Playground")
-					}),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						s := fmt.Sprintf("%d apps, each named by the SHA-256 of its manifest, verified chunk by chunk", len(u.apps))
-						if len(u.errs) > 0 {
-							s += fmt.Sprintf(", %d failed verification", len(u.errs))
-						}
-						return u.label(gtx, font.Font{}, 14, dim, s)
-					}),
-				)
-			})
-		}),
-		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-			return material.List(u.th, &u.list).Layout(gtx, len(u.apps), func(gtx layout.Context, i int) layout.Dimensions {
-				return layout.Inset{Left: 12, Right: 12, Bottom: 10}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					return u.row(gtx, i)
+	page.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				s := fmt.Sprintf("  %d apps", len(u.apps))
+				if len(u.errs) > 0 {
+					s += fmt.Sprintf(", %d failed verification", len(u.errs))
+				}
+				return row.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return u.line(gtx, span{fg, "CX Playground"}, span{dim, s})
 				})
-			})
-		}),
-	)
-}
-
-func (u *ui) row(gtx layout.Context, i int) layout.Dimensions {
-	a := u.apps[i]
-	return u.rows[i].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		m := op.Record(gtx.Ops)
-		dims := layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			gtx.Constraints.Min.X = gtx.Constraints.Max.X
-			kind := a.Manifest.Kind
-			if kind == "" {
-				kind = "console"
-			}
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return u.label(gtx, font.Font{Weight: font.Bold}, 19, fg, a.Manifest.Name)
-				}),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return u.label(gtx, font.Font{}, 14, dim, kind+" · "+a.Manifest.Description)
-				}),
-				layout.Rigid(layout.Spacer{Height: 4}.Layout),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return u.label(gtx, mono, 11, hashCol, string(a.Hash))
-				}),
-			)
-		})
-		call := m.Stop()
-		rr := gtx.Dp(8)
-		defer clip.UniformRRect(image.Rectangle{Max: dims.Size}, rr).Push(gtx.Ops).Pop()
-		paint.Fill(gtx.Ops, panel)
-		call.Add(gtx.Ops)
-		return dims
+			}),
+			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+				return u.list.Layout(gtx, len(u.apps), func(gtx layout.Context, i int) layout.Dimensions {
+					a := u.apps[i]
+					return u.rows[i].Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+						gtx.Constraints.Min.X = gtx.Constraints.Max.X
+						return row.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+							return u.line(gtx,
+								span{dim, fmt.Sprintf("%2d  ", i+1)},
+								span{fg, a.Manifest.Name + "  "},
+								span{dim, a.Manifest.Description})
+						})
+					})
+				})
+			}),
+		)
 	})
 }
 
@@ -283,30 +291,51 @@ func (u *ui) layoutRun(gtx layout.Context) {
 	)
 }
 
+// topBar shows the app's name and state, then its manifest hash and details,
+// which the list leaves out.
 func (u *ui) topBar(gtx layout.Context, done bool) layout.Dimensions {
-	return layout.UniformInset(unit.Dp(8)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
+	m := u.cur.Manifest
+	kind := m.Kind
+	if kind == "" {
+		kind = "console"
+	}
+	var size int64
+	for _, f := range m.Files {
+		size += f.Size
+	}
+	state := "running"
+	if done {
+		state = u.result
+	} else if u.leaveReq {
+		state = "stopping when the program returns"
+	}
+	return page.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				b := material.Button(u.th, &u.back, "‹ Apps")
-				b.Background = panel
-				return b.Layout(gtx)
+				return row.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return layout.Flex{}.Layout(gtx,
+						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+							return u.back.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+								return u.text(gtx, link, "< apps  ", false)
+							})
+						}),
+						layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
+							return u.line(gtx, span{fg, m.Name})
+						}),
+					)
+				})
 			}),
-			layout.Rigid(layout.Spacer{Width: 12}.Layout),
-			layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
-				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						return u.label(gtx, font.Font{Weight: font.Bold}, 17, fg, u.cur.Manifest.Name)
-					}),
-					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						s := "running"
-						if done {
-							s = u.result
-						} else if u.leaveReq {
-							s = "stopping when the program returns"
-						}
-						return u.label(gtx, font.Font{}, 13, dim, s)
-					}),
-				)
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return u.text(gtx, dim, state, false)
+			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return u.text(gtx, dim, "sha256 "+string(u.cur.Hash), true)
+			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				s := fmt.Sprintf("%s  %s  %d files  %d bytes", kind, m.Entry, len(m.Files), size)
+				return row.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					return u.text(gtx, dim, s, false)
+				})
 			}),
 		)
 	})
@@ -314,9 +343,9 @@ func (u *ui) topBar(gtx layout.Context, done bool) layout.Dimensions {
 
 func (u *ui) layoutConsole(gtx layout.Context) layout.Dimensions {
 	lines := strings.Split(strings.TrimRight(u.out.String(), "\n"), "\n")
-	return material.List(u.th, &u.scrl).Layout(gtx, len(lines), func(gtx layout.Context, i int) layout.Dimensions {
-		return layout.Inset{Left: 12, Right: 12, Top: 2}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			return u.label(gtx, mono, 14, fg, lines[i])
+	return layout.Inset{Left: 12, Right: 12}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		return u.scrl.Layout(gtx, len(lines), func(gtx layout.Context, i int) layout.Dimensions {
+			return u.text(gtx, fg, lines[i], true)
 		})
 	})
 }
@@ -420,8 +449,7 @@ func draw(gtx layout.Context, shaper *text.Shaper, cmds []cxrun.Cmd) {
 			mat := m.Stop()
 			g := gtx
 			g.Constraints = layout.Constraints{Max: image.Pt(max(gtx.Constraints.Max.X-int(p[0]), 1), max(gtx.Constraints.Max.Y, 1))}
-			sp := unit.Sp(c.Width / gtx.Metric.PxPerSp)
-			widget.Label{}.Layout(g, shaper, font.Font{}, sp, c.Text, mat)
+			widget.Label{}.Layout(g, shaper, mono, textSize, c.Text, mat)
 			t.Pop()
 		}
 	}

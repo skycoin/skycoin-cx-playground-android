@@ -31,8 +31,8 @@ into a manifest:
 
 Each file is split into `chunk_size` pieces, the last one shorter, and
 `chunks` lists the SHA-256 of each piece in order. The app hash is the
-SHA-256 of the manifest bytes exactly as encoded. The home screen lists apps
-by that hash.
+SHA-256 of the manifest bytes exactly as encoded. The home screen lists one
+line per app, and an opened app shows its hash and manifest details.
 
 A bundle is content addressed: `index.txt` lists app hashes, `m/<hash>.json`
 holds manifests and `c/<hash>` holds chunks. The app embeds the bundle built
@@ -59,7 +59,8 @@ Programs draw a display list that the host renders with Gio's GPU renderer
 | --- | --- |
 | `app.ScreenSize() (w, h i32)` | canvas size in pixels |
 | `app.Clear(r, g, b)` | start a frame |
-| `app.Rect`, `app.Circle`, `app.Line`, `app.Tri`, `app.Text` | shapes and text, colours as r, g, b, a in 0..1 |
+| `app.Rect`, `app.Circle`, `app.Line`, `app.Tri` | shapes, colours as r, g, b, a in 0..1 |
+| `app.Text(s, x, y, size, r, g, b, a)` | draws in the app font at its one size, `size` is ignored |
 | `app.Frame()` | show the frame, paced by the display |
 | `app.PollEvent() (kind i32, x, y f32, code i32)` | `app.TOUCH_DOWN`, `TOUCH_MOVE`, `TOUCH_UP`, `KEY`, `RESIZE`, or `app.NONE` |
 | `app.ShowKeyboard()`, `app.HideKeyboard()` | the soft keyboard |
@@ -75,3 +76,9 @@ closes the app. The bundled apps are all compiled by `make test`.
 
 A program cannot be interrupted. Back stops a `gfx` program at its next
 `app.ShouldClose()`; a console program runs to the end first.
+
+## Look
+
+The whole UI, CX `app.Text` included, is JetBrains Mono at one size on a
+dark background, plain text lines with no boxes. The font is under the SIL
+Open Font License 1.1, see `cmd/cxplayground/font/OFL.txt`.
