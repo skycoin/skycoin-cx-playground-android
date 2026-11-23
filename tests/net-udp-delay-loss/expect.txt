@@ -1,0 +1,4 @@
+out loss detected
+out delay detected
+finished app="Network: UDP delay and loss" err=<nil>
+file-contains udp.pcap ping 1

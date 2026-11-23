@@ -1,0 +1,5 @@
+# A console app: the start line marks it ready. The echo server runs in the
+# rig container, which the emulator reaches as 10.0.2.2.
+ready start app="Network: TCP echo"
+echo-server 7001
+timeout 60

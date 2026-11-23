@@ -181,6 +181,7 @@ func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, ski
 	}
 	stamp := time.Now().Format("20060102-150405")
 	s.dev, s.appID, s.results = &o.dev, o.appID, filepath.Join(o.results, stamp)
+	s.rig, s.repo = &o.rig, o.repo
 	if err := os.MkdirAll(s.results, 0o755); err != nil {
 		return err
 	}

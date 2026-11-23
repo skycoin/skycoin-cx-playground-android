@@ -1,0 +1,2 @@
+out tcp echoed 5 of 5
+finished app="Network: TCP echo" err=<nil>

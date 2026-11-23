@@ -107,6 +107,10 @@ package with `import "sys/app"`.
 | `app.ShouldClose() bool` | the user pressed back |
 | `app.Rune(code i32) str` | a key code as text, as `sprintf` has no `%c` |
 | `app.CellSize() (w, h f32)` | the advance and line height of one character of the app font, the cell of a terminal grid |
+| `app.NetDial(network, address str) (conn i32, err str)` | a `tcp` or `udp` connection, `err` is "" when it worked |
+| `app.NetSend(conn i32, data str) (err str)` | writes data, one datagram for UDP |
+| `app.NetRecv(conn i32, timeoutMs i32) (data str, err str)` | what arrived, one datagram for UDP, `err` is `timeout` when nothing did |
+| `app.NetClose(conn i32)` | closes it, as the end of the program does |
 
 Console output from `printf` and `string.PrintLine` is shown on screen, and so
 are compile and runtime errors.
@@ -171,6 +175,18 @@ the comparison. `suite -update-references` writes the captured regions to
 | `setprop <name> <value>` | sets a property before the start and clears it after |
 | `before <command>`, `after <command>` | device shell commands around the test |
 | `timeout <seconds>` | for `wait-for` and the checks, 10 by default |
+| `echo-server <port>` | runs `net-echo-server` on that TCP and UDP port in the rig container, which the emulator reaches as 10.0.2.2 |
+| `netem <args>` | `tc qdisc ... netem <args>` on the packets of that port in both directions, for example `delay 200ms loss 30%` |
+| `capture <file>` | `tcpdump` of the packets of that port, pulled as `<file>` for the `file-` checks |
+
+The network settings act on the container's loopback, where the emulator's
+user mode network meets the echo server, so they need the rig container
+(`--cap-add NET_ADMIN`, and `iproute2` and `tcpdump` in the image) and do not
+work against a phone. A TAP device for the emulator (`-net-tap`) would replace
+that user mode network, and the Android image would then need DHCP, DNS and a
+router on the TAP side as well. The emulator console's `network delay` and
+`network speed` have no loss. tc netem on the container side gives delay, loss
+and capture of the same packets with none of that, so the rig uses it.
 
 The app enters test mode when the system property `debug.cxplayground.test`
 is 1, and `debug.cxplayground.autostart` names an app to run at launch. Test
@@ -209,7 +225,11 @@ suite at once with that many runs.
 | `cx-ir-key-input` | the `ui-key-input` program serialized, with the checks of `ui-key-input` |
 | `forth-grid-text` | Forth text at grid rows and columns, `KEY` waits for ENTER |
 | `forth-key-echo` | typed keys reach Forth `KEY` and are echoed line by line |
+| `net-tcp-echo` | five lines through the TCP echo server on the host |
+| `net-udp-echo` | 20 datagrams through the UDP echo server, no loss and no delay |
+| `net-udp-delay-loss` | the same program with 200 ms delay and 30% loss each way, reports both, and the capture holds its datagrams |
 | `cx-forms-same-output` (go) | the bundled apps of each form print the expected files on the host |
+| `net-echo-on-host` (go) | the network programs against `netecho` on the host |
 
 ## Benchmark suite
 

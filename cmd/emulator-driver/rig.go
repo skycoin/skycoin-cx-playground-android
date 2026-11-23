@@ -33,7 +33,7 @@ func (r *rigContainer) start(ctx context.Context, d *device) (bootResult, error)
 	var res bootResult
 	begin := time.Now()
 	out, err := exec.CommandContext(ctx, "docker", "run", "-d", "--name", r.name,
-		"--device", "/dev/kvm", "--memory", r.memory, "--memory-swap", r.memory,
+		"--device", "/dev/kvm", "--cap-add", "NET_ADMIN", "--memory", r.memory, "--memory-swap", r.memory,
 		"-p", "127.0.0.1:"+r.adbPort+":15555", "-p", "127.0.0.1:"+r.console+":15554",
 		r.image).CombinedOutput()
 	if err != nil {

@@ -191,7 +191,7 @@ func compileWith(files map[string][]byte, entry string, opts Options, h Host, ou
 	defer restore()
 
 	host, cmds = h, cmds[:0]
-	defer func() { host = nil }()
+	defer func() { host = nil; netCloseAll() }()
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("cx panic: %v", r)

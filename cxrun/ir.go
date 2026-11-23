@@ -47,7 +47,7 @@ func RunIRWith(program []byte, executor Executor, opts Options, h Host, out io.W
 	}
 	defer restore()
 	host, cmds = h, cmds[:0]
-	defer func() { host = nil }()
+	defer func() { host = nil; netCloseAll() }()
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("cx panic: %v", r)

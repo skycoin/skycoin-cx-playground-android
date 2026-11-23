@@ -23,6 +23,7 @@ import (
 //	                           clear it after the test
 //	before <shell command>     run on the device before the start
 //	after <shell command>      run on the device after the test
+//	echo-server, netem, capture see net.go
 //	timeout <seconds>          for wait-for steps and the expected output,
 //	                           10 by default
 const settingsFile = "emulator.txt"
@@ -40,6 +41,7 @@ type testFolder struct {
 	before  []string
 	after   []string
 	timeout time.Duration
+	net     netSettings
 	steps   []inputStep
 	expect  []expectation
 }
@@ -124,6 +126,12 @@ func (t *testFolder) parseSettings(r io.Reader) error {
 			t.before = append(t.before, rest)
 		case "after":
 			t.after = append(t.after, rest)
+		case "echo-server":
+			t.net.echoPort = rest
+		case "netem":
+			t.net.netem = rest
+		case "capture":
+			t.net.capture = rest
 		case "timeout":
 			s, err := strconv.Atoi(rest)
 			if err != nil || s <= 0 {

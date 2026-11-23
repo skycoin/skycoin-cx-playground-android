@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Network: UDP echo",
+  "description": "Test demo: 20 datagrams through the echo server on the host",
+  "kind": "console",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 1219,
+      "sha256": "15656af255adc86a655e0ef28796e43ffbea3341143a1bae3e08b8734c157a6b",
+      "chunks": [
+        "15656af255adc86a655e0ef28796e43ffbea3341143a1bae3e08b8734c157a6b"
+      ]
+    }
+  ]
+}

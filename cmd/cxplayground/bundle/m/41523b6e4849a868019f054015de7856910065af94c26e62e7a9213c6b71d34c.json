@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Network: TCP echo",
+  "description": "Test demo: five lines through the echo server on the host",
+  "kind": "console",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 778,
+      "sha256": "66e4dbdf1e7b06f31b933091c80218fd0a2001ab2bd797a97e200a64f15bbac3",
+      "chunks": [
+        "66e4dbdf1e7b06f31b933091c80218fd0a2001ab2bd797a97e200a64f15bbac3"
+      ]
+    }
+  ]
+}

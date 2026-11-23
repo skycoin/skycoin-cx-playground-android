@@ -47,6 +47,10 @@ func register(p *cxast.CXProgram) {
 	fn("ShouldClose", opShouldClose, nil, in(boolean))
 	fn("Rune", opRune, in(i32), in(str))
 	fn("CellSize", opCellSize, nil, in(f32, f32))
+	fn("NetDial", opNetDial, in(str, str), in(i32, str))
+	fn("NetSend", opNetSend, in(i32, str), in(str))
+	fn("NetRecv", opNetRecv, in(i32, i32), in(str, str))
+	fn("NetClose", opNetClose, in(i32), nil)
 
 	for i, c := range []struct {
 		name string

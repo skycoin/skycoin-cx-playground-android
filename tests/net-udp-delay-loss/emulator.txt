@@ -1,0 +1,9 @@
+# tc netem delays each packet of port 7001 by 200 ms and drops 30%, both ways,
+# and tcpdump captures them.
+# A console app: the start line marks it ready. The echo server runs in the
+# rig container, which the emulator reaches as 10.0.2.2.
+ready start app="Network: UDP delay and loss"
+echo-server 7001
+timeout 60
+netem delay 200ms loss 30%
+capture udp.pcap

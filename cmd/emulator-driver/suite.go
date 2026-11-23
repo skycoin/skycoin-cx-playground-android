@@ -26,6 +26,8 @@ type session struct {
 	// updateReferences writes the screen-matches captures to expected/
 	// instead of comparing them.
 	updateReferences bool
+	rig              *rigContainer // nil when the device is not the rig
+	repo             string
 }
 
 // buildAPK builds an x86_64 debug APK with the repository's make apk.
@@ -58,7 +60,20 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 	if err != nil {
 		return []string{err.Error()}
 	}
+	var netStop func() (string, error)
+	stopNet := func() string {
+		if netStop == nil {
+			return ""
+		}
+		path, err := netStop()
+		netStop = nil
+		if err != nil {
+			fail("network settings: %v", err)
+		}
+		return path
+	}
 	finish := func() {
+		stopNet()
 		d.stopApp(ctx, s.appID)
 		if err := table.timed("uninstall", func() error { return d.uninstall(ctx, s.appID) }); err != nil {
 			fail("uninstall: %v", err)
@@ -89,6 +104,14 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 	for _, c := range t.before {
 		if _, err := d.shell(ctx, c); err != nil {
 			fail("before %s: %v", c, err)
+		}
+	}
+	if t.net.used() {
+		var err error
+		if netStop, err = s.netSetup(ctx, t, out); err != nil {
+			fail("network settings: %v", err)
+			finish()
+			return failures
 		}
 	}
 	startBegin := time.Now()
@@ -177,6 +200,9 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 		}
 	}
 
+	if path := stopNet(); path != "" {
+		pulled[t.net.capture] = path
+	}
 	expectCtx, cancel := context.WithTimeout(ctx, t.timeout)
 	for {
 		missing := unmatchedText(t.expect, w.traces())

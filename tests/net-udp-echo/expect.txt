@@ -1,0 +1,4 @@
+out udp received 20 of 20
+out no loss
+out no delay
+finished app="Network: UDP echo" err=<nil>

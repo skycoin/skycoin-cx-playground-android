@@ -38,13 +38,15 @@ install: apk ## Install the APK on the adb device and start it
 	adb shell am start -n $(APPID)/org.gioui.GioActivity
 
 RIG_IMAGE ?= cx-android-rig
+# Extra driver flags, e.g. -container and the ports for a second rig.
+EMULATOR_FLAGS ?=
 
 emulator-image: ## Build the headless Android emulator image
 	docker build -t $(RIG_IMAGE) docker/emulator
 
 emulator-smoke: ## Boot the rig, build the APK, run every emulator test in tests/, stop the rig
 	docker image inspect $(RIG_IMAGE) > /dev/null 2>&1 || $(MAKE) emulator-image
-	go run ./cmd/emulator-driver suite -boot -stop -image $(RIG_IMAGE)
+	go run ./cmd/emulator-driver suite -boot -stop -image $(RIG_IMAGE) $(EMULATOR_FLAGS)
 
 collector: ## Build the benchmark results collector
 	go build -o build/benchmark-collector ./cmd/benchmark-collector
