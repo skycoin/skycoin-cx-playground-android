@@ -1,0 +1,24 @@
+package main
+
+import "sys/string"
+
+// Port of memory_set of memory.h, as test/host/mock_memory.c implements it:
+// 16 entries with keys of up to 31 bytes and values of up to 511 bytes. A
+// full store drops the value and still reports success, like the mock.
+func memorySet(key str, value str) (stored bool) {
+	stored = false
+	if string.ByteLength(key) == 0 {
+		return
+	}
+	stored = true
+	var index i32 = memoryFind(key)
+	if index >= 0 {
+		gAgentState.memoryValues[index] = truncateBytes(value, ZclawMemoryValueLength)
+		return
+	}
+	if len(gAgentState.memoryKeys) >= ZclawMemorySlots {
+		return
+	}
+	gAgentState.memoryKeys = append(gAgentState.memoryKeys, truncateBytes(key, ZclawMemoryKeyLength))
+	gAgentState.memoryValues = append(gAgentState.memoryValues, truncateBytes(value, ZclawMemoryValueLength))
+}

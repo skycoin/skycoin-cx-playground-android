@@ -1,0 +1,9 @@
+package main
+
+import "sys/string"
+
+// Port of agent_parse_persona_name of agent_prompt.c. The port keeps the
+// persona as its name, which agent_persona_name maps the enum to.
+func agentParsePersonaName(name str) (known bool) {
+	known = string.EqualityByByteValue(name, "neutral") || string.EqualityByByteValue(name, "friendly") || string.EqualityByByteValue(name, "technical") || string.EqualityByByteValue(name, "witty")
+}

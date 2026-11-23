@@ -1,0 +1,8 @@
+package main
+
+import "sys/string"
+
+// Port of agent_is_cron_trigger_message of agent_commands.c.
+func agentIsCronTrigger(message str) (trigger bool) {
+	trigger = string.ByteIndexOfFirstSubstring(agentSkipWhitespace(message), "[CRON ") == 0
+}

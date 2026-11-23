@@ -1,0 +1,47 @@
+package main
+
+import "sys/string"
+
+// Port of build_anthropic_request of json_util.c, printed as
+// cJSON_PrintUnformatted prints it. The user message is already in the
+// history and there are no user tools. A tool_use input that cJSON_Parse
+// would reject, because history_add cut it, is sent as {}.
+func jsonBuildRequest(systemPrompt str, history []ConversationMessage, tools []ToolDefinition) (request str) {
+	request = joinStrings([]str{"{\"model\":", jsonEscapeString(ZclawModel), ",\"max_tokens\":", i32.str(ZclawMaxTokens), ",\"system\":", jsonEscapeString(systemPrompt), ",\"messages\":["})
+	var written i32 = 0
+	for i := 0; i < len(history); i++ {
+		var message ConversationMessage = history[i]
+		var text str = ""
+		if message.toolUse {
+			var input str = message.content
+			if message.truncated {
+				input = "{}"
+			} else {
+				compact, after := jsonCompactValue(input, 0)
+				input = compact
+			}
+			text = joinStrings([]str{"{\"role\":", jsonEscapeString(message.role), ",\"content\":[{\"type\":\"tool_use\",\"id\":", jsonEscapeString(message.toolId), ",\"name\":", jsonEscapeString(message.toolName), ",\"input\":", input, "}]}"})
+		} else if message.toolResult {
+			if historyHasPriorToolUse(history, i, message.toolId) {
+				text = joinStrings([]str{"{\"role\":", jsonEscapeString(message.role), ",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":", jsonEscapeString(message.toolId), ",\"content\":", jsonEscapeString(message.content), "}]}"})
+			}
+		} else {
+			text = joinStrings([]str{"{\"role\":", jsonEscapeString(message.role), ",\"content\":", jsonEscapeString(message.content), "}"})
+		}
+		if string.ByteLength(text) > 0 {
+			if written > 0 {
+				request = string.Concatenation(request, ",")
+			}
+			request = string.Concatenation(request, text)
+			written++
+		}
+	}
+	request = string.Concatenation(request, "],\"tools\":[")
+	for i := 0; i < len(tools); i++ {
+		if i > 0 {
+			request = string.Concatenation(request, ",")
+		}
+		request = string.Concatenation(request, joinStrings([]str{"{\"name\":", jsonEscapeString(tools[i].name), ",\"description\":", jsonEscapeString(tools[i].description), ",\"input_schema\":", tools[i].inputSchemaJson, "}"}))
+	}
+	request = string.Concatenation(request, "]}")
+}

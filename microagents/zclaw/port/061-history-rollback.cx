@@ -1,0 +1,13 @@
+package main
+
+// Port of history_rollback_to of agent.c.
+func historyRollback(marker i32) {
+	if marker < 0 || marker >= len(gAgentState.history) {
+		return
+	}
+	var history []ConversationMessage
+	for i := 0; i < marker; i++ {
+		history = append(history, gAgentState.history[i])
+	}
+	gAgentState.history = history
+}

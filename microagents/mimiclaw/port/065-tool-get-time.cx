@@ -1,0 +1,25 @@
+package main
+
+import "sys/string"
+
+// Port of tool_get_time_execute and fetch_time_direct of
+// tools/tool_get_time.c: a HEAD request to MimiTimeUrl, whose Date header
+// gives the time. The proxy path is left out, as http_proxy is not enabled.
+func toolGetTime(inputJson str) (output str) {
+	succeeded, date := netHead(MimiTimeUrl)
+	var errorName str = ""
+	if !succeeded {
+		errorName = "ESP_FAIL"
+	} else if string.ByteLength(date) == 0 {
+		errorName = "ESP_ERR_NOT_FOUND"
+	} else {
+		formatted, parsed := timeParseHttpDate(date)
+		if !parsed {
+			errorName = "ESP_FAIL"
+		} else {
+			output = formatted
+			return
+		}
+	}
+	output = joinStrings([]str{"Error: failed to fetch time (", errorName, ")"})
+}

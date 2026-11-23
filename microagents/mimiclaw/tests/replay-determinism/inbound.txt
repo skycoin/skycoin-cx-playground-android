@@ -1,0 +1,4 @@
+telegram	42	Hello there
+telegram	42	What is the time now? Also read /spiffs/notes.md
+telegram	42	Thanks, bye
+telegram	42	This one fails [[status 529]]

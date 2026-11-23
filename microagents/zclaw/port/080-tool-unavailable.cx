@@ -1,0 +1,8 @@
+package main
+
+// The result of a built-in tool that the port does not implement. The host
+// harness of the original links handlers that print the same text.
+func toolUnavailable(name str) (ok bool, result str) {
+	ok = false
+	result = joinStrings([]str{"Error: tool '", name, "' is not available in the host build"})
+}

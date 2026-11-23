@@ -1,0 +1,19 @@
+package main
+
+// The static state of agent.c and ratelimit.c, and the key value store of
+// memory.c as the host mock keeps it.
+type AgentState struct {
+	history []ConversationMessage
+	persona str
+	paused bool
+	lastStartResponseUs i64
+	lastNonCommandResponseUs i64
+	lastNonCommandText str
+	requestsThisHour i32
+	requestsToday i32
+	lastHour i64
+	lastDay i64
+	lastYear i64
+	memoryKeys []str
+	memoryValues []str
+}

@@ -1,0 +1,26 @@
+package main
+
+import "sys/string"
+
+// netHead is the network wrapper for one HTTP HEAD request whose Date
+// header the agent reads. The tape record holds the URL, "ok" or "error",
+// and the Date value.
+func netHead(url str) (succeeded bool, date str) {
+	if gWrapperState.mode == WrapperModeReplay {
+		var fields []str = tapeNext("net-head", 4)
+		if !string.EqualityByByteValue(fields[1], url) {
+			fatalStop(joinStrings([]str{"net-head to '", url, "', the tape has '", fields[1], "'"}))
+		}
+		succeeded = string.EqualityByByteValue(fields[2], "ok")
+		date = fields[3]
+		return
+	}
+	succeeded, date = liveNetHead(url)
+	if gWrapperState.mode == WrapperModeRecord {
+		var outcome str = "error"
+		if succeeded {
+			outcome = "ok"
+		}
+		tapeRecord([]str{"net-head", url, outcome, date})
+	}
+}

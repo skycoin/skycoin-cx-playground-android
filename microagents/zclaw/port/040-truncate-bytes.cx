@@ -1,0 +1,12 @@
+package main
+
+import "sys/string"
+
+// truncateBytes keeps the first limit bytes of s, as strncpy or snprintf
+// into a buffer of limit + 1 bytes does. It may cut a UTF-8 sequence, as C does.
+func truncateBytes(s str, limit i32) (kept str) {
+	kept = s
+	if string.ByteLength(s) > limit {
+		kept = string.SubstringByByteRange(s, 0, limit)
+	}
+}

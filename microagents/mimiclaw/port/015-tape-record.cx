@@ -1,0 +1,14 @@
+package main
+
+import "sys/string"
+
+func tapeRecord(fields []str) {
+	var line str = ""
+	for i := 0; i < len(fields); i++ {
+		if i > 0 {
+			line = string.Concatenation(line, "\t")
+		}
+		line = string.Concatenation(line, tapeEscape(fields[i]))
+	}
+	gWrapperState.recordedTape = string.Concatenation(gWrapperState.recordedTape, string.Concatenation(line, "\n"))
+}

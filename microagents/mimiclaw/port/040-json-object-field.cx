@@ -1,0 +1,34 @@
+package main
+
+import "sys/string"
+
+// jsonObjectField finds the member name of the object at position and
+// returns the position of its value.
+func jsonObjectField(s str, position i32, name str) (valuePosition i32, found bool) {
+	found = false
+	valuePosition = -1
+	var count i32 = string.ByteLength(s)
+	var i i32 = jsonSkipSpace(s, position)
+	if !string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 1), "{") {
+		return
+	}
+	i = jsonSkipSpace(s, i + 1)
+	for i < count {
+		if !string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 1), "\"") {
+			return
+		}
+		key, afterKey := jsonScanString(s, i)
+		i = jsonSkipSpace(s, afterKey) + 1
+		i = jsonSkipSpace(s, i)
+		if string.EqualityByByteValue(key, name) {
+			valuePosition = i
+			found = true
+			return
+		}
+		i = jsonSkipSpace(s, jsonSkipValue(s, i))
+		if !string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 1), ",") {
+			return
+		}
+		i = jsonSkipSpace(s, i + 1)
+	}
+}

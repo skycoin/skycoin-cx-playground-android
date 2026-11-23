@@ -1,0 +1,14 @@
+package main
+
+// Port of conversation_msg_t of json_util.h. truncated is set when content
+// was cut to fit, which makes the tool input of a tool_use message invalid
+// JSON for cJSON_Parse.
+type ConversationMessage struct {
+	role str
+	content str
+	truncated bool
+	toolUse bool
+	toolResult bool
+	toolId str
+	toolName str
+}

@@ -1,0 +1,10 @@
+package main
+
+// Port of channel_msg_t of messages.h, with the uptime at which the message
+// arrived, which esp_timer_get_time returns while it is processed.
+type InboundMessage struct {
+	source str
+	chatId i64
+	uptimeUs i64
+	text str
+}

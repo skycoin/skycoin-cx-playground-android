@@ -1,0 +1,8 @@
+package main
+
+import "sys/string"
+
+// Port of is_whitespace_char of agent_commands.c for the one byte string c.
+func agentIsWhitespace(c str) (whitespace bool) {
+	whitespace = string.EqualityByByteValue(c, " ") || string.EqualityByByteValue(c, "\t") || string.EqualityByByteValue(c, "\r") || string.EqualityByByteValue(c, "\n")
+}

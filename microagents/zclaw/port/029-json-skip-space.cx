@@ -1,0 +1,16 @@
+package main
+
+import "sys/string"
+
+func jsonSkipSpace(s str, position i32) (next i32) {
+	var count i32 = string.ByteLength(s)
+	next = position
+	for next < count {
+		var c str = string.SubstringByByteRange(s, next, next + 1)
+		if string.EqualityByByteValue(c, " ") || string.EqualityByByteValue(c, "\n") || string.EqualityByByteValue(c, "\r") || string.EqualityByByteValue(c, "\t") {
+			next++
+		} else {
+			return
+		}
+	}
+}

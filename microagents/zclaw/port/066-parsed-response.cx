@@ -1,0 +1,11 @@
+package main
+
+// The outputs of json_parse_response of json_util.c. toolInput is the
+// printed input of the tool_use block, or "" where the C code holds NULL.
+type ParsedResponse struct {
+	parsed bool
+	text str
+	toolName str
+	toolId str
+	toolInput str
+}

@@ -1,0 +1,8 @@
+package main
+
+// formatDate is localtime_r followed by strftime "%Y-%m-%d".
+func formatDate(epoch i64) (formatted str) {
+	offset, zoneName := localTimeOffset(epoch)
+	year, month, day := civilDate((epoch + offset) / 86400L)
+	formatted = joinStrings([]str{i64.str(year), "-", padTwo(month), "-", padTwo(day)})
+}

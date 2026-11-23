@@ -1,0 +1,44 @@
+package main
+
+import "sys/string"
+
+// Port of parse_and_set_time of tools/tool_get_time.c for a Date header such
+// as "Sun, 23 Nov 2026 02:09:49 GMT". The sscanf format
+// "%*[^,], %d %3s %d %d:%d:%d" is read field by field. The C code switches
+// TZ to MimiTimezone once the month is known, before it checks the time,
+// and formats in that zone. settimeofday is left out: the clock wrapper is
+// the clock.
+func timeParseHttpDate(date str) (formatted str, parsed bool) {
+	var months []str = []str{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+	formatted = ""
+	parsed = false
+	var comma i32 = string.ByteIndexOfFirstSubstring(date, ",")
+	if comma < 1 {
+		return
+	}
+	var words []str = httpDateWords(string.SubstringByByteRange(date, comma + 1, string.ByteLength(date)))
+	if len(words) < 9 || !string.EqualityByByteValue(words[4], ":") || !string.EqualityByByteValue(words[6], ":") {
+		return
+	}
+	var month i64 = -1L
+	for i := 0; i < 12; i++ {
+		if string.EqualityByByteValue(words[1], months[i]) {
+			month = i32.i64(i + 1)
+		}
+	}
+	if month < 0L {
+		return
+	}
+	gLocalTimezone = MimiTimezone
+	var day i64 = string.ParseDecimalI64(words[0])
+	var year i64 = string.ParseDecimalI64(words[2])
+	var hour i64 = string.ParseDecimalI64(words[3])
+	var minute i64 = string.ParseDecimalI64(words[5])
+	var second i64 = string.ParseDecimalI64(words[7])
+	var epoch i64 = daysFromCivil(year, month, day) * 86400L + hour * 3600L + minute * 60L + second
+	if epoch < 0L {
+		return
+	}
+	formatted = formatDateTime(epoch)
+	parsed = true
+}

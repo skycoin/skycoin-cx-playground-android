@@ -1,0 +1,23 @@
+package main
+
+import "sys/string"
+
+// Port of tools_memory_delete_handler of tools_memory.c.
+func toolMemoryDelete(inputJson str) (ok bool, result str) {
+	ok = false
+	key, keyFound := jsonStringField(inputJson, 0, "key")
+	if !keyFound {
+		result = "Error: 'key' required (string)"
+		return
+	}
+	result = toolKeyCheck(key, "delete")
+	if string.ByteLength(result) > 0 {
+		return
+	}
+	ok = true
+	if memoryDelete(key) {
+		result = joinStrings([]str{"Deleted: ", key})
+	} else {
+		result = joinStrings([]str{"Key not found: ", key})
+	}
+}

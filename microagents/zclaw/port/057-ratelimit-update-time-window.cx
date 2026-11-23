@@ -1,0 +1,24 @@
+package main
+
+// Port of update_time_window of ratelimit.c. localtime_r runs in UTC, the
+// default timezone; set_timezone is not ported.
+func ratelimitUpdateTimeWindow() {
+	var now i64 = clockNow()
+	var days i64 = now / 86400L
+	year, month, day := civilDate(days)
+	var currentHour i64 = (now % 86400L) / 3600L
+	var currentDay i64 = days - daysFromCivil(year, 1L, 1L)
+	var currentYear i64 = year - 1900L
+	if currentHour != gAgentState.lastHour {
+		gAgentState.requestsThisHour = 0
+		gAgentState.lastHour = currentHour
+	}
+	if currentDay != gAgentState.lastDay || currentYear != gAgentState.lastYear {
+		gAgentState.requestsToday = 0
+		gAgentState.lastDay = currentDay
+		gAgentState.lastYear = currentYear
+		var dayStored bool = memorySet("rl_day", i64.str(currentDay))
+		var yearStored bool = memorySet("rl_year", i64.str(currentYear))
+		var dailyStored bool = memorySet("rl_daily", "0")
+	}
+}

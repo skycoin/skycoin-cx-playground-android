@@ -1,0 +1,39 @@
+package main
+
+import "sys/string"
+
+// inboundNext is the wrapper for the input queue that agent_task reads.
+// Live messages come from the ++inbound file, one per line as source
+// (telegram or channel), chat id, arrival uptime in milliseconds and text,
+// separated by tabs. The uptime is an input of the message: the agent's
+// clock does not move while it processes one.
+func inboundNext() (message InboundMessage, found bool) {
+	found = false
+	if gWrapperState.mode == WrapperModeReplay {
+		var kind str = tapePeekKind()
+		if string.EqualityByByteValue(kind, "inbound-end") {
+			var end []str = tapeNext("inbound-end", 1)
+			return
+		}
+		var fields []str = tapeNext("inbound", 5)
+		message = InboundMessage{source: fields[1], chatId: string.ParseDecimalI64(fields[2]), uptimeUs: string.ParseDecimalI64(fields[3]), text: fields[4]}
+		found = true
+		return
+	}
+	if gWrapperState.inboundPosition >= len(gWrapperState.inboundLines) {
+		if gWrapperState.mode == WrapperModeRecord {
+			tapeRecord([]str{"inbound-end"})
+		}
+		return
+	}
+	var fields []str = tapeSplitFields(gWrapperState.inboundLines[gWrapperState.inboundPosition])
+	gWrapperState.inboundPosition = gWrapperState.inboundPosition + 1
+	if len(fields) != 4 {
+		fatalStop(joinStrings([]str{"inbound line ", i32.str(gWrapperState.inboundPosition), " needs source, chat id, uptime and text"}))
+	}
+	message = InboundMessage{source: fields[0], chatId: string.ParseDecimalI64(fields[1]), uptimeUs: string.ParseDecimalI64(fields[2]) * 1000L, text: fields[3]}
+	found = true
+	if gWrapperState.mode == WrapperModeRecord {
+		tapeRecord([]str{"inbound", message.source, i64.str(message.chatId), i64.str(message.uptimeUs), message.text})
+	}
+}

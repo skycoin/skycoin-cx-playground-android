@@ -1,0 +1,15 @@
+package main
+
+import "sys/string"
+
+// Port of persona_instruction of agent_prompt.c.
+func agentPersonaInstruction(persona str) (instruction str) {
+	instruction = "Use direct, plain wording."
+	if string.EqualityByByteValue(persona, "friendly") {
+		instruction = "Use warm, approachable wording while staying concise."
+	} else if string.EqualityByByteValue(persona, "technical") {
+		instruction = "Use precise technical language and concrete terminology."
+	} else if string.EqualityByByteValue(persona, "witty") {
+		instruction = "Use a lightly witty tone; at most one brief witty flourish per reply."
+	}
+}

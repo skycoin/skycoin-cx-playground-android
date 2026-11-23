@@ -1,0 +1,36 @@
+package main
+
+// Port of config.h for the anthropic backend with its default model, and of
+// the parts of nvs_keys.h, memory_keys.h and mock_memory.c the port uses.
+
+var ZclawApiUrl str = "https://api.anthropic.com/v1/messages"
+var ZclawModel str = "claude-sonnet-4-6"
+var ZclawMaxTokens i32 = 1024
+var ZclawResponseBufferSize i32 = 16384
+var ZclawChannelReceiveBufferSize i32 = 512
+var ZclawChannelSendBufferSize i32 = 1024
+var ZclawToolResultBufferSize i32 = 512
+var ZclawMaxHistoryMessages i32 = 24
+var ZclawMaxMessageLength i32 = 1024
+var ZclawToolIdLength i32 = 64
+var ZclawToolNameLength i32 = 32
+var ZclawMaxToolRounds i32 = 5
+var ZclawTelegramMaxMessageLength i32 = 4096
+var ZclawStartCooldownMs i64 = 30000L
+var ZclawMessageReplayCooldownMs i64 = 20000L
+var ZclawLlmMaxRetries i32 = 3
+var ZclawRateLimitMaxPerHour i32 = 100
+var ZclawRateLimitMaxPerDay i32 = 1000
+var ZclawSystemPromptBufferSize i32 = 2048
+var ZclawSystemPrompt str = "You are zclaw, an AI agent running on an ESP32 with 400KB RAM and FreeRTOS. You run on the device, not in a cloud session. Be concise. Return plain text only, never markdown. Use tools to control hardware, memory, schedules, personas, and custom tools. When asked for multiple GPIO states, prefer one gpio_read_all call. Use persona tools only when the user explicitly asks to view, set, or reset persona. Do not change persona from casual wording. When asked what is saved or set on the device, verify with tools. When a custom tool returns an action, carry it out with built-in tools."
+var ZclawDeviceTarget str = "esp32-family"
+var ZclawGpioMinPin i32 = 2
+var ZclawGpioMaxPin i32 = 10
+var ZclawNvsMaxKeyLength i32 = 15
+var ZclawNvsMaxValueLength i32 = 512
+var ZclawUserMemoryKeyPrefix str = "u_"
+var ZclawMemorySlots i32 = 16
+var ZclawMemoryKeyLength i32 = 31
+var ZclawMemoryValueLength i32 = 511
+var ZclawSourceChannel str = "channel"
+var ZclawSourceTelegram str = "telegram"

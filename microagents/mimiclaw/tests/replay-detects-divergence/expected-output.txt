@@ -1,0 +1,3 @@
+--- outbound channel=telegram chat_id=42 bytes=22
+🐱mimi is working...
+FATAL net-request body of 7277 bytes differs from the 7277 recorded bytes

@@ -1,0 +1,10 @@
+package main
+
+import "sys/string"
+import "sys/os"
+
+// fatalStop ends the run when a replay no longer matches its tape.
+func fatalStop(reason str) {
+	string.PrintLine(string.Concatenation("FATAL ", reason))
+	os.Exit(3)
+}

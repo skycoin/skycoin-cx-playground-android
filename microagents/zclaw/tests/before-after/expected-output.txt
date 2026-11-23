@@ -1,0 +1,220 @@
+--- channel bytes=610
+zclaw online.
+
+Talk to me in normal language. You do not need command syntax.
+
+Examples:
+- what are all GPIO states
+- turn GPIO 5 on
+- remind me daily at 8:15 to water plants
+- remember that GPIO 4 controls the arcade machine
+- create a tool called arcade_on that turns GPIO 4 on
+- turn the arcade on in 10 minutes
+- switch to witty persona
+
+Chat commands:
+- /help (show this message)
+- /settings (show status)
+- /stop (pause intake)
+- /resume (resume)
+
+USB local admin commands:
+- /gpio [all|pin|pin high|pin low]
+- /diag [scope] [verbose]
+- /reboot
+- /wifi [status|scan]
+- /bootcount
+- /factory-reset confirm
+--- telegram chat_id=777 bytes=610
+zclaw online.
+
+Talk to me in normal language. You do not need command syntax.
+
+Examples:
+- what are all GPIO states
+- turn GPIO 5 on
+- remind me daily at 8:15 to water plants
+- remember that GPIO 4 controls the arcade machine
+- create a tool called arcade_on that turns GPIO 4 on
+- turn the arcade on in 10 minutes
+- switch to witty persona
+
+Chat commands:
+- /help (show this message)
+- /settings (show status)
+- /stop (pause intake)
+- /resume (resume)
+
+USB local admin commands:
+- /gpio [all|pin|pin high|pin low]
+- /diag [scope] [verbose]
+- /reboot
+- /wifi [status|scan]
+- /bootcount
+- /factory-reset confirm
+--- channel bytes=83
+Stub f10bf6cc1b3e: you said "Hello zclaw". I see 1 message(s) in this conversation.
+--- telegram chat_id=777 bytes=83
+Stub f10bf6cc1b3e: you said "Hello zclaw". I see 1 message(s) in this conversation.
+--- channel bytes=83
+Stub 5021468f30f0: you said "Hello zclaw". I see 3 message(s) in this conversation.
+--- telegram chat_id=777 bytes=83
+Stub 5021468f30f0: you said "Hello zclaw". I see 3 message(s) in this conversation.
+--- channel bytes=72
+Stub 9d39ca57994d: the tools returned 1 result(s):
+Saved: u_locker = B12
+--- telegram chat_id=777 bytes=72
+Stub 9d39ca57994d: the tools returned 1 result(s):
+Saved: u_locker = B12
+--- channel bytes=65
+Stub 9f0d0e8ac265: the tools returned 1 result(s):
+u_locker = B12
+--- telegram chat_id=777 bytes=65
+Stub 9f0d0e8ac265: the tools returned 1 result(s):
+u_locker = B12
+--- channel bytes=101
+Stub 9346598ec7f9: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- telegram chat_id=777 bytes=101
+Stub 9346598ec7f9: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- channel bytes=84
+Stub ed0515e93c85: the tools returned 1 result(s):
+Error: invalid character in input
+--- telegram chat_id=777 bytes=84
+Stub ed0515e93c85: the tools returned 1 result(s):
+Error: invalid character in input
+--- channel bytes=72
+Stub f4b78c4e3e59: the tools returned 1 result(s):
+Persona set to witty.
+--- telegram chat_id=777 bytes=72
+Stub f4b78c4e3e59: the tools returned 1 result(s):
+Persona set to witty.
+--- channel bytes=362
+zclaw settings:
+- Message intake: active
+- Persona: neutral
+- Chat commands: /start, /help, /settings, /stop, /resume
+- USB local admin: /gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset
+- /gpio supports reads and writes (e.g. /gpio 9 low)
+- Persona changes: ask in normal chat (handled via tool calls)
+- Device settings are global (e.g., timezone <name>)
+--- telegram chat_id=777 bytes=362
+zclaw settings:
+- Message intake: active
+- Persona: neutral
+- Chat commands: /start, /help, /settings, /stop, /resume
+- USB local admin: /gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset
+- /gpio supports reads and writes (e.g. /gpio 9 low)
+- Persona changes: ask in normal chat (handled via tool calls)
+- Device settings are global (e.g., timezone <name>)
+--- channel bytes=110
+Stub 74d4198319c0: the tools returned 1 result(s):
+Error: tool 'gpio_write' is not available in the host build
+--- telegram chat_id=777 bytes=110
+Stub 74d4198319c0: the tools returned 1 result(s):
+Error: tool 'gpio_write' is not available in the host build
+--- channel bytes=68
+Stub fe67e0394bcc: the tools returned 1 result(s):
+Deleted: u_locker
+--- telegram chat_id=777 bytes=68
+Stub fe67e0394bcc: the tools returned 1 result(s):
+Deleted: u_locker
+--- channel bytes=46
+Error: Failed to contact LLM API after retries
+--- telegram chat_id=777 bytes=46
+Error: Failed to contact LLM API after retries
+--- channel bytes=55
+zclaw paused. I will ignore new messages until /resume.
+--- telegram chat_id=777 bytes=55
+zclaw paused. I will ignore new messages until /resume.
+--- channel bytes=44
+zclaw resumed. Send /start for command help.
+--- telegram chat_id=777 bytes=44
+zclaw resumed. Send /start for command help.
+--- channel bytes=610
+zclaw online.
+
+Talk to me in normal language. You do not need command syntax.
+
+Examples:
+- what are all GPIO states
+- turn GPIO 5 on
+- remind me daily at 8:15 to water plants
+- remember that GPIO 4 controls the arcade machine
+- create a tool called arcade_on that turns GPIO 4 on
+- turn the arcade on in 10 minutes
+- switch to witty persona
+
+Chat commands:
+- /help (show this message)
+- /settings (show status)
+- /stop (pause intake)
+- /resume (resume)
+
+USB local admin commands:
+- /gpio [all|pin|pin high|pin low]
+- /diag [scope] [verbose]
+- /reboot
+- /wifi [status|scan]
+- /bootcount
+- /factory-reset confirm
+--- telegram chat_id=0 bytes=610
+zclaw online.
+
+Talk to me in normal language. You do not need command syntax.
+
+Examples:
+- what are all GPIO states
+- turn GPIO 5 on
+- remind me daily at 8:15 to water plants
+- remember that GPIO 4 controls the arcade machine
+- create a tool called arcade_on that turns GPIO 4 on
+- turn the arcade on in 10 minutes
+- switch to witty persona
+
+Chat commands:
+- /help (show this message)
+- /settings (show status)
+- /stop (pause intake)
+- /resume (resume)
+
+USB local admin commands:
+- /gpio [all|pin|pin high|pin low]
+- /diag [scope] [verbose]
+- /reboot
+- /wifi [status|scan]
+- /bootcount
+- /factory-reset confirm
+--- channel bytes=73
+Error: local admin commands are only available on the USB serial console.
+--- telegram chat_id=777 bytes=73
+Error: local admin commands are only available on the USB serial console.
+--- channel bytes=183
+Stub 2dc64bb32729: the tools returned 1 result(s):
+Error: cron_set is not allowed during scheduled task execution. Execute the scheduled action now instead of creating a new schedule.
+--- telegram chat_id=0 bytes=183
+Stub 2dc64bb32729: the tools returned 1 result(s):
+Error: cron_set is not allowed during scheduled task execution. Execute the scheduled action now instead of creating a new schedule.
+--- channel bytes=76
+Stub 149703f02607: the tools returned 1 result(s):
+Persona reset to neutral.
+--- telegram chat_id=777 bytes=76
+Stub 149703f02607: the tools returned 1 result(s):
+Persona reset to neutral.
+--- channel bytes=76
+Stub 78ae85ee5210: the tools returned 1 result(s):
+Persona set to technical.
+--- telegram chat_id=777 bytes=76
+Stub 78ae85ee5210: the tools returned 1 result(s):
+Persona set to technical.
+--- channel bytes=73
+Stub f27eb2d8a061: the tools returned 1 result(s):
+Unknown tool: fly_away
+--- telegram chat_id=777 bytes=73
+Stub f27eb2d8a061: the tools returned 1 result(s):
+Unknown tool: fly_away
+--- channel bytes=112
+Stub 95ed3c1dca69: you said "Last one, how many messages do you see?". I see 23 message(s) in this conversation.
+--- telegram chat_id=777 bytes=112
+Stub 95ed3c1dca69: you said "Last one, how many messages do you see?". I see 23 message(s) in this conversation.

@@ -1,0 +1,19 @@
+package main
+
+// Port of tools_set_persona_handler of tools_persona.c.
+func toolSetPersona(inputJson str) (ok bool, result str) {
+	ok = false
+	persona, found := jsonStringField(inputJson, 0, "persona")
+	if !found {
+		result = "Error: 'persona' required (string)"
+		return
+	}
+	canonical, known := canonicalizePersonaName(persona)
+	if !known {
+		result = joinStrings([]str{"Error: unknown persona '", persona, "' (use neutral, friendly, technical, witty)"})
+		return
+	}
+	var stored bool = memorySet("persona", canonical)
+	result = joinStrings([]str{"Persona set to ", canonical, "."})
+	ok = true
+}

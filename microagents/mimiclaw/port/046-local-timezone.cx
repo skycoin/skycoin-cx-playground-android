@@ -1,0 +1,5 @@
+package main
+
+// The TZ environment variable of the agent. It starts unset, which is UTC,
+// and get_current_time sets it to MimiTimezone, as tool_get_time.c does.
+var gLocalTimezone str = "UTC0"

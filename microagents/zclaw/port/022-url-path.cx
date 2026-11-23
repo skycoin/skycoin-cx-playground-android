@@ -1,0 +1,17 @@
+package main
+
+import "sys/string"
+
+// urlPath returns the path of url, from the first slash after the host.
+func urlPath(url str) (path str) {
+	var rest str = url
+	var scheme i32 = string.ByteIndexOfFirstSubstring(rest, "://")
+	if scheme >= 0 {
+		rest = string.SubstringByByteRange(rest, scheme + 3, string.ByteLength(rest))
+	}
+	var slash i32 = string.ByteIndexOfFirstSubstring(rest, "/")
+	path = "/"
+	if slash >= 0 {
+		path = string.SubstringByByteRange(rest, slash, string.ByteLength(rest))
+	}
+}

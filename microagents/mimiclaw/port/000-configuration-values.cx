@@ -1,0 +1,20 @@
+package main
+
+// Port of mimi_config.h and the channel names of bus/message_bus.h, for the
+// anthropic provider with the build-time defaults.
+
+var MimiModel str = "claude-opus-4-5"
+var MimiMaxTokens i32 = 4096
+var MimiLlmApiUrl str = "https://api.anthropic.com/v1/messages"
+var MimiAgentMaxHistory i32 = 20
+var MimiAgentMaxToolIterations i32 = 10
+var MimiMaxToolCalls i32 = 4
+var MimiTimezone str = "PST8PDT,M3.2.0,M11.1.0"
+var MimiTimeUrl str = "https://api.telegram.org/"
+var MimiSpiffsMemoryDirectory str = "/spiffs/memory"
+var MimiSpiffsSessionDirectory str = "/spiffs/sessions"
+var MimiMemoryFile str = "/spiffs/memory/MEMORY.md"
+var MimiSoulFile str = "/spiffs/config/SOUL.md"
+var MimiUserFile str = "/spiffs/config/USER.md"
+var MimiChannelTelegram str = "telegram"
+var MimiChannelSystem str = "system"

@@ -1,0 +1,22 @@
+package main
+
+// Port of agent_task of agent.c, with the state agent_test_reset and the
+// static initializers of agent.c and ratelimit.c give. It returns when the
+// input queue is empty instead of blocking.
+func agentLoopRun() {
+	gAgentState.persona = "neutral"
+	gAgentState.paused = false
+	gAgentState.lastStartResponseUs = 0L
+	gAgentState.lastNonCommandResponseUs = 0L
+	gAgentState.lastNonCommandText = ""
+	gAgentState.requestsThisHour = 0
+	gAgentState.requestsToday = 0
+	gAgentState.lastHour = -1L
+	gAgentState.lastDay = -1L
+	gAgentState.lastYear = -1L
+	message, found := inboundNext()
+	for found {
+		processMessage(message)
+		message, found = inboundNext()
+	}
+}

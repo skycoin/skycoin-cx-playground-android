@@ -1,0 +1,8 @@
+package main
+
+// Port of mimi_msg_t of bus/message_bus.h.
+type InboundMessage struct {
+	channel str
+	chatId str
+	content str
+}

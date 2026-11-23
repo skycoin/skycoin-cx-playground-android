@@ -1,0 +1,24 @@
+telegram	777	1000	/start
+telegram	777	2000	/start
+telegram	777	3000	Hello zclaw
+telegram	777	4000	Hello zclaw
+telegram	777	30000	Hello zclaw
+telegram	777	31000	Remember my locker [[tool memory_set {"key":"u_locker","value":"B12"}]]
+telegram	777	32000	What is in it? [[tool memory_get {"key":"u_locker"}]]
+telegram	777	33000	[[tool memory_set {"key":"wifi_pass","value":"x"}]]
+telegram	777	34000	[[tool memory_set {"key":"u_city","value":"Zürich"}]]
+telegram	777	35000	Be witty [[tool set_persona {"persona":"Witty"}]]
+telegram	777	36000	/settings
+telegram	777	37000	Lamp on [[tool gpio_write {"pin":5,"state":1}]]
+telegram	777	38000	Two tools [[tool get_persona]] [[tool memory_delete {"key":"u_locker"}]]
+telegram	777	39000	This one fails [[status 529]]
+telegram	777	40000	/stop
+telegram	777	41000	Are you there?
+telegram	777	42000	/resume
+channel	0	43000	/help
+telegram	777	44000	/reboot
+channel	0	45000	[CRON 1] water the plants [[tool cron_set {"type":"once","action":"water"}]]
+telegram	777	46000	Back to normal [[tool reset_persona]]
+telegram	777	47000	[[tool set_persona {"persona":"technical"}]]
+telegram	777	48000	Unknown [[tool fly_away {}]]
+telegram	777	49000	Last one, how many messages do you see?

@@ -1,0 +1,20 @@
+package main
+
+import "sys/os"
+
+// liveFileWrite writes content as raw bytes. os.WriteStr would add a length
+// prefix, so the bytes go through os.WriteUI8Slice.
+func liveFileWrite(path str, content str) (written bool) {
+	written = false
+	var handle i32 = os.Create(path)
+	if handle < 0 {
+		return
+	}
+	var bytes []ui8 = stringToBytes(content)
+	written = true
+	if len(bytes) > 0 {
+		written = os.WriteUI8Slice(handle, bytes)
+	}
+	var closed bool = os.Close(handle)
+	written = written && closed
+}

@@ -1,0 +1,16 @@
+package main
+
+import "sys/string"
+
+// Port of append_turn_context_prompt of agent/agent_loop.c.
+func agentTurnContext(prompt str, message InboundMessage) (extended str) {
+	var channel str = message.channel
+	if string.ByteLength(channel) == 0 {
+		channel = "(unknown)"
+	}
+	var chatId str = message.chatId
+	if string.ByteLength(chatId) == 0 {
+		chatId = "(empty)"
+	}
+	extended = string.Concatenation(prompt, joinStrings([]str{"\n## Current Turn Context\n- source_channel: ", channel, "\n- source_chat_id: ", chatId, "\n- If using cron_add for Telegram in this turn, set channel='telegram' and chat_id to source_chat_id.\n- Never use chat_id 'cron' for Telegram messages.\n"}))
+}

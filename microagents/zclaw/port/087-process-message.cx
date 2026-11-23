@@ -1,0 +1,77 @@
+package main
+
+import "sys/string"
+
+// Port of process_message of agent.c, with the reply chat id of
+// response_chat_id_for_source. Local admin commands on the serial console
+// (/gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset) drive the
+// hardware and are not ported; from Telegram they are refused, as in C.
+func processMessage(message InboundMessage) {
+	var text str = message.text
+	var chatId i64 = 0L
+	if string.EqualityByByteValue(message.source, ZclawSourceTelegram) {
+		chatId = message.chatId
+	}
+	var nonCommand bool = !agentIsSlashCommand(text)
+	if agentIsCommand(text, "resume") {
+		if !gAgentState.paused {
+			sendResponse("zclaw is already active.", chatId)
+			return
+		}
+		gAgentState.paused = false
+		sendResponse("zclaw resumed. Send /start for command help.", chatId)
+		return
+	}
+	if agentIsCommand(text, "settings") {
+		handleSettingsCommand(chatId)
+		return
+	}
+	if localAdminIsCommand(text) {
+		if !string.EqualityByByteValue(message.source, ZclawSourceChannel) {
+			sendResponse("Error: local admin commands are only available on the USB serial console.", chatId)
+			return
+		}
+		fatalStop("local admin commands on the serial console are not ported")
+	}
+	if gAgentState.paused {
+		return
+	}
+	if agentIsCommand(text, "help") {
+		handleStartCommand(chatId)
+		return
+	}
+	if agentIsCommand(text, "stop") {
+		gAgentState.paused = true
+		sendResponse("zclaw paused. I will ignore new messages until /resume.", chatId)
+		return
+	}
+	var now i64 = message.uptimeUs
+	if agentIsCommand(text, "start") {
+		var sinceLastStartMs i64 = 0L
+		if gAgentState.lastStartResponseUs > 0L && now > gAgentState.lastStartResponseUs {
+			sinceLastStartMs = (now - gAgentState.lastStartResponseUs) / 1000L
+		}
+		if gAgentState.lastStartResponseUs > 0L && sinceLastStartMs < ZclawStartCooldownMs {
+			return
+		}
+		gAgentState.lastStartResponseUs = now
+		handleStartCommand(chatId)
+		return
+	}
+	if nonCommand {
+		var sinceLastMs i64 = 0L
+		if gAgentState.lastNonCommandResponseUs > 0L && now > gAgentState.lastNonCommandResponseUs {
+			sinceLastMs = (now - gAgentState.lastNonCommandResponseUs) / 1000L
+		}
+		if string.ByteLength(gAgentState.lastNonCommandText) > 0 && string.EqualityByByteValue(text, gAgentState.lastNonCommandText) && gAgentState.lastNonCommandResponseUs > 0L && sinceLastMs < ZclawMessageReplayCooldownMs {
+			return
+		}
+	}
+	if !agentRunTurn(message, chatId) {
+		return
+	}
+	if nonCommand {
+		gAgentState.lastNonCommandText = truncateBytes(text, ZclawChannelReceiveBufferSize - 1)
+		gAgentState.lastNonCommandResponseUs = now
+	}
+}

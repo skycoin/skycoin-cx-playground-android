@@ -1,0 +1,62 @@
+package main
+
+import "sys/string"
+
+// The model part of process_message of agent.c: add the message to the
+// history, then up to MAX_TOOL_ROUNDS rounds of request, retry, parse and
+// tool call. It returns false when the turn ended early with an error.
+func agentRunTurn(message InboundMessage, chatId i64) (completed bool) {
+	completed = false
+	var turnStart i32 = len(gAgentState.history)
+	var cronTrigger bool = agentIsCronTrigger(message.text)
+	var tools []ToolDefinition = toolDefinitions()
+	historyAdd("user", message.text, false, false, "", "")
+	var rounds i32 = 0
+	var done bool = false
+	for !done && rounds < ZclawMaxToolRounds {
+		rounds++
+		var request str = jsonBuildRequest(agentBuildSystemPrompt(gAgentState.persona), gAgentState.history, tools)
+		allowed, reason := ratelimitCheck()
+		if !allowed {
+			historyRollback(turnStart)
+			sendResponse(reason, chatId)
+			return
+		}
+		var succeeded bool = false
+		var response str = ""
+		for attempt := 0; attempt < ZclawLlmMaxRetries && !succeeded; attempt++ {
+			succeeded, response = llmRequest(request)
+		}
+		if !succeeded {
+			historyRollback(turnStart)
+			sendResponse("Error: Failed to contact LLM API after retries", chatId)
+			return
+		}
+		ratelimitRecordRequest()
+		var parsed ParsedResponse = jsonParseResponse(response)
+		if !parsed.parsed {
+			historyRollback(turnStart)
+			sendResponse("Error: Failed to parse LLM response", chatId)
+			return
+		}
+		if string.ByteLength(parsed.toolName) > 0 && string.ByteLength(parsed.toolInput) > 0 {
+			historyAdd("assistant", parsed.toolInput, true, false, parsed.toolId, parsed.toolName)
+			var result str = agentToolResult(parsed, cronTrigger)
+			historyAdd("user", result, false, true, parsed.toolId, "")
+		} else {
+			var text str = parsed.text
+			if string.ByteLength(text) == 0 {
+				text = "(No response from Claude)"
+			}
+			historyAdd("assistant", text, false, false, "", "")
+			sendResponse(text, chatId)
+			done = true
+		}
+	}
+	if !done {
+		historyAdd("assistant", "(Reached max tool iterations)", false, false, "", "")
+		sendResponse("(Reached max tool iterations)", chatId)
+		return
+	}
+	completed = true
+}

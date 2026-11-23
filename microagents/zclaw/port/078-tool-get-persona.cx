@@ -1,0 +1,16 @@
+package main
+
+// Port of tools_get_persona_handler and load_current_persona of
+// tools_persona.c. memory_get fills a 24 byte buffer.
+func toolGetPersona(inputJson str) (ok bool, result str) {
+	var current str = "neutral"
+	stored, found := memoryGet("persona")
+	if found {
+		canonical, known := canonicalizePersonaName(truncateBytes(stored, 23))
+		if known {
+			current = canonical
+		}
+	}
+	result = joinStrings([]str{"Current persona: ", current, ". Available: neutral, friendly, technical, witty."})
+	ok = true
+}

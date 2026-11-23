@@ -1,0 +1,8 @@
+package main
+
+// Port of tools_reset_persona_handler of tools_persona.c.
+func toolResetPersona(inputJson str) (ok bool, result str) {
+	var stored bool = memorySet("persona", "neutral")
+	result = "Persona reset to neutral."
+	ok = true
+}

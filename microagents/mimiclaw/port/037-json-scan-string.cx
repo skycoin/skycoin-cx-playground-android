@@ -1,0 +1,57 @@
+package main
+
+import "sys/string"
+
+// jsonScanString decodes the JSON string that starts at the quote at position.
+func jsonScanString(s str, position i32) (value str, next i32) {
+	var count i32 = string.ByteLength(s)
+	var i i32 = position + 1
+	var runStart i32 = i
+	value = ""
+	for i < count {
+		var c str = string.SubstringByByteRange(s, i, i + 1)
+		if string.EqualityByByteValue(c, "\"") {
+			value = string.Concatenation(value, string.SubstringByByteRange(s, runStart, i))
+			next = i + 1
+			return
+		}
+		if string.EqualityByByteValue(c, "\\") {
+			value = string.Concatenation(value, string.SubstringByByteRange(s, runStart, i))
+			var e str = string.SubstringByByteRange(s, i + 1, i + 2)
+			i = i + 2
+			if string.EqualityByByteValue(e, "n") {
+				value = string.Concatenation(value, "\n")
+			} else if string.EqualityByByteValue(e, "t") {
+				value = string.Concatenation(value, "\t")
+			} else if string.EqualityByByteValue(e, "r") {
+				value = string.Concatenation(value, "\r")
+			} else if string.EqualityByByteValue(e, "b") {
+				value = string.Concatenation(value, "\010")
+			} else if string.EqualityByByteValue(e, "f") {
+				value = string.Concatenation(value, "\014")
+			} else if string.EqualityByByteValue(e, "u") {
+				var code i32 = jsonHexFour(s, i)
+				i = i + 4
+				if code >= 55296 && code < 56320 {
+					if string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 2), "\\u") {
+						var low i32 = jsonHexFour(s, i + 2)
+						if low >= 56320 && low < 57344 {
+							code = 65536 + (code - 55296) * 1024 + (low - 56320)
+							i = i + 6
+						}
+					}
+				}
+				if code >= 0 {
+					value = string.Concatenation(value, utf8Encode(code))
+				}
+			} else {
+				value = string.Concatenation(value, e)
+			}
+			runStart = i
+		} else {
+			i++
+		}
+	}
+	value = string.Concatenation(value, string.SubstringByByteRange(s, runStart, count))
+	next = count
+}

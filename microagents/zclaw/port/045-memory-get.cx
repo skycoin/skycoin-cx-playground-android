@@ -1,0 +1,18 @@
+package main
+
+import "sys/string"
+
+// Port of memory_get of memory.h, as test/host/mock_memory.c implements it.
+func memoryGet(key str) (value str, found bool) {
+	value = ""
+	found = false
+	if string.ByteLength(key) == 0 {
+		return
+	}
+	var index i32 = memoryFind(key)
+	if index < 0 {
+		return
+	}
+	value = gAgentState.memoryValues[index]
+	found = true
+}

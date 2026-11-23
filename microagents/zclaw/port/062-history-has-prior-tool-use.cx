@@ -1,0 +1,19 @@
+package main
+
+import "sys/string"
+
+// Port of history_has_prior_tool_use of json_util.c. The field goes through
+// a local, since CX gets `s.flag && f()` wrong when flag is a struct field.
+func historyHasPriorToolUse(history []ConversationMessage, index i32, toolId str) (found bool) {
+	found = false
+	if string.ByteLength(toolId) == 0 {
+		return
+	}
+	for i := 0; i < index; i++ {
+		var toolUse bool = history[i].toolUse
+		if toolUse && string.EqualityByByteValue(history[i].toolId, toolId) {
+			found = true
+			return
+		}
+	}
+}

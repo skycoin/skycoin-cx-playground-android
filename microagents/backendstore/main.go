@@ -5,6 +5,7 @@
 //	backendstore serve -store F -mode record|replay [-upstream URL]
 //	backendstore stub
 //	backendstore post -url URL -body FILE
+//	backendstore head -url URL
 //	backendstore list -store F
 //	backendstore stop -url URL
 package main
@@ -51,6 +52,8 @@ func main() {
 		err = runStub(os.Args[2:])
 	case "post":
 		err = runPost(os.Args[2:])
+	case "head":
+		err = runHead(os.Args[2:])
 	case "list":
 		err = runList(os.Args[2:])
 	case "stop":
@@ -65,7 +68,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: backendstore serve|stub|post|list|stop [flags]")
+	fmt.Fprintln(os.Stderr, "usage: backendstore serve|stub|post|head|list|stop [flags]")
 	os.Exit(2)
 }
 
@@ -117,11 +120,9 @@ func (s *memoServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		if status/100 == 2 {
-			if err := s.store(key, body, status, response); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+		if err := s.store(key, body, status, response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -364,14 +365,15 @@ type stubRequest struct {
 	} `json:"messages"`
 }
 
-// StubReplyFor builds the stub reply to an Anthropic Messages request body.
-func StubReplyFor(body []byte) ([]byte, error) {
+// StubReplyFor builds the stub reply to an Anthropic Messages request body
+// and its HTTP status.
+func StubReplyFor(body []byte) (int, []byte, error) {
 	var req stubRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if len(req.Messages) == 0 {
-		return nil, errors.New("no messages")
+		return 0, nil, errors.New("no messages")
 	}
 	tag := RequestKey(body)[:12]
 	reply := stubReply{ID: "msg_stub_" + tag, Type: "message", Role: "assistant", Model: req.Model, StopReason: "end_turn"}
@@ -384,7 +386,7 @@ func StubReplyFor(body []byte) ([]byte, error) {
 			Content string `json:"content"`
 		}
 		if err := json.Unmarshal(last.Content, &blocks); err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		var results []string
 		for _, b := range blocks {
@@ -394,11 +396,20 @@ func StubReplyFor(body []byte) ([]byte, error) {
 		}
 		reply.Content = []stubContentBlock{{Type: "text", Text: fmt.Sprintf(
 			"Stub %s: the tools returned %d result(s):\n%s", tag, len(results), strings.Join(results, "\n---\n"))}}
-		return marshalStub(reply)
+		return marshalStub(http.StatusOK, reply)
+	}
+
+	if status, found := stubStatusDirective(text); found {
+		return marshalStub(status, stubError{Type: "error", Error: stubErrorDetail{Type: "overloaded_error", Message: fmt.Sprintf("Stub %s: status %d", tag, status)}})
+	}
+	calls := stubToolDirectives(text, tag)
+	if len(calls) > 0 {
+		reply.StopReason = "tool_use"
+		reply.Content = append([]stubContentBlock{{Type: "text", Text: "Let me check."}}, calls...)
+		return marshalStub(http.StatusOK, reply)
 	}
 
 	lower := strings.ToLower(text)
-	var calls []stubContentBlock
 	if strings.Contains(lower, "time") {
 		calls = append(calls, stubContentBlock{Type: "tool_use", ID: "toolu_" + tag + "_time", Name: "get_current_time", Input: json.RawMessage(`{}`)})
 	}
@@ -409,11 +420,11 @@ func StubReplyFor(body []byte) ([]byte, error) {
 	if len(calls) > 0 {
 		reply.StopReason = "tool_use"
 		reply.Content = append([]stubContentBlock{{Type: "text", Text: "Let me check."}}, calls...)
-		return marshalStub(reply)
+		return marshalStub(http.StatusOK, reply)
 	}
 	reply.Content = []stubContentBlock{{Type: "text", Text: fmt.Sprintf(
 		"Stub %s: you said \"%s\". I see %d message(s) in this conversation.", tag, text, len(req.Messages))}}
-	return marshalStub(reply)
+	return marshalStub(http.StatusOK, reply)
 }
 
 func pathInput(path string) json.RawMessage {
@@ -421,8 +432,9 @@ func pathInput(path string) json.RawMessage {
 	return input
 }
 
-func marshalStub(reply stubReply) ([]byte, error) {
-	return json.Marshal(reply)
+func marshalStub(status int, reply any) (int, []byte, error) {
+	encoded, err := json.Marshal(reply)
+	return status, encoded, err
 }
 
 type stubServer struct {
@@ -440,12 +452,13 @@ func (s *stubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	reply, err := StubReplyFor(body)
+	status, reply, err := StubReplyFor(body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	w.Write(reply)
 }
 
@@ -460,4 +473,80 @@ func runStub(args []string) error {
 	}
 	server := &stubServer{stopChannel: make(chan struct{})}
 	return serveUntilStop(ln, server, server.stopChannel)
+}
+
+// runHead sends a HEAD request and prints "ok" and the Date header on two
+// lines, or "error" when the request fails. It is the live side of the
+// net-head wrapper, which a port uses for the HTTP Date clock fallback.
+func runHead(args []string) error {
+	flags := flag.NewFlagSet("head", flag.ExitOnError)
+	url := flags.String("url", "", "URL to send HEAD to")
+	flags.Parse(args)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Head(*url)
+	if err != nil {
+		fmt.Println("error")
+		return nil
+	}
+	resp.Body.Close()
+	fmt.Printf("ok\n%s", resp.Header.Get("Date"))
+	return nil
+}
+
+type stubErrorDetail struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+type stubError struct {
+	Type  string          `json:"type"`
+	Error stubErrorDetail `json:"error"`
+}
+
+// stubStatusDirective finds "[[status N]]" in a message. The stub then
+// answers with HTTP status N and an Anthropic error body.
+func stubStatusDirective(text string) (int, bool) {
+	i := strings.Index(text, "[[status ")
+	if i < 0 {
+		return 0, false
+	}
+	rest := text[i+len("[[status "):]
+	end := strings.Index(rest, "]]")
+	if end < 0 {
+		return 0, false
+	}
+	status, err := strconv.Atoi(rest[:end])
+	if err != nil || status < 100 || status > 599 {
+		return 0, false
+	}
+	return status, true
+}
+
+// stubToolDirectives turns each "[[tool NAME JSON]]" in a message into a
+// tool_use block, so a test can make the stub call any tool of any agent.
+func stubToolDirectives(text, tag string) []stubContentBlock {
+	var calls []stubContentBlock
+	rest := text
+	for {
+		i := strings.Index(rest, "[[tool ")
+		if i < 0 {
+			return calls
+		}
+		rest = rest[i+len("[[tool "):]
+		end := strings.Index(rest, "]]")
+		if end < 0 {
+			return calls
+		}
+		directive := rest[:end]
+		rest = rest[end+2:]
+		name, input, _ := strings.Cut(directive, " ")
+		if input == "" {
+			input = "{}"
+		}
+		var compact bytes.Buffer
+		if json.Compact(&compact, []byte(input)) != nil {
+			continue
+		}
+		calls = append(calls, stubContentBlock{Type: "tool_use", ID: fmt.Sprintf("toolu_%s_%d", tag, len(calls)+1), Name: name, Input: json.RawMessage(compact.Bytes())})
+	}
 }

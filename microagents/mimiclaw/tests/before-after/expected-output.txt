@@ -1,0 +1,37 @@
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub 0888f2f637f1: you said "Hi, I am Sam". I see 1 message(s) in this conversation.
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=83
+Stub 5681a04b9b0d: the tools returned 1 result(s):
+2026-11-23 02:45:17 PST (Monday)
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=116
+Stub 9991deb0ef3f: the tools returned 1 result(s):
+# Memory
+- Sam drinks tea at 16:00.
+- Sam's cat is called Pixel.
+
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 9062db1e17cc: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=110
+Stub 4e393b2fbf70: the tools returned 1 result(s):
+Error: tool 'gpio_write' is not available in the host build
+--- outbound channel=websocket chat_id=ws1 bytes=22
+🐱mimi is working...
+--- outbound channel=websocket chat_id=ws1 bytes=141
+Stub edcfb7c5ceea: you said "Unicode: café — naïve ✓, a tab	here, <b>&</b> and a \ backslash". I see 1 message(s) in this conversation.
+--- outbound channel=system chat_id=heartbeat bytes=90
+Stub 1d86e6adebcd: you said "Check HEARTBEAT.md". I see 1 message(s) in this conversation.
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=30
+Sorry, I encountered an error.

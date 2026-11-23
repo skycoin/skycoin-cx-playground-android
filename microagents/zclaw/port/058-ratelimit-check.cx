@@ -1,0 +1,17 @@
+package main
+
+// Port of ratelimit_check of ratelimit.c.
+func ratelimitCheck() (allowed bool, reason str) {
+	ratelimitUpdateTimeWindow()
+	allowed = false
+	reason = ""
+	if gAgentState.requestsThisHour >= ZclawRateLimitMaxPerHour {
+		reason = joinStrings([]str{"Rate limited: ", i32.str(gAgentState.requestsThisHour), "/", i32.str(ZclawRateLimitMaxPerHour), " requests this hour. Try again later."})
+		return
+	}
+	if gAgentState.requestsToday >= ZclawRateLimitMaxPerDay {
+		reason = joinStrings([]str{"Daily limit reached: ", i32.str(gAgentState.requestsToday), "/", i32.str(ZclawRateLimitMaxPerDay), " requests today. Resets at midnight."})
+		return
+	}
+	allowed = true
+}

@@ -1,0 +1,14 @@
+package main
+
+import "sys/string"
+
+// agentSkipWhitespace returns message without its leading white space, the
+// while loop that starts each function of agent_commands.c.
+func agentSkipWhitespace(message str) (rest str) {
+	var count i32 = string.ByteLength(message)
+	var i i32 = 0
+	for i < count && agentIsWhitespace(string.SubstringByByteRange(message, i, i + 1)) {
+		i++
+	}
+	rest = string.SubstringByByteRange(message, i, count)
+}

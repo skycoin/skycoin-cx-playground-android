@@ -1,0 +1,6 @@
+package main
+
+// Port of handle_start_command of agent.c.
+func handleStartCommand(chatId i64) {
+	sendResponse("zclaw online.\n\nTalk to me in normal language. You do not need command syntax.\n\nExamples:\n- what are all GPIO states\n- turn GPIO 5 on\n- remind me daily at 8:15 to water plants\n- remember that GPIO 4 controls the arcade machine\n- create a tool called arcade_on that turns GPIO 4 on\n- turn the arcade on in 10 minutes\n- switch to witty persona\n\nChat commands:\n- /help (show this message)\n- /settings (show status)\n- /stop (pause intake)\n- /resume (resume)\n\nUSB local admin commands:\n- /gpio [all|pin|pin high|pin low]\n- /diag [scope] [verbose]\n- /reboot\n- /wifi [status|scan]\n- /bootcount\n- /factory-reset confirm", chatId)
+}

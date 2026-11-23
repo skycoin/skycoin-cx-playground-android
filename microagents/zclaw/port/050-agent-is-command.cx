@@ -1,0 +1,29 @@
+package main
+
+import "sys/string"
+
+// Port of agent_is_command of agent_commands.c: "/<name>", "/<name> payload"
+// and "/<name>@bot payload".
+func agentIsCommand(message str, name str) (command bool) {
+	command = false
+	var rest str = agentSkipWhitespace(message)
+	var count i32 = string.ByteLength(rest)
+	var nameLength i32 = string.ByteLength(name)
+	if nameLength == 0 || count == 0 || !string.EqualityByByteValue(string.SubstringByByteRange(rest, 0, 1), "/") {
+		return
+	}
+	if count < 1 + nameLength || !string.EqualityByByteValue(string.SubstringByByteRange(rest, 1, 1 + nameLength), name) {
+		return
+	}
+	var cursor i32 = 1 + nameLength
+	if cursor == count {
+		command = true
+		return
+	}
+	var next str = string.SubstringByByteRange(rest, cursor, cursor + 1)
+	if agentIsWhitespace(next) {
+		command = true
+		return
+	}
+	command = string.EqualityByByteValue(next, "@") && cursor + 1 < count
+}

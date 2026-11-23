@@ -1,0 +1,38 @@
+--- channel bytes=74
+Stub cfd929676ad5: you said "Hi". I see 1 message(s) in this conversation.
+--- telegram chat_id=5 bytes=74
+Stub cfd929676ad5: you said "Hi". I see 1 message(s) in this conversation.
+--- channel bytes=78
+Stub 52237ad802b5: the tools returned 1 result(s):
+Saved: u_note = tea at four
+--- telegram chat_id=5 bytes=78
+Stub 52237ad802b5: the tools returned 1 result(s):
+Saved: u_note = tea at four
+--- channel bytes=71
+Stub 9db585c0971f: the tools returned 1 result(s):
+u_note = tea at four
+--- telegram chat_id=5 bytes=71
+Stub 9db585c0971f: the tools returned 1 result(s):
+u_note = tea at four
+--- channel bytes=362
+zclaw settings:
+- Message intake: active
+- Persona: neutral
+- Chat commands: /start, /help, /settings, /stop, /resume
+- USB local admin: /gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset
+- /gpio supports reads and writes (e.g. /gpio 9 low)
+- Persona changes: ask in normal chat (handled via tool calls)
+- Device settings are global (e.g., timezone <name>)
+--- telegram chat_id=0 bytes=362
+zclaw settings:
+- Message intake: active
+- Persona: neutral
+- Chat commands: /start, /help, /settings, /stop, /resume
+- USB local admin: /gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset
+- /gpio supports reads and writes (e.g. /gpio 9 low)
+- Persona changes: ask in normal chat (handled via tool calls)
+- Device settings are global (e.g., timezone <name>)
+--- channel bytes=79
+Stub 358c338f8511: you said "Thanks". I see 11 message(s) in this conversation.
+--- telegram chat_id=5 bytes=79
+Stub 358c338f8511: you said "Thanks". I see 11 message(s) in this conversation.

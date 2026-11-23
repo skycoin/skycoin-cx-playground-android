@@ -1,0 +1,14 @@
+package main
+
+import "sys/string"
+
+// Port of memory_keys_is_sensitive of memory_keys.c.
+func memoryKeysIsSensitive(key str) (sensitive bool) {
+	var keys []str = []str{"api_key", "tg_token", "tg_chat_id", "tg_chat_ids", "wifi_pass", "llm_backend", "llm_model", "llm_api_url", "wifi_ssid"}
+	sensitive = false
+	for i := 0; i < len(keys); i++ {
+		if string.EqualityByByteValue(key, keys[i]) {
+			sensitive = true
+		}
+	}
+}

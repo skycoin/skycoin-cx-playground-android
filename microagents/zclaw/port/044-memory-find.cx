@@ -1,0 +1,14 @@
+package main
+
+import "sys/string"
+
+// memoryFind returns the index of key in the store, or -1.
+func memoryFind(key str) (index i32) {
+	index = -1
+	for i := 0; i < len(gAgentState.memoryKeys); i++ {
+		if string.EqualityByByteValue(gAgentState.memoryKeys[i], key) {
+			index = i
+			return
+		}
+	}
+}

@@ -1,0 +1,22 @@
+package main
+
+import "sys/string"
+import "sys/os"
+
+// liveNetHead sends a HEAD request through the backendstore client, which
+// prints "ok" and the Date header, or "error".
+func liveNetHead(url str) (succeeded bool, date str) {
+	succeeded = false
+	date = ""
+	var command str = joinStrings([]str{gWrapperState.clientCommand, " head -url ", url})
+	runError, exitCode, output := os.Run(command, 0, 30000, ".")
+	if runError != 0 || exitCode != 0 {
+		return
+	}
+	var newline i32 = string.ByteIndexOfFirstSubstring(output, "\n")
+	if newline < 0 || !string.EqualityByByteValue(string.SubstringByByteRange(output, 0, newline), "ok") {
+		return
+	}
+	succeeded = true
+	date = string.SubstringByByteRange(output, newline + 1, string.ByteLength(output))
+}

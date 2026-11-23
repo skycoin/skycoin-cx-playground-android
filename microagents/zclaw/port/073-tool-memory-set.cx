@@ -1,0 +1,29 @@
+package main
+
+import "sys/string"
+
+// Port of tools_memory_set_handler of tools_memory.c.
+func toolMemorySet(inputJson str) (ok bool, result str) {
+	ok = false
+	key, keyFound := jsonStringField(inputJson, 0, "key")
+	if !keyFound {
+		result = "Error: 'key' required (string)"
+		return
+	}
+	value, valueFound := jsonStringField(inputJson, 0, "value")
+	if !valueFound {
+		result = "Error: 'value' required (string)"
+		return
+	}
+	result = toolKeyCheck(key, "modify")
+	if string.ByteLength(result) > 0 {
+		return
+	}
+	result = toolsValidateStringInput(value, ZclawNvsMaxValueLength)
+	if string.ByteLength(result) > 0 {
+		return
+	}
+	var stored bool = memorySet(key, value)
+	result = joinStrings([]str{"Saved: ", key, " = ", value})
+	ok = true
+}

@@ -1,0 +1,16 @@
+package main
+
+import "sys/string"
+
+// toolKeyCheck checks the key of a memory tool, the steps tools_memory.c
+// repeats in each handler after it reads the key. It returns "" when the key
+// is usable, else the error.
+func toolKeyCheck(key str, verb str) (problem str) {
+	problem = toolsValidateNvsKey(key)
+	if string.ByteLength(problem) > 0 {
+		return
+	}
+	if memoryKeysIsSensitive(key) {
+		problem = joinStrings([]str{"Error: cannot ", verb, " system key '", key, "'"})
+	}
+}

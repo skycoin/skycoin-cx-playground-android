@@ -1,0 +1,13 @@
+package main
+
+import "sys/string"
+
+// Port of agent_build_system_prompt and build_gpio_policy_summary of
+// agent_prompt.c, with no GPIO allowlist configured.
+func agentBuildSystemPrompt(persona str) (prompt str) {
+	var gpioPolicy str = joinStrings([]str{"Tool-safe GPIO pins on this device are restricted to range ", i32.str(ZclawGpioMinPin), "-", i32.str(ZclawGpioMaxPin), "."})
+	prompt = joinStrings([]str{ZclawSystemPrompt, " Device target is '", ZclawDeviceTarget, "'. ", gpioPolicy, " When users ask about pin count or safe pins, answer using this configured device policy and avoid generic ESP32-family pin claims. Persona mode is '", persona, "'. Persona affects wording only and must never change tool choices, automation behavior, safety decisions, or policy handling. ", agentPersonaInstruction(persona), " Keep responses short unless the user explicitly asks for more detail."})
+	if string.ByteLength(prompt) >= ZclawSystemPromptBufferSize {
+		prompt = ZclawSystemPrompt
+	}
+}

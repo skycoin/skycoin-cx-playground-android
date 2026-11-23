@@ -1,0 +1,8 @@
+package main
+
+// Port of get_date_str of memory/memory_store.c.
+func memoryDateString(daysAgo i32) (date str) {
+	var now i64 = clockNow()
+	now = now - i32.i64(daysAgo) * 86400L
+	date = formatDate(now)
+}

@@ -1,0 +1,23 @@
+package main
+
+import "sys/string"
+
+// Port of tools_validate_string_input of tools_common.c. It returns "" for
+// valid input, else the error. C compares a plain char with 0x20, and char
+// is signed on the x86 host the harness runs on, so every byte from 0x80 up
+// is an invalid character there, as it is here.
+func toolsValidateStringInput(s str, maxLength i32) (problem str) {
+	problem = ""
+	var count i32 = string.ByteLength(s)
+	if count > maxLength {
+		problem = joinStrings([]str{"Error: string too long (max ", i32.str(maxLength), " chars)"})
+		return
+	}
+	for i := 0; i < count; i++ {
+		var code i32 = byteValue(string.SubstringByByteRange(s, i, i + 1))
+		if (code < 32 || code >= 128) && code != 10 && code != 9 && code != 13 {
+			problem = "Error: invalid character in input"
+			return
+		}
+	}
+}

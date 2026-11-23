@@ -1,0 +1,28 @@
+package main
+
+import "sys/string"
+
+// Port of tools_validate_nvs_key and tools_validate_user_memory_key of
+// tools_common.c. It returns "" for a valid key, else the error.
+func toolsValidateNvsKey(key str) (problem str) {
+	problem = ""
+	var count i32 = string.ByteLength(key)
+	if count == 0 {
+		problem = "Error: empty key"
+		return
+	}
+	if count > ZclawNvsMaxKeyLength {
+		problem = joinStrings([]str{"Error: key max ", i32.str(ZclawNvsMaxKeyLength), " chars"})
+		return
+	}
+	for i := 0; i < count; i++ {
+		var code i32 = byteValue(string.SubstringByByteRange(key, i, i + 1))
+		if !((code >= 97 && code <= 122) || (code >= 65 && code <= 90) || (code >= 48 && code <= 57) || code == 95) {
+			problem = "Error: key must be alphanumeric/underscore"
+			return
+		}
+	}
+	if string.ByteIndexOfFirstSubstring(key, ZclawUserMemoryKeyPrefix) != 0 {
+		problem = joinStrings([]str{"Error: key must start with '", ZclawUserMemoryKeyPrefix, "' (user memory only)"})
+	}
+}

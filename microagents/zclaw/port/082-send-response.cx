@@ -1,0 +1,16 @@
+package main
+
+import "sys/string"
+
+// Port of send_response of agent.c with the queues the host harness drains
+// after each message: the channel queue gets the text cut to its buffer,
+// the Telegram queue the text and the chat id. Each queued message is
+// printed, and the printed text is the agent's output.
+func sendResponse(text str, chatId i64) {
+	var channelText str = truncateBytes(text, ZclawChannelSendBufferSize - 1)
+	var telegramText str = truncateBytes(text, ZclawTelegramMaxMessageLength - 1)
+	string.PrintLine(joinStrings([]str{"--- channel bytes=", i32.str(string.ByteLength(channelText))}))
+	string.PrintLine(channelText)
+	string.PrintLine(joinStrings([]str{"--- telegram chat_id=", i64.str(chatId), " bytes=", i32.str(string.ByteLength(telegramText))}))
+	string.PrintLine(telegramText)
+}

@@ -1,0 +1,12 @@
+package main
+
+import "sys/string"
+
+// Port of llm_request of llm.c for the anthropic backend, the part after
+// the HTTP exchange: a status other than 200 fails, and a response that
+// does not fit the response buffer fails as truncated.
+func llmRequest(request str) (succeeded bool, response str) {
+	status, reply := netPost(ZclawApiUrl, request)
+	response = truncateBytes(reply, ZclawResponseBufferSize - 1)
+	succeeded = status == 200 && string.ByteLength(reply) <= ZclawResponseBufferSize - 1
+}

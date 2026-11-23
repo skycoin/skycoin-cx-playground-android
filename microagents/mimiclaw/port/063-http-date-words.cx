@@ -1,0 +1,27 @@
+package main
+
+import "sys/string"
+
+// httpDateWords splits text at spaces and tabs and makes each colon a word
+// of its own, so "02:09:49" reads as 02 : 09 : 49.
+func httpDateWords(text str) (words []str) {
+	var count i32 = string.ByteLength(text)
+	var word str = ""
+	for i := 0; i < count; i++ {
+		var c str = string.SubstringByByteRange(text, i, i + 1)
+		if string.EqualityByByteValue(c, " ") || string.EqualityByByteValue(c, "\t") || string.EqualityByByteValue(c, ":") {
+			if string.ByteLength(word) > 0 {
+				words = append(words, word)
+			}
+			word = ""
+			if string.EqualityByByteValue(c, ":") {
+				words = append(words, ":")
+			}
+		} else {
+			word = string.Concatenation(word, c)
+		}
+	}
+	if string.ByteLength(word) > 0 {
+		words = append(words, word)
+	}
+}

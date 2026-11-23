@@ -1,0 +1,9 @@
+package main
+
+import "sys/string"
+
+// Port of agent_is_slash_command of agent_commands.c.
+func agentIsSlashCommand(message str) (slash bool) {
+	var rest str = agentSkipWhitespace(message)
+	slash = string.ByteLength(rest) > 0 && string.EqualityByByteValue(string.SubstringByByteRange(rest, 0, 1), "/")
+}

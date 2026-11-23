@@ -1,0 +1,24 @@
+package main
+
+import "sys/string"
+
+// Port of tools_memory_get_handler of tools_memory.c.
+func toolMemoryGet(inputJson str) (ok bool, result str) {
+	ok = false
+	key, keyFound := jsonStringField(inputJson, 0, "key")
+	if !keyFound {
+		result = "Error: 'key' required (string)"
+		return
+	}
+	result = toolKeyCheck(key, "access")
+	if string.ByteLength(result) > 0 {
+		return
+	}
+	value, found := memoryGet(key)
+	if found {
+		result = joinStrings([]str{key, " = ", value})
+	} else {
+		result = joinStrings([]str{"Key '", key, "' not found"})
+	}
+	ok = true
+}

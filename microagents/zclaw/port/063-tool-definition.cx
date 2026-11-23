@@ -1,0 +1,8 @@
+package main
+
+// Port of tool_def_t of tools.h, without the execute pointer.
+type ToolDefinition struct {
+	name str
+	description str
+	inputSchemaJson str
+}

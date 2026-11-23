@@ -1,0 +1,13 @@
+package main
+
+// formatDateTime is localtime_r followed by strftime
+// "%Y-%m-%d %H:%M:%S %Z (%A)".
+func formatDateTime(epoch i64) (formatted str) {
+	var weekdays []str = []str{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	offset, zoneName := localTimeOffset(epoch)
+	var local i64 = epoch + offset
+	var days i64 = local / 86400L
+	var seconds i64 = local % 86400L
+	var weekday i64 = (days + 4L) % 7L
+	formatted = joinStrings([]str{formatDate(epoch), " ", padTwo(seconds / 3600L), ":", padTwo((seconds / 60L) % 60L), ":", padTwo(seconds % 60L), " ", zoneName, " (", weekdays[i64.i32(weekday)], ")"})
+}

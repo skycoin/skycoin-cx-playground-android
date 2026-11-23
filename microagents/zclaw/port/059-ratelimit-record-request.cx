@@ -1,0 +1,9 @@
+package main
+
+// Port of ratelimit_record_request of ratelimit.c.
+func ratelimitRecordRequest() {
+	ratelimitUpdateTimeWindow()
+	gAgentState.requestsThisHour = gAgentState.requestsThisHour + 1
+	gAgentState.requestsToday = gAgentState.requestsToday + 1
+	var stored bool = memorySet("rl_daily", i32.str(gAgentState.requestsToday))
+}

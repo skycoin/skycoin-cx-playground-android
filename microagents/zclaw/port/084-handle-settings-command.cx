@@ -1,0 +1,11 @@
+package main
+
+// Port of handle_settings_command of agent.c, cut to its 384 byte buffer.
+func handleSettingsCommand(chatId i64) {
+	var intake str = "active"
+	if gAgentState.paused {
+		intake = "paused"
+	}
+	var text str = joinStrings([]str{"zclaw settings:\n- Message intake: ", intake, "\n- Persona: ", gAgentState.persona, "\n- Chat commands: /start, /help, /settings, /stop, /resume\n- USB local admin: /gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset\n- /gpio supports reads and writes (e.g. /gpio 9 low)\n- Persona changes: ask in normal chat (handled via tool calls)\n- Device settings are global (e.g., timezone <name>)"})
+	sendResponse(truncateBytes(text, 383), chatId)
+}

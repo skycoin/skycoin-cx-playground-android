@@ -1,0 +1,29 @@
+package main
+
+import "sys/string"
+
+// localTimeOffset returns the offset from UTC in seconds and the %Z name of
+// epoch in gLocalTimezone, the part of localtime_r the port needs. Only
+// UTC0 and PST8PDT,M3.2.0,M11.1.0 are ported: daylight time runs from 02:00
+// standard time on the second Sunday of March to 02:00 daylight time on the
+// first Sunday of November.
+func localTimeOffset(epoch i64) (offset i64, name str) {
+	offset = 0L
+	name = "UTC"
+	if !string.EqualityByByteValue(gLocalTimezone, MimiTimezone) {
+		return
+	}
+	offset = -28800L
+	name = "PST"
+	year, month, day := civilDate((epoch + offset) / 86400L)
+	var marchFirst i64 = daysFromCivil(year, 3L, 1L)
+	var marchSunday i64 = marchFirst + (7L - (marchFirst + 4L) % 7L) % 7L + 7L
+	var novemberFirst i64 = daysFromCivil(year, 11L, 1L)
+	var novemberSunday i64 = novemberFirst + (7L - (novemberFirst + 4L) % 7L) % 7L
+	var daylightStart i64 = marchSunday * 86400L + 36000L
+	var daylightEnd i64 = novemberSunday * 86400L + 32400L
+	if epoch >= daylightStart && epoch < daylightEnd {
+		offset = -25200L
+		name = "PDT"
+	}
+}

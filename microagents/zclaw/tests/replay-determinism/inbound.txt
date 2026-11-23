@@ -1,0 +1,5 @@
+telegram	5	1000	Hi
+telegram	5	2000	Save it [[tool memory_set {"key":"u_note","value":"tea at four"}]]
+telegram	5	3000	Read it back [[tool memory_get {"key":"u_note"}]]
+channel	0	4000	/settings
+telegram	5	5000	Thanks

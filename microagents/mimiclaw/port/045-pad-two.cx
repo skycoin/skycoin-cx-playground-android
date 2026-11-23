@@ -1,0 +1,10 @@
+package main
+
+import "sys/string"
+
+func padTwo(value i64) (padded str) {
+	padded = i64.str(value)
+	if value < 10L {
+		padded = string.Concatenation("0", padded)
+	}
+}

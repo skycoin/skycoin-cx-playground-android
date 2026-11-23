@@ -1,0 +1,41 @@
+package main
+
+import "sys/string"
+
+// One pass of the while loop of agent_loop_task of agent/agent_loop.c. The
+// working status starts with U+1F431, written as octal bytes.
+func agentProcessMessage(message InboundMessage, toolsJsonText str) {
+	var systemPrompt str = contextBuildSystemPrompt()
+	systemPrompt = agentTurnContext(systemPrompt, message)
+	var messages []str = sessionHistoryMessages(message.chatId, MimiAgentMaxHistory)
+	messages = append(messages, joinStrings([]str{"{\"role\":\"user\",\"content\":", jsonEscapeString(message.content), "}"}))
+
+	var finalText str = ""
+	var iteration i32 = 0
+	var sentWorkingStatus bool = false
+	for iteration < MimiAgentMaxToolIterations {
+		if !sentWorkingStatus && !string.EqualityByByteValue(message.channel, MimiChannelSystem) {
+			messageBusPushOutbound(message.channel, message.chatId, "\360\237\220\261mimi is working...")
+			sentWorkingStatus = true
+		}
+		var reply LlmReply = llmChatTools(systemPrompt, messages, toolsJsonText)
+		if !reply.succeeded {
+			iteration = MimiAgentMaxToolIterations
+		} else if !reply.toolUse {
+			finalText = reply.text
+			iteration = MimiAgentMaxToolIterations
+		} else {
+			messages = append(messages, joinStrings([]str{"{\"role\":\"assistant\",\"content\":", agentAssistantContent(reply), "}"}))
+			messages = append(messages, joinStrings([]str{"{\"role\":\"user\",\"content\":", agentToolResults(reply), "}"}))
+			iteration++
+		}
+	}
+
+	if string.ByteLength(finalText) > 0 {
+		var savedUser bool = sessionAppend(message.chatId, "user", message.content)
+		var savedAssistant bool = sessionAppend(message.chatId, "assistant", finalText)
+		messageBusPushOutbound(message.channel, message.chatId, finalText)
+	} else {
+		messageBusPushOutbound(message.channel, message.chatId, "Sorry, I encountered an error.")
+	}
+}

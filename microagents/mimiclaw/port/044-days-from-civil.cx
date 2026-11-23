@@ -1,0 +1,24 @@
+package main
+
+// daysFromCivil converts a year, month and day to days since 1970-01-01,
+// the part of mktime the port needs in UTC. A day past the end of the month
+// carries over as mktime does. Algorithm from
+// https://howardhinnant.github.io/date_algorithms.html#days_from_civil
+func daysFromCivil(year i64, month i64, day i64) (days i64) {
+	var y i64 = year
+	if month <= 2L {
+		y = y - 1L
+	}
+	var era i64 = y / 400L
+	if y < 0L {
+		era = (y - 399L) / 400L
+	}
+	var yearOfEra i64 = y - era * 400L
+	var shiftedMonth i64 = month - 3L
+	if month <= 2L {
+		shiftedMonth = month + 9L
+	}
+	var dayOfYear i64 = (153L * shiftedMonth + 2L) / 5L
+	var dayOfEra i64 = yearOfEra * 365L + yearOfEra / 4L - yearOfEra / 100L + dayOfYear
+	days = era * 146097L + dayOfEra - 719468L + day - 1L
+}

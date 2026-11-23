@@ -1,0 +1,7 @@
+package main
+
+// Port of is_local_admin_command of agent.c and local_admin_is_command of
+// local_admin.c.
+func localAdminIsCommand(message str) (command bool) {
+	command = agentIsCommand(message, "gpio") || agentIsCommand(message, "diag") || agentIsCommand(message, "reboot") || agentIsCommand(message, "wifi") || agentIsCommand(message, "bootcount") || agentIsCommand(message, "factory-reset")
+}

@@ -1,0 +1,22 @@
+package main
+
+import "sys/string"
+
+// Port of canonicalize_persona_name of tools_persona.c: the first 23 bytes
+// lower cased with ASCII tolower, then one of the four names or nothing.
+func canonicalizePersonaName(input str) (canonical str, known bool) {
+	var lowered str = ""
+	var count i32 = string.ByteLength(input)
+	if count > 23 {
+		count = 23
+	}
+	for i := 0; i < count; i++ {
+		var code i32 = byteValue(string.SubstringByByteRange(input, i, i + 1))
+		if code >= 65 && code <= 90 {
+			code = code + 32
+		}
+		lowered = string.Concatenation(lowered, gWrapperState.byteStrings[code])
+	}
+	canonical = lowered
+	known = agentParsePersonaName(lowered)
+}
