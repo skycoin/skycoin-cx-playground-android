@@ -10,11 +10,12 @@
 //	emulator-driver log                  print the app's logcat
 //	emulator-driver uninstall            remove the app
 //	emulator-driver stop                 stop and remove the rig container
-//	emulator-driver suite [tests/x ...]  run test folders, print the timing table
+//	emulator-driver suite [tests/x ...]  run the emulator test folders, print the timing table
 package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -84,6 +85,7 @@ func runCommand(ctx context.Context, name string, args []string) error {
 	skipBuild := fs.Bool("skip-build", false, "suite: use the existing -apk")
 	tolerance := fs.Uint("tolerance", 16, "suite: per channel tolerance of screenshot comparison, 0..255")
 	maxDiff := fs.Float64("max-diff", 0.01, "suite: share of pixels that may differ for screen-matches")
+	updateReferences := fs.Bool("update-references", false, "suite: write the screen-matches captures to expected/ instead of comparing them")
 	fs.Parse(args)
 	d := &o.dev
 
@@ -135,7 +137,7 @@ func runCommand(ctx context.Context, name string, args []string) error {
 		fmt.Print(out)
 		return err
 	case "suite":
-		return o.suite(ctx, fs.Args(), *boot, *stopAfter, *skipBuild, uint32(*tolerance), *maxDiff)
+		return o.suite(ctx, fs.Args(), *boot, *stopAfter, *skipBuild, &session{tolerance: uint32(*tolerance), maxDiff: *maxDiff, updateReferences: *updateReferences})
 	}
 	usage()
 	return nil
@@ -151,7 +153,7 @@ func (o *options) stopRig(ctx context.Context) error {
 	return o.rig.stop(ctx)
 }
 
-func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, skipBuild bool, tolerance uint32, maxDiff float64) (err error) {
+func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, skipBuild bool, s *session) (err error) {
 	if len(dirs) == 0 {
 		dirs, _ = filepath.Glob(filepath.Join(o.repo, "tests", "*"))
 	}
@@ -161,6 +163,9 @@ func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, ski
 			continue
 		}
 		t, err := loadTestFolder(dir)
+		if errors.Is(err, errNotEmulatorTest) {
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -170,7 +175,7 @@ func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, ski
 		return fmt.Errorf("no test folders")
 	}
 	stamp := time.Now().Format("20060102-150405")
-	s := &session{dev: &o.dev, appID: o.appID, results: filepath.Join(o.results, stamp), tolerance: tolerance, maxDiff: maxDiff}
+	s.dev, s.appID, s.results = &o.dev, o.appID, filepath.Join(o.results, stamp)
 	if err := os.MkdirAll(s.results, 0o755); err != nil {
 		return err
 	}

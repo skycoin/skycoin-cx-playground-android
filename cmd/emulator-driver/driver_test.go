@@ -1,6 +1,11 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"path/filepath"
@@ -96,19 +101,106 @@ func TestDifferingFraction(t *testing.T) {
 	}
 }
 
-// TestFolders checks that every test folder of the repository parses.
+// TestFolders checks that every emulator test folder of the repository
+// parses, and that the go test folders are told apart.
 func TestFolders(t *testing.T) {
 	dirs, _ := filepath.Glob("../../tests/*")
-	if len(dirs) == 0 {
-		t.Fatal("no test folders")
-	}
+	emulator := 0
 	for _, d := range dirs {
 		tf, err := loadTestFolder(d)
+		if errors.Is(err, errNotEmulatorTest) {
+			if m, _ := filepath.Glob(filepath.Join(d, "*_test.go")); len(m) == 0 {
+				t.Errorf("%s is neither an emulator test nor a go test", d)
+			}
+			continue
+		}
+		emulator++
 		if err != nil {
 			t.Fatal(err)
 		}
 		if tf.appName == "" || len(tf.steps) == 0 || len(tf.expect) == 0 {
 			t.Fatalf("%s: incomplete test folder", d)
 		}
+	}
+	if emulator == 0 {
+		t.Fatal("no emulator test folders")
+	}
+}
+
+func TestParseNewSteps(t *testing.T) {
+	steps, err := parseSteps(strings.NewReader("rotate 1\nwait-for out done now\nkeyboard shown\npull cxtest/stdout.txt stdout.txt\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 4 || !steps[0].injected() || steps[1].args[0] != "out done now" || steps[3].args[1] != "stdout.txt" {
+		t.Fatalf("%+v", steps)
+	}
+	if got := strings.Join(steps[0].inputCommand(), " "); got != "settings put system accelerometer_rotation 0 ; settings put system user_rotation 1" {
+		t.Fatalf("rotate command %q", got)
+	}
+	for _, bad := range []string{"rotate 4", "rotate x", "keyboard open", "pull a", "wait-for"} {
+		if _, err := parseSteps(strings.NewReader(bad)); err == nil {
+			t.Errorf("%q parsed", bad)
+		}
+	}
+	expect, err := parseExpectations(strings.NewReader("screen-matches grid 0 100 720 300\nfile-equals out.txt ../x/expected.txt\nfile-contains doc.json \"status\": \"pass\"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := region(expect[0]); r == nil || *r != image.Rect(0, 100, 720, 400) {
+		t.Fatalf("region %v", r)
+	}
+	if expect[2].args[1] != `"status": "pass"` {
+		t.Fatalf("file-contains %q", expect[2].args)
+	}
+	for _, bad := range []string{"screen-matches a 1 2 3", "screen-matches a 1 2 3 -4", "file-equals a", "file-contains a"} {
+		if _, err := parseExpectations(strings.NewReader(bad)); err == nil {
+			t.Errorf("%q parsed", bad)
+		}
+	}
+}
+
+func TestParseSettings(t *testing.T) {
+	var tf testFolder
+	err := tf.parseSettings(strings.NewReader("app Benchmark suite\nready start app=\nsetprop debug.x 1\nbefore settings put secure a 1\nafter settings put secure a 0\ntimeout 90\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tf.appName != "Benchmark suite" || tf.ready != "start app=" || tf.props[0] != [2]string{"debug.x", "1"} ||
+		tf.before[0] != "settings put secure a 1" || tf.after[0] != "settings put secure a 0" || tf.timeout != 90*time.Second {
+		t.Fatalf("%+v", tf)
+	}
+	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app"} {
+		if err := new(testFolder).parseSettings(strings.NewReader(bad)); err == nil {
+			t.Errorf("%q parsed", bad)
+		}
+	}
+}
+
+func TestPublishedFile(t *testing.T) {
+	w := &logWatch{update: make(chan struct{}), done: make(chan struct{})}
+	data := []byte("hello published file")
+	sum := sha256.Sum256(data)
+	trace := []string{
+		"file path=other/a.txt bytes=1 chunks=1 sha256=00",
+		fmt.Sprintf("file path=benchmark-results/x.json bytes=%d chunks=2 sha256=%x", len(data), sum),
+		"file-chunk path=benchmark-results/x.json n=0 " + base64.StdEncoding.EncodeToString(data[:10]),
+		"frame n=1 event=0",
+		"file-chunk path=benchmark-results/x.json n=1 " + base64.StdEncoding.EncodeToString(data[10:]),
+	}
+	var raw strings.Builder
+	for _, l := range trace {
+		raw.WriteString("1763830000.125 1 1 I app: cxtest " + l + "\n")
+	}
+	w.read(strings.NewReader(raw.String()))
+	close(w.done)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	b, err := w.publishedFile(ctx, "benchmark-results/*.json")
+	if err != nil || string(b) != string(data) {
+		t.Fatalf("%q %v", b, err)
+	}
+	if _, err := w.publishedFile(ctx, "other/*.txt"); err == nil {
+		t.Fatal("a file with a missing chunk was accepted")
 	}
 }

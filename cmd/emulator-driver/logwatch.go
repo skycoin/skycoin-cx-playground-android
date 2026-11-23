@@ -3,8 +3,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
+	pathpkg "path"
 	"strconv"
 	"strings"
 	"sync"
@@ -144,4 +148,46 @@ func (w *logWatch) text() string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// publishedFile returns the last file whose path matches pattern that the
+// app published in test mode: a "file path=P bytes=N chunks=C sha256=H"
+// line, then C "file-chunk path=P n=I <base64>" lines. It waits until the
+// file is complete and checks its size and hash.
+func (w *logWatch) publishedFile(ctx context.Context, pattern string) ([]byte, error) {
+	var path, sum string
+	var size, chunks int
+	header := func(l logLine) bool {
+		var p string
+		if _, err := fmt.Sscanf(l.trace, "file path=%s bytes=%d chunks=%d sha256=%s", &p, &size, &chunks, &sum); err != nil {
+			return false
+		}
+		ok, _ := pathpkg.Match(pattern, p)
+		if ok {
+			path = p
+		}
+		return ok
+	}
+	_, at, err := w.waitFor(ctx, 0, header)
+	if err != nil {
+		return nil, fmt.Errorf("no published file matches %s: %w", pattern, err)
+	}
+	var b []byte
+	for n := 0; n < chunks; n++ {
+		prefix := fmt.Sprintf("file-chunk path=%s n=%d ", path, n)
+		l, i, err := w.waitFor(ctx, at+1, func(l logLine) bool { return strings.HasPrefix(l.trace, prefix) })
+		if err != nil {
+			return nil, fmt.Errorf("%s: chunk %d of %d: %w", path, n, chunks, err)
+		}
+		c, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(l.trace, prefix))
+		if err != nil {
+			return nil, fmt.Errorf("%s: chunk %d: %w", path, n, err)
+		}
+		b, at = append(b, c...), i
+	}
+	got := sha256.Sum256(b)
+	if len(b) != size || hex.EncodeToString(got[:]) != sum {
+		return nil, fmt.Errorf("%s: %d bytes with sha256 %x, want %d bytes with %s", path, len(b), got, size, sum)
+	}
+	return b, nil
 }

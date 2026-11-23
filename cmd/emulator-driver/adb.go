@@ -142,3 +142,27 @@ func (d *device) appLog(ctx context.Context, appID string) (string, error) {
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
+
+// keyboardShown reports whether the soft keyboard is on screen.
+func (d *device) keyboardShown(ctx context.Context) (bool, error) {
+	out, err := d.shell(ctx, "dumpsys", "input_method")
+	if err != nil {
+		return false, err
+	}
+	return strings.Contains(out, "mInputShown=true"), nil
+}
+
+// waitKeyboard waits until the soft keyboard is shown or hidden.
+func (d *device) waitKeyboard(ctx context.Context, shown bool, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		got, err := d.keyboardShown(ctx)
+		if err == nil && got == shown {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("soft keyboard shown=%v after %v, want %v (%v)", got, timeout, shown, err)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}

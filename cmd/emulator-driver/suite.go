@@ -1,56 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 )
-
-// testFolder is one folder under tests/: app/ holds the CX app (bundled into
-// the APK by make bundle), input.txt the events, expect.txt the expected
-// output, and expected/<name>.png optional reference screenshots.
-type testFolder struct {
-	dir     string
-	name    string // folder name
-	appName string // manifest name, used to autostart the app
-	steps   []inputStep
-	expect  []expectation
-}
-
-func loadTestFolder(dir string) (testFolder, error) {
-	t := testFolder{dir: dir, name: filepath.Base(dir)}
-	b, err := os.ReadFile(filepath.Join(dir, "app", "cxapp.json"))
-	if err != nil {
-		return t, err
-	}
-	var app struct{ Name string }
-	if err := json.Unmarshal(b, &app); err != nil {
-		return t, fmt.Errorf("%s: %w", dir, err)
-	}
-	t.appName = app.Name
-	for file, parse := range map[string]func(*os.File) error{
-		"input.txt":  func(f *os.File) (err error) { t.steps, err = parseSteps(f); return },
-		"expect.txt": func(f *os.File) (err error) { t.expect, err = parseExpectations(f); return },
-	} {
-		f, err := os.Open(filepath.Join(dir, file))
-		if err != nil {
-			return t, err
-		}
-		err = parse(f)
-		f.Close()
-		if err != nil {
-			return t, fmt.Errorf("%s/%s: %w", dir, file, err)
-		}
-	}
-	return t, nil
-}
 
 // session holds what every test of a run shares.
 type session struct {
@@ -59,6 +23,9 @@ type session struct {
 	results   string // results directory of this run
 	tolerance uint32 // per channel, for screenshot comparison
 	maxDiff   float64
+	// updateReferences writes the screen-matches captures to expected/
+	// instead of comparing them.
+	updateReferences bool
 }
 
 // buildAPK builds an x86_64 debug APK with the repository's make apk.
@@ -96,6 +63,15 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 		if err := table.timed("uninstall", func() error { return d.uninstall(ctx, s.appID) }); err != nil {
 			fail("uninstall: %v", err)
 		}
+		for _, p := range t.props {
+			d.shell(ctx, "setprop", p[0], "' '")
+		}
+		for _, c := range t.after {
+			if _, err := d.shell(ctx, c); err != nil {
+				fail("after %s: %v", c, err)
+			}
+		}
+		d.shell(ctx, "settings", "put", "system", "user_rotation", "0")
 		table.add("total", time.Since(begin), 0, "")
 		os.WriteFile(filepath.Join(out, "logcat.txt"), []byte(w.text()), 0o644)
 	}
@@ -104,6 +80,16 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 		fail("install: %v", err)
 		finish()
 		return failures
+	}
+	for _, p := range t.props {
+		if _, err := d.shell(ctx, "setprop", p[0], shellQuote(p[1])); err != nil {
+			fail("setprop %s: %v", p[0], err)
+		}
+	}
+	for _, c := range t.before {
+		if _, err := d.shell(ctx, c); err != nil {
+			fail("before %s: %v", c, err)
+		}
 	}
 	startBegin := time.Now()
 	if err := table.timed("start (am start -W)", func() error { return d.startApp(ctx, s.appID, t.appName) }); err != nil {
@@ -114,16 +100,21 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 	firstCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	// The first frame on screen is not always the program's frame 1: frames
 	// drawn before the window shows are replaced, not shown.
-	first, _, err := w.waitFor(firstCtx, 0, func(l logLine) bool { _, _, ok := l.frameTrace(); return ok })
+	ready, readyStep := func(l logLine) bool { _, _, ok := l.frameTrace(); return ok }, "first frame (from start)"
+	if t.ready != "" {
+		ready, readyStep = func(l logLine) bool { return strings.Contains(l.trace, t.ready) }, "ready line (from start)"
+	}
+	first, _, err := w.waitFor(firstCtx, 0, ready)
 	cancel()
 	if err != nil {
-		fail("no first frame of %q: %v", t.appName, err)
+		fail("%s of %q not seen: %v", readyStep, t.appName, err)
 		finish()
 		return failures
 	}
-	table.add("first frame (from start)", first.arrived.Sub(startBegin), 0, "")
+	table.add(readyStep, first.arrived.Sub(startBegin), 0, "")
 
 	shots := map[string]string{}
+	pulled := map[string]string{}
 	for i, step := range t.steps {
 		switch {
 		case step.verb == "screenshot":
@@ -140,9 +131,38 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 			}
 			shots[step.args[0]] = path
 		case step.verb == "wait":
-			var ms int
-			fmt.Sscan(step.args[0], &ms)
+			ms, _ := strconv.Atoi(step.args[0])
 			time.Sleep(time.Duration(ms) * time.Millisecond)
+		case step.verb == "wait-for":
+			waitCtx, cancel := context.WithTimeout(ctx, t.timeout)
+			err := table.timed(step.line, func() error {
+				_, _, err := w.waitFor(waitCtx, 0, func(l logLine) bool { return strings.Contains(l.trace, step.args[0]) })
+				return err
+			})
+			cancel()
+			if err != nil {
+				fail("%s: %v", step.line, err)
+			}
+		case step.verb == "keyboard":
+			if err := table.timed(step.line, func() error { return d.waitKeyboard(ctx, step.args[0] == "shown", 5*time.Second) }); err != nil {
+				fail("%s: %v", step.line, err)
+			}
+		case step.verb == "pull":
+			path := filepath.Join(out, step.args[1])
+			err := table.timed(step.line, func() error {
+				pullCtx, cancel := context.WithTimeout(ctx, t.timeout)
+				defer cancel()
+				b, err := w.publishedFile(pullCtx, step.args[0])
+				if err != nil {
+					return err
+				}
+				return os.WriteFile(path, b, 0o644)
+			})
+			if err != nil {
+				fail("%s: %v", step.line, err)
+			} else {
+				pulled[step.args[1]] = path
+			}
 		case step.injected():
 			row, err := measureEvent(ctx, d, w, step)
 			table.rows = append(table.rows, row)
@@ -152,7 +172,7 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 		}
 	}
 
-	expectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	expectCtx, cancel := context.WithTimeout(ctx, t.timeout)
 	for {
 		missing := unmatchedText(t.expect, w.traces())
 		if missing == "" {
@@ -178,16 +198,92 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 				fail("%s: the screenshots are identical", e.source)
 			}
 		case "screen-matches":
-			f, err := s.compareShots(shots[e.args[0]], filepath.Join(t.dir, "expected", e.args[0]+".png"))
-			if err != nil {
+			if err := s.screenMatches(t, e, shots[e.args[0]], out); err != nil {
 				fail("%s: %v", e.source, err)
-			} else if f > s.maxDiff {
-				fail("%s: %.2f%% of pixels differ, more than %.2f%%", e.source, f*100, s.maxDiff*100)
+			}
+		case "file-equals":
+			got, err := os.ReadFile(pulled[e.args[0]])
+			want, err2 := os.ReadFile(filepath.Join(t.dir, filepath.FromSlash(e.args[1])))
+			switch {
+			case pulled[e.args[0]] == "":
+				fail("%s: %s was not pulled", e.source, e.args[0])
+			case err != nil || err2 != nil:
+				fail("%s: %v %v", e.source, err, err2)
+			case !bytes.Equal(got, want):
+				fail("%s: %d bytes differ from the %d expected", e.source, len(got), len(want))
+			}
+		case "file-contains":
+			got, err := os.ReadFile(pulled[e.args[0]])
+			if pulled[e.args[0]] == "" || err != nil {
+				fail("%s: %s was not pulled: %v", e.source, e.args[0], err)
+			} else if !strings.Contains(string(got), e.args[1]) {
+				fail("%s: not found", e.source)
 			}
 		}
 	}
 	finish()
 	return failures
+}
+
+// region returns the x y w h region of a screen-matches line, or nil for
+// the whole screen.
+func region(e expectation) *image.Rectangle {
+	if len(e.args) != 5 {
+		return nil
+	}
+	var v [4]int
+	for i := range v {
+		v[i], _ = strconv.Atoi(e.args[i+1])
+	}
+	r := image.Rect(v[0], v[1], v[0]+v[2], v[1]+v[3])
+	return &r
+}
+
+// screenMatches compares a screenshot, or its region, with the reference
+// expected/<name>.png, which holds just the region. With updateReferences
+// it writes the reference instead.
+func (s *session) screenMatches(t testFolder, e expectation, shot, out string) error {
+	if shot == "" {
+		return errors.New("screenshot not taken")
+	}
+	img, err := readPNG(shot)
+	if err != nil {
+		return err
+	}
+	if r := region(e); r != nil {
+		sub, ok := img.(interface {
+			SubImage(image.Rectangle) image.Image
+		})
+		if !ok || !r.In(img.Bounds()) {
+			return fmt.Errorf("region %v is outside the %v screenshot", *r, img.Bounds())
+		}
+		img = sub.SubImage(*r)
+	}
+	ref := filepath.Join(t.dir, "expected", e.args[0]+".png")
+	if s.updateReferences {
+		if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
+			return err
+		}
+		return writePNG(ref, img)
+	}
+	want, err := readPNG(ref)
+	if err != nil {
+		return err
+	}
+	f := differingFraction(img, want, s.tolerance)
+	if f > s.maxDiff {
+		writePNG(filepath.Join(out, e.args[0]+"-region.png"), img)
+		return fmt.Errorf("%.2f%% of pixels differ, more than %.2f%%", f*100, s.maxDiff*100)
+	}
+	return nil
+}
+
+func writePNG(path string, img image.Image) error {
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		return err
+	}
+	return os.WriteFile(path, b.Bytes(), 0o644)
 }
 
 func (s *session) compareShots(a, b string) (float64, error) {
@@ -222,20 +318,24 @@ func measureEvent(ctx context.Context, d *device, w *logWatch, step inputStep) (
 		switch step.verb {
 		case "text":
 			return len(events) >= utf8.RuneCountInString(step.args[0])
-		case "key":
+		case "key", "rotate":
 			return len(events) >= 1
 		}
 		return len(events) > 0 && strings.Contains(events[len(events)-1].trace, "kind=touch-up")
 	}
-	// Resize events can arrive at any time and are not part of the step.
+	// Resize events can arrive at any time and are not part of the step,
+	// except for a rotation.
 	wantKind := "kind=touch-"
-	if step.verb == "text" || step.verb == "key" {
+	switch step.verb {
+	case "text", "key":
 		wantKind = "kind=key "
+	case "rotate":
+		wantKind = "kind=resize "
 	}
 	var events []logLine
 	var lastSeq int64
 	scanned := from
-	settle, cancel := context.WithTimeout(ctx, 3*time.Second)
+	settle, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	for !complete(events) {
 		l, i, err := w.waitFor(settle, scanned, func(l logLine) bool {
