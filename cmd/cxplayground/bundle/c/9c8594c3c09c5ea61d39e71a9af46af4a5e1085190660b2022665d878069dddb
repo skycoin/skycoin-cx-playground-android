@@ -2,8 +2,8 @@ package main
 
 import "sys/string"
 
-// jsonObjectField finds the member name of the object at position and
-// returns the position of its value.
+// jsonObjectField finds the member name of the object at position, ignoring
+// ASCII case as cJSON_GetObjectItem does, and returns the position of its value.
 func jsonObjectField(s str, position i32, name str) (valuePosition i32, found bool) {
 	found = false
 	valuePosition = -1
@@ -20,7 +20,7 @@ func jsonObjectField(s str, position i32, name str) (valuePosition i32, found bo
 		key, afterKey := jsonScanString(s, i)
 		i = jsonSkipSpace(s, afterKey) + 1
 		i = jsonSkipSpace(s, i)
-		if string.EqualityByByteValue(key, name) {
+		if jsonKeyEqualFold(key, name) {
 			valuePosition = i
 			found = true
 			return

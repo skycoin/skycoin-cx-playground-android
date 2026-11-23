@@ -11,6 +11,14 @@ func toolRegistryExecute(name str, inputJson str) (output str) {
 				output = toolGetTime(inputJson)
 			} else if string.EqualityByByteValue(name, "read_file") {
 				output = toolReadFile(inputJson)
+			} else if string.EqualityByByteValue(name, "write_file") {
+				output = toolWriteFile(inputJson)
+			} else if string.EqualityByByteValue(name, "edit_file") {
+				output = toolEditFile(inputJson)
+			} else if string.EqualityByByteValue(name, "list_dir") {
+				output = toolListDir(inputJson)
+			} else if string.EqualityByByteValue(name, "send_message") {
+				output = toolSendMessage(inputJson)
 			} else {
 				output = toolUnavailable(name)
 			}

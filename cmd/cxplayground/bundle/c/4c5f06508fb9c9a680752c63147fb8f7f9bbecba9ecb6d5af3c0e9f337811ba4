@@ -1,0 +1,26 @@
+package main
+
+import "sys/string"
+
+// Port of tool_list_dir_execute of tools/tool_files.c. The C buffer limit on
+// the listing is not ported.
+func toolListDir(inputJson str) (output str) {
+	prefix, prefixFound := jsonStringField(inputJson, 0, "prefix")
+	names, found := dirList()
+	if !found {
+		output = "Error: cannot open /spiffs directory"
+		return
+	}
+	output = ""
+	var count i32 = 0
+	for i := 0; i < len(names); i++ {
+		var fullPath str = string.Concatenation("/spiffs/", names[i])
+		if !prefixFound || string.ByteIndexOfFirstSubstring(fullPath, prefix) == 0 {
+			output = joinStrings([]str{output, fullPath, "\n"})
+			count++
+		}
+	}
+	if count == 0 {
+		output = "(no files found)"
+	}
+}

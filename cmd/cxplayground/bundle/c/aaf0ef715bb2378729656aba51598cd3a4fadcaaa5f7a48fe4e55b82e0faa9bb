@@ -11,4 +11,5 @@ type WrapperState struct {
 	inboundPosition i32
 	clientCommand str
 	backendUrl str
+	applyWrites bool
 }

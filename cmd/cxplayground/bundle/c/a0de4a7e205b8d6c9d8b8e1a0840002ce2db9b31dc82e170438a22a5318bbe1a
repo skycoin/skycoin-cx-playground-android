@@ -1,0 +1,42 @@
+package main
+
+import "sys/string"
+
+// Port of extract_description of skills/skill_loader.c: the lines after the
+// title up to a blank line or a "##" header, each read with fgets into 256
+// bytes, newlines turned into spaces, kept to a buffer of size bytes.
+func skillExtractDescription(content str, position i32, size i32) (description str) {
+	description = ""
+	var length i32 = 0
+	var reading bool = true
+	for reading {
+		line, next, found := skillReadLine(content, position, 256)
+		position = next
+		var lineLength i32 = string.ByteLength(line)
+		reading = found && length < size - 1
+		if reading {
+			if string.EqualityByByteValue(line, "\n") || string.ByteIndexOfFirstSubstring(line, "##") == 0 {
+				reading = false
+			}
+		}
+		if reading {
+			if string.EqualityByByteValue(string.SubstringByByteRange(line, lineLength - 1, lineLength), "\n") {
+				line = string.Concatenation(string.SubstringByByteRange(line, 0, lineLength - 1), " ")
+			}
+			var copy i32 = lineLength
+			if copy > size - length - 1 {
+				copy = size - length - 1
+			}
+			description = string.Concatenation(description, string.SubstringByByteRange(line, 0, copy))
+			length = length + copy
+		}
+	}
+	var trimming bool = true
+	for trimming && length > 0 {
+		trimming = string.EqualityByByteValue(string.SubstringByByteRange(description, length - 1, length), " ")
+		if trimming {
+			length--
+		}
+	}
+	description = string.SubstringByByteRange(description, 0, length)
+}
