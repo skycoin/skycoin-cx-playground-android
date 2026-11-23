@@ -1,0 +1,10 @@
+package main
+
+// formatDateTime is strftime "%Y-%m-%d %H:%M:%S %Z (%A)" with TZ=UTC0.
+func formatDateTime(epoch i64) (formatted str) {
+	var weekdays []str = []str{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+	var days i64 = epoch / 86400L
+	var seconds i64 = epoch % 86400L
+	var weekday i64 = (days + 4L) % 7L
+	formatted = joinStrings([]str{formatDate(epoch), " ", padTwo(seconds / 3600L), ":", padTwo((seconds / 60L) % 60L), ":", padTwo(seconds % 60L), " UTC (", weekdays[i64.i32(weekday)], ")"})
+}

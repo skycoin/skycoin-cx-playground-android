@@ -1,0 +1,8 @@
+package main
+
+// Port of session_append of memory/session_mgr.c.
+func sessionAppend(chatId str, role str, content str) (appended bool) {
+	var epoch i64 = clockNow()
+	var line str = joinStrings([]str{"{\"role\":", jsonEscapeString(role), ",\"content\":", jsonEscapeString(content), ",\"ts\":", i64.str(epoch), "}\n"})
+	appended = fileAppend(sessionPath(chatId), line)
+}

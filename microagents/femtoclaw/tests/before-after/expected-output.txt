@@ -1,0 +1,30 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub fd96409a9909: you said "Hi, I am Sam". I see 1 message(s) in this conversation.
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=92
+Stub 5ffc20e605b4: the tools returned 1 result(s):
+Error: file not found: /spiffs/missing.md
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 64c209da9dab: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=172
+Stub 609423d91c4e: the tools returned 2 result(s):
+2026-11-23 02:09:49 UTC (Monday) | epoch=1795399789
+---
+# Memory
+- Sam drinks tea at 16:00.
+- Sam's cat is called Pixel.
+
+--- outbound channel=websocket chat_id=ws1 bytes=19
+femto is working...
+--- outbound channel=websocket chat_id=ws1 bytes=141
+Stub 85215647d74c: you said "Unicode: café — naïve ✓, a tab	here, <b>&</b> and a \ backslash". I see 1 message(s) in this conversation.
+--- outbound channel=system chat_id=heartbeat bytes=90
+Stub 4271f52c0f06: you said "Check HEARTBEAT.md". I see 1 message(s) in this conversation.

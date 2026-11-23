@@ -1,0 +1,23 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=30
+Sorry, I encountered an error.
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=30
+Sorry, I encountered an error.
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=30
+Sorry, I encountered an error.
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=30
+Sorry, I encountered an error.
+--- outbound channel=websocket chat_id=ws1 bytes=19
+femto is working...
+--- outbound channel=websocket chat_id=ws1 bytes=30
+Sorry, I encountered an error.
+--- outbound channel=system chat_id=heartbeat bytes=30
+Sorry, I encountered an error.
+FATAL the original left clock records of the tape unread

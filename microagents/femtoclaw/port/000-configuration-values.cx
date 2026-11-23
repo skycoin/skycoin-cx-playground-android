@@ -1,0 +1,19 @@
+package main
+
+// Port of femto_config.h and the channel names of bus/message_bus.h, for
+// the build the host harness models (CONFIG_SPIRAM set, ESP32-S3 target).
+
+var FemtoTarget str = "esp32s3"
+var FemtoModel str = "claude-opus-4-5"
+var FemtoMaxTokens i32 = 4096
+var FemtoAgentMaxHistory i32 = 20
+var FemtoAgentMaxToolIterations i32 = 10
+var FemtoMaxToolCalls i32 = 4
+var FemtoApiPath str = "/v1/messages"
+var FemtoSpiffsMemoryDirectory str = "/spiffs/memory"
+var FemtoSpiffsSessionDirectory str = "/spiffs/sessions"
+var FemtoMemoryFile str = "/spiffs/memory/MEMORY.md"
+var FemtoSoulFile str = "/spiffs/config/SOUL.md"
+var FemtoUserFile str = "/spiffs/config/USER.md"
+var FemtoChannelTelegram str = "telegram"
+var FemtoChannelSystem str = "system"

@@ -1,0 +1,6 @@
+telegram	3003	Hi, I am Sam
+telegram	3003	Read /spiffs/missing.md please
+telegram	3003	Read /spiffs/../etc/passwd
+telegram	3003	What time is it? Also read /spiffs/memory/MEMORY.md
+websocket	ws1	Unicode: café — naïve ✓, a tab\there, <b>&</b> and a \\ backslash
+system	heartbeat	Check HEARTBEAT.md

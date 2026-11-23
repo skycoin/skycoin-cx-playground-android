@@ -1,0 +1,14 @@
+package main
+
+import "sys/string"
+
+// Port of append_file of agent/context_builder.c.
+func contextAppendFile(prompt str, path str, header str) (extended str) {
+	extended = prompt
+	content, found := fileRead(path)
+	if !found {
+		return
+	}
+	extended = string.Concatenation(extended, joinStrings([]str{"\n## ", header, "\n\n"}))
+	extended = string.Concatenation(extended, content)
+}

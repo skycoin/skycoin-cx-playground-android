@@ -1,0 +1,12 @@
+package main
+
+// Port of llm_chat_tools of llm/llm_proxy.c for the anthropic provider.
+func llmChatTools(systemPrompt str, messages []str, toolsJsonText str) (reply LlmReply) {
+	var body str = llmRequestBody(systemPrompt, messages, toolsJsonText)
+	status, response := netPost(llmApiUrl(), body)
+	reply.succeeded = false
+	if status != 200 {
+		return
+	}
+	reply = llmParseReply(response)
+}

@@ -1,0 +1,12 @@
+package main
+
+import "sys/string"
+
+// joinStrings concatenates parts. The port builds text with it rather than
+// with sprintf, whose %s expands backslash escapes inside its arguments.
+func joinStrings(parts []str) (joined str) {
+	joined = ""
+	for i := 0; i < len(parts); i++ {
+		joined = string.Concatenation(joined, parts[i])
+	}
+}

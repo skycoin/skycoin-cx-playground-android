@@ -1,0 +1,12 @@
+package main
+
+// Port of agent_loop_task of agent/agent_loop.c. It returns when the inbound
+// queue is empty instead of blocking.
+func agentLoopRun() {
+	var toolsJsonText str = toolsJson(toolDefinitions())
+	message, found := inboundNext()
+	for found {
+		agentProcessMessage(message, toolsJsonText)
+		message, found = inboundNext()
+	}
+}

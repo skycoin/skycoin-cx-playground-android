@@ -1,0 +1,25 @@
+package main
+
+// Port of session_get_history_json of memory/session_mgr.c. It returns the
+// last maxMessages entries as printed JSON objects, which is what the agent
+// loop gets after it parses the C function's JSON array.
+func sessionHistoryMessages(chatId str, maxMessages i32) (messages []str) {
+	content, found := fileRead(sessionPath(chatId))
+	if !found {
+		return
+	}
+	var lines []str = splitLines(content)
+	var first i32 = 0
+	if len(lines) > maxMessages {
+		first = len(lines) - maxMessages
+	}
+	for i := first; i < len(lines); i++ {
+		role, roleFound := jsonStringField(lines[i], 0, "role")
+		text, textFound := jsonStringField(lines[i], 0, "content")
+		if roleFound && textFound {
+			messages = append(messages, joinStrings([]str{"{\"role\":", jsonEscapeString(role), ",\"content\":", jsonEscapeString(text), "}"}))
+		} else {
+			messages = append(messages, "{}")
+		}
+	}
+}

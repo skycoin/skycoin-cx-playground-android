@@ -1,0 +1,5 @@
+telegram	1001	Hello femto
+telegram	1001	What time is it?
+telegram	1001	Please read /spiffs/notes.md
+telegram	2002	What time is it, and what is in /spiffs/notes.md?
+system	cron	Daily summary\nwith a second line

@@ -1,0 +1,25 @@
+package main
+
+import "sys/string"
+
+// Port of build_assistant_content of agent/agent_loop.c, printed.
+func agentAssistantContent(reply LlmReply) (content str) {
+	content = "["
+	var blockCount i32 = 0
+	if string.ByteLength(reply.text) > 0 {
+		content = string.Concatenation(content, joinStrings([]str{"{\"type\":\"text\",\"text\":", jsonEscapeString(reply.text), "}"}))
+		blockCount++
+	}
+	for i := 0; i < len(reply.calls); i++ {
+		var input str = reply.calls[i].inputJson
+		if string.ByteLength(input) == 0 {
+			input = "{}"
+		}
+		if blockCount > 0 {
+			content = string.Concatenation(content, ",")
+		}
+		content = string.Concatenation(content, joinStrings([]str{"{\"type\":\"tool_use\",\"id\":", jsonEscapeString(reply.calls[i].id), ",\"name\":", jsonEscapeString(reply.calls[i].name), ",\"input\":", input, "}"}))
+		blockCount++
+	}
+	content = string.Concatenation(content, "]")
+}

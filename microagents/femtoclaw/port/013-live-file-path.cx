@@ -1,0 +1,12 @@
+package main
+
+import "sys/string"
+
+// liveFilePath maps an agent path such as /spiffs/config/SOUL.md to the
+// relative path spiffs/config/SOUL.md that the CX file sandbox accepts.
+func liveFilePath(agentPath str) (path str) {
+	path = agentPath
+	if string.ByteIndexOfFirstSubstring(path, "/") == 0 {
+		path = string.SubstringByByteRange(path, 1, string.ByteLength(path))
+	}
+}
