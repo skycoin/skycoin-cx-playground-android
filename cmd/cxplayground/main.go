@@ -32,6 +32,7 @@ import (
 	"github.com/0magnet/gio/widget"
 	"github.com/0magnet/gio/widget/material"
 
+	"github.com/skycoin/skycoin-cx-playground-android/apprun"
 	"github.com/skycoin/skycoin-cx-playground-android/cxrun"
 	"github.com/skycoin/skycoin-cx-playground-android/store"
 )
@@ -262,7 +263,7 @@ func (u *ui) start(a *store.App) {
 		}
 		log.Printf("cxplayground: running %s (%s)", a.Manifest.Name, a.Hash)
 		var stdout bytes.Buffer
-		err = cxrun.RunWith(files, a.Manifest.Entry, opts, h, io.MultiWriter(out, &stdout))
+		err = apprun.Run(a.Manifest, files, opts, h, io.MultiWriter(out, &stdout))
 		if err != nil {
 			fmt.Fprintf(out, "error: %v\n", err)
 		}

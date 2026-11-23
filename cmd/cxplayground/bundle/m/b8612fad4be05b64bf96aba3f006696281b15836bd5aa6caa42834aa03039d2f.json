@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "cx-forth: grid text",
+  "description": "Test demo: Forth text at rows and columns of the terminal grid",
+  "kind": "gfx",
+  "form": "forth",
+  "entry": "main.fs",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.fs",
+      "size": 217,
+      "sha256": "49eb28a8f11a8e9489146ba1169a23201a06cccd29d69febcc7ab194ece948f0",
+      "chunks": [
+        "49eb28a8f11a8e9489146ba1169a23201a06cccd29d69febcc7ab194ece948f0"
+      ]
+    }
+  ]
+}

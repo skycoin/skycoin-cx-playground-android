@@ -55,6 +55,36 @@ of an app that are not CX sources to `app-files/<hash>/` in its files dir
 and makes that the program's sandbox root, which its `os` file operations
 resolve against. `os.Exit` ends the program, not the app.
 
+### Program forms
+
+The `form` field of `cxapp.json` says how the app holds its program.
+
+| `form` | The bundle holds | The app runs it |
+| --- | --- | --- |
+| none | the CX sources | through the parser, on the old executor |
+| `ir` | `main.cxir`, the program serialized with skycoin-cx `ast.SerializeCXProgram`, the bytes `cx build` appends to its core | with `ast.Deserialize` and no parser, on the auto executor: the vm when every function lowers, the old one otherwise |
+| `forth` | `main.fs`, Forth source | on the cx-forth VM, see below |
+
+`make bundle` compiles the sources of an `ir` app with the pinned skycoin-cx
+and keeps only the serialized program. The app registers the same opcodes in
+the same order, the `app` package included, so the IR of one build of the
+app runs in that build. A `forth` app with `"cxir_example": "fib"` gets the
+cx-forth translation of that `cxir.Examples` program as its `main.fs`.
+
+cx-forth is `github.com/skycoin/skycoin-cx-forth`, whose `forth` and `cxir`
+packages build with the standard Go compiler. In a `gfx` app `forthrun` gives its
+VM a terminal grid of the app font's cells as output, and these words. A
+console app prints to the console and has no grid and no keys.
+
+| Word | Does |
+| --- | --- |
+| `AT-XY ( col row -- )` | moves the cursor |
+| `PAGE ( -- )` | clears the grid |
+| `GRID-SIZE ( -- cols rows )` | the grid size |
+| `KEY ( -- code )` | waits for a key, 10 for ENTER and 8 for backspace |
+| `KEY? ( -- flag )` | whether a key is waiting |
+| `SHOW ( -- )` | draws the grid now, as `KEY` and the end of the program do |
+
 Fetching apps over the network is deferred. `store.Source` is the seam: a
 loader that can return an index, a manifest and a chunk by hash plugs in
 without changes to verification or the UI.
@@ -174,6 +204,12 @@ suite at once with that many runs.
 | `collector-accept-reject` (go) | the collector stores a valid upload and refuses duplicates, bad and oversized ones |
 | `femtoclaw-replay-in-app-runtime` (go) | the bundled femtoclaw app run through `store` and `cxrun` on the host prints the host replay's bytes, twice |
 | `ui-enter-first-key` | ENTER as the first key after the start reaches the program |
+| `cx-source-fib15`, `cx-ir-fib15`, `forth-cxir-fib15` | one program, fib 0 to 14, as CX source, as serialized CX and as the cx-forth translation of its CX IR, each printing the same file |
+| `cx-source-primes`, `cx-ir-primes` | the primes benchmark as source on the old executor and serialized on the vm, printing the same file |
+| `cx-ir-key-input` | the `ui-key-input` program serialized, with the checks of `ui-key-input` |
+| `forth-grid-text` | Forth text at grid rows and columns, `KEY` waits for ENTER |
+| `forth-key-echo` | typed keys reach Forth `KEY` and are echoed line by line |
+| `cx-forms-same-output` (go) | the bundled apps of each form print the expected files on the host |
 
 ## Benchmark suite
 

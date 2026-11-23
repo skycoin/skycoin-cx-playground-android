@@ -1,0 +1,3 @@
+hello from cx-forth |   6 x 7 = 42 |   grid
+| bye
+finished app="cx-forth: grid text" err=<nil>

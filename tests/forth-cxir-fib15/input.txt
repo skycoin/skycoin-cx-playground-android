@@ -1,0 +1,4 @@
+# The cx-forth translation of the CX IR of the same program, run on the cx-forth VM. It must print what the source form prints.
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot end

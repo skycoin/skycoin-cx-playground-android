@@ -57,6 +57,12 @@ func runCompiledOn(executor Executor, args []string) (time.Duration, error) {
 		return elapsed, nil
 	case ExecutorVm:
 		return runOnVm(actions.AST)
+	case ExecutorAuto:
+		elapsed, err := runOnVm(actions.AST)
+		if errors.Is(err, ErrVmRejected) {
+			return runCompiledOn(ExecutorOld, args)
+		}
+		return elapsed, err
 	}
 	return 0, fmt.Errorf("unknown executor %q", executor)
 }

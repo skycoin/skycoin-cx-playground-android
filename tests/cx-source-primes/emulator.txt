@@ -1,0 +1,3 @@
+# A console app: the start line marks it ready.
+ready start app="CX source: primes"
+timeout 60

@@ -1,0 +1,4 @@
+# The CX source of the cx-forth fib example, compiled and run by the app.
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot end

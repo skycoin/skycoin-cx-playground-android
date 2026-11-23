@@ -1,0 +1,2 @@
+finished app="CX IR: primes" err=<nil>
+file-equals stdout.txt ../cx-source-primes/expected/stdout.txt

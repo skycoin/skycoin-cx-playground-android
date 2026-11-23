@@ -109,6 +109,7 @@ func resetCompiler() {
 	cxast.OpcodeHandlers[cxast.OpCodes["os.Exit"]] = opExit
 	globals.FoundCompileErrors = false
 	actions.LineNo = 0
+	actions.TemporaryVariableCounter = 0
 }
 
 // ErrCompile is returned when the sources do not compile. The compiler's
@@ -152,6 +153,16 @@ func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out
 }
 
 func runOn(files map[string][]byte, entry string, executor Executor, opts Options, h Host, out io.Writer) (elapsed time.Duration, err error) {
+	err = compileWith(files, entry, opts, h, out, func() error {
+		elapsed, err = runCompiledOn(executor, opts.Args)
+		return err
+	})
+	return elapsed, err
+}
+
+// compileWith compiles the .cx files in files, entry first, into actions.AST
+// with output going to out, and then calls then.
+func compileWith(files map[string][]byte, entry string, opts Options, h Host, out io.Writer, then func() error) (err error) {
 	runMu.Lock()
 	defer runMu.Unlock()
 
@@ -166,7 +177,7 @@ func runOn(files map[string][]byte, entry string, executor Executor, opts Option
 		names = append([]string{entry}, names...)
 	}
 	if len(names) == 0 {
-		return 0, errors.New("no .cx files")
+		return errors.New("no .cx files")
 	}
 	srcs := make([]string, len(names))
 	for i, n := range names {
@@ -175,7 +186,7 @@ func runOn(files map[string][]byte, entry string, executor Executor, opts Option
 
 	restore, err := captureOutput(out, opts.Stderr)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer restore()
 
@@ -191,21 +202,21 @@ func runOn(files map[string][]byte, entry string, executor Executor, opts Option
 	if opts.Dir != "" {
 		root, fileError := util.ProgramSandboxRootOpen(opts.Dir)
 		if fileError != nil {
-			return 0, errors.New(fileError.FileErrorMessage)
+			return errors.New(fileError.FileErrorMessage)
 		}
 		defer root.Close()
 		actions.AST.ProgramSandboxRoot = root
 	}
 	if err := cxparsing.ParseSourceStrings(srcs, names); err != nil {
-		return 0, ErrCompile
+		return ErrCompile
 	}
 	if _, err := actions.AST.GetFunction(actions.AST.CXProgramNameIntern(constants.MAIN_FUNC), actions.AST.CxIrState.CxIrStateNameMain); err != nil {
-		return 0, errors.New("no main function in package main")
+		return errors.New("no main function in package main")
 	}
 	if err := cxparsing.AddInitFunction(actions.AST); err != nil {
-		return 0, err
+		return err
 	}
-	return runCompiledOn(executor, opts.Args)
+	return then()
 }
 
 // captureOutput sends os.Stdout to out, and os.Stderr to stderr or to out

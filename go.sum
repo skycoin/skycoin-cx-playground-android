@@ -29,6 +29,8 @@ github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5 h1:2uKlusxY1QPc
 github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5/go.mod h1:GTD5BEZxmxfJCJ1FBzJtM9og00ziZq/RSPkUPMb/rk8=
 github.com/skycoin/skycoin-cx v0.0.0-20261123002813-df4c987910ae h1:TwoBiHy7nWKS700NRJPnPmlT9lrK0jvNCi0PjwTu7IM=
 github.com/skycoin/skycoin-cx v0.0.0-20261123002813-df4c987910ae/go.mod h1:RXBzKKWHNIdmN1qAQQ2ef3P+pZoEUY8vFOU19v9pq3A=
+github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76 h1:yTQDVvkIh2QzNdIgEYLP3i54P9sR/wWtlju2scjipTY=
+github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76/go.mod h1:Uiq5ZN/VCq/fF2nu9RFtxA7iPWNA4LUug9DjspmGNYQ=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 go.etcd.io/bbolt v1.5.0 h1:S7GAl7Fxv12yohbwFfIbQCGDWbQbtDGPET4P/bD4lxU=

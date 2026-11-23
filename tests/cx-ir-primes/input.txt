@@ -1,0 +1,4 @@
+# The primes benchmark serialized, run on the vm by the auto executor. It must print what the source form prints.
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot end

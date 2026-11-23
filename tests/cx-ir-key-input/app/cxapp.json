@@ -1,0 +1,1 @@
+{"name": "CX IR: key input", "description": "Test demo: the key input program as a serialized CX program", "kind": "gfx", "form": "ir", "include": ["../../ui-key-input/app/main.cx"]}

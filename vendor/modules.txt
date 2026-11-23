@@ -138,6 +138,10 @@ github.com/skycoin/skycoin-cx/t6-cxfx
 github.com/skycoin/skycoin-cx/t7-init
 github.com/skycoin/skycoin-cx/t8-cxparsingcompletor
 github.com/skycoin/skycoin-cx/t9-cxparsing
+# github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76
+## explicit; go 1.26.0
+github.com/skycoin/skycoin-cx-forth/cxir
+github.com/skycoin/skycoin-cx-forth/forth
 # go.etcd.io/bbolt v1.5.0
 ## explicit; go 1.25.0
 go.etcd.io/bbolt

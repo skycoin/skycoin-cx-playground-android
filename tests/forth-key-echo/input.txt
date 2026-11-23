@@ -1,0 +1,7 @@
+# Keys typed into the cx-forth KEY word, echoed on the grid line by line.
+text hi
+key ENTER
+text abc
+key ENTER
+key ENTER
+screenshot end

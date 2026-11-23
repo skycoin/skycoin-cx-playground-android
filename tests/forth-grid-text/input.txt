@@ -1,0 +1,5 @@
+# The program draws text at grid rows and columns and waits for a key.
+screenshot grid
+key ENTER
+wait-for finished
+screenshot end

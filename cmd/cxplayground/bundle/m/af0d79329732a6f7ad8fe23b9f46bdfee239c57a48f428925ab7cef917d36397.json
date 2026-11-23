@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "cx-forth: key echo",
+  "description": "Test demo: Forth reads keys and echoes each line",
+  "kind": "gfx",
+  "form": "forth",
+  "entry": "main.fs",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.fs",
+      "size": 293,
+      "sha256": "5f9af35a51cced70bb1f1b32130a25b557fbc3a3320d262ff6c5307a98e20ed4",
+      "chunks": [
+        "5f9af35a51cced70bb1f1b32130a25b557fbc3a3320d262ff6c5307a98e20ed4"
+      ]
+    }
+  ]
+}

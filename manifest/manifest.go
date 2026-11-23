@@ -50,16 +50,29 @@ func (h Hash) Valid() bool {
 	return true
 }
 
+// The program forms of an app. A FormSource app holds CX sources that the app
+// compiles. A FormIR app holds one serialized CX program, the format of
+// skycoin-cx t3-ast SerializeCXProgram that cx build appends to its core,
+// which the app runs without a parser. A FormForth app holds Forth source for
+// the cx-forth VM.
+const (
+	FormSource = ""
+	FormIR     = "ir"
+	FormForth  = "forth"
+)
+
 // Manifest lists the files of one app.
 type Manifest struct {
-	Version     int      `json:"version"`
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	Kind        string   `json:"kind,omitempty"`
-	Entry       string   `json:"entry"`
-	Args        []string `json:"args,omitempty"`
-	ChunkSize   int      `json:"chunk_size"`
-	Files       []File   `json:"files"`
+	Version     int    `json:"version"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Kind        string `json:"kind,omitempty"`
+	// Form is how the app holds its program: FormSource, FormIR or FormForth.
+	Form      string   `json:"form,omitempty"`
+	Entry     string   `json:"entry"`
+	Args      []string `json:"args,omitempty"`
+	ChunkSize int      `json:"chunk_size"`
+	Files     []File   `json:"files"`
 }
 
 // File is one file of an app. Chunks holds the hash of each ChunkSize piece
@@ -76,12 +89,16 @@ type Meta struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Kind        string `json:"kind,omitempty"`
+	Form        string `json:"form,omitempty"`
 	Entry       string `json:"entry,omitempty"`
 	// Args is the program's os.Args, as the ++ arguments of cx.
 	Args []string `json:"args,omitempty"`
 	// Include lists files and directories outside the app directory, relative
 	// to it, whose regular files BuildDir adds under their base names.
 	Include []string `json:"include,omitempty"`
+	// CXIRExample names a cx-forth cxir.Examples program. cxmanifest writes
+	// its Forth translation to main.fs of a FormForth app.
+	CXIRExample string `json:"cxir_example,omitempty"`
 }
 
 // Build makes the manifest for every regular file under fsys. It also
@@ -99,7 +116,7 @@ func Build(fsys fs.FS, chunkSize int) (*Manifest, map[Hash][]byte, error) {
 		if len(meta.Include) > 0 {
 			return nil, nil, errors.New(MetaFile + ": include needs BuildDir")
 		}
-		m.Name, m.Description, m.Kind, m.Args = meta.Name, meta.Description, meta.Kind, meta.Args
+		m.Name, m.Description, m.Kind, m.Form, m.Args = meta.Name, meta.Description, meta.Kind, meta.Form, meta.Args
 		if meta.Entry != "" {
 			m.Entry = meta.Entry
 		}

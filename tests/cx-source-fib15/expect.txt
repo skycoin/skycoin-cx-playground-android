@@ -1,0 +1,2 @@
+finished app="CX source: fib 0 to 14" err=<nil>
+file-equals stdout.txt expected/stdout.txt

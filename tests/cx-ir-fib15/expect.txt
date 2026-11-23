@@ -1,0 +1,2 @@
+finished app="CX IR: fib 0 to 14" err=<nil>
+file-equals stdout.txt ../cx-source-fib15/expected/stdout.txt

@@ -1,0 +1,4 @@
+# The same program serialized by make bundle, run without the parser. It must print what the source form prints.
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot end

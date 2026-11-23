@@ -1,0 +1,4 @@
+# The primes benchmark as CX source, run on the old executor.
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot end

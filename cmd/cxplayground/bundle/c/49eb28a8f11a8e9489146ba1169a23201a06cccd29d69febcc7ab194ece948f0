@@ -1,0 +1,7 @@
+\ Text at rows and columns of the terminal grid, then wait for a key.
+PAGE
+2 1 AT-XY ." hello from cx-forth"
+2 3 AT-XY ." 6 x 7 = " 6 7 * .
+GRID-SIZE 2 5 AT-XY ." grid " SWAP . ." by " .
+KEY DROP
+0 7 AT-XY ." bye" CR

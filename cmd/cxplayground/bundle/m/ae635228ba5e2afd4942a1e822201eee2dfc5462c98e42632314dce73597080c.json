@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "CX source: primes",
+  "description": "Test demo: the primes benchmark as CX source",
+  "kind": "console",
+  "entry": "primes.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "primes.cx",
+      "size": 2912,
+      "sha256": "fc8029916633e1e1523db149f21ad84b442b4be3352248c1e3a7d729f01ef565",
+      "chunks": [
+        "fc8029916633e1e1523db149f21ad84b442b4be3352248c1e3a7d729f01ef565"
+      ]
+    }
+  ]
+}

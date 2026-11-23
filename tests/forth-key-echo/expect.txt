@@ -1,0 +1,6 @@
+out > hi
+out length 2
+out > abc
+out length 3
+out > done
+finished app="cx-forth: key echo" err=<nil>

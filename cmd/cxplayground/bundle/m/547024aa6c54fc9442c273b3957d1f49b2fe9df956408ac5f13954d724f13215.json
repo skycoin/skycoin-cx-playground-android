@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "CX source: fib 0 to 14",
+  "description": "Test demo: the cx-forth fib example as CX source",
+  "kind": "console",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 166,
+      "sha256": "03068db0cdd0a499ea0265e76d15aba8dafd47058821cc0a672f1ad2b5c799a2",
+      "chunks": [
+        "03068db0cdd0a499ea0265e76d15aba8dafd47058821cc0a672f1ad2b5c799a2"
+      ]
+    }
+  ]
+}

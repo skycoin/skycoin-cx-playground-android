@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "CX IR: fib 0 to 14",
+  "description": "Test demo: the same program as a serialized CX program",
+  "kind": "console",
+  "form": "ir",
+  "entry": "main.cxir",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cxir",
+      "size": 5324,
+      "sha256": "1476a8e920ad79ee5d5b788708d54f73933695c8fdc67d449359eecd43d87ace",
+      "chunks": [
+        "1476a8e920ad79ee5d5b788708d54f73933695c8fdc67d449359eecd43d87ace"
+      ]
+    }
+  ]
+}

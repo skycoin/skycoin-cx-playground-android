@@ -1,0 +1,8 @@
+# The key input program as a serialized CX program. Its app opcodes are
+# outside the vm, so the auto executor runs it on the old one. The checks are
+# those of ui-key-input, the source form.
+key A
+key KEYCODE_7
+key ENTER
+key DEL
+screenshot end
