@@ -1,0 +1,10 @@
+# Text with spaces and punctuation through adb input text, then a fix with
+# backspace.
+text Hello, CX world!
+key ENTER
+text 42+x
+key DEL
+key DEL
+text 1
+key ENTER
+screenshot end

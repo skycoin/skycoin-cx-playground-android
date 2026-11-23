@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Key input",
+  "description": "Test demo: prints the code of every key event",
+  "kind": "gfx",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 740,
+      "sha256": "ee6ef0fd86c869ef74444dcc286f2f5a10197aa3dc777eb6472a2012f754c9fb",
+      "chunks": [
+        "ee6ef0fd86c869ef74444dcc286f2f5a10197aa3dc777eb6472a2012f754c9fb"
+      ]
+    }
+  ]
+}

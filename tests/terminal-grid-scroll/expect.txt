@@ -1,0 +1,5 @@
+out rows=21 top=line 10 bottom=line 30
+out rows=21 top=line 13 bottom=line 33
+screen-changed start scrolled
+# The whole grid, below the top bar and above the navigation bar.
+screen-matches scrolled 0 364 720 820

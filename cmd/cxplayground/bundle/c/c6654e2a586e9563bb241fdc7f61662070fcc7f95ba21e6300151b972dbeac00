@@ -1,0 +1,10 @@
+package main
+
+import "sys/string"
+
+func stringToBytes(s str) (bytes []ui8) {
+	var count i32 = string.ByteLength(s)
+	for i := 0; i < count; i++ {
+		bytes = append(bytes, i32.ui8(byteValue(string.SubstringByByteRange(s, i, i + 1))))
+	}
+}

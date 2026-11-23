@@ -1,0 +1,6 @@
+# Four swipes of 300 ms, one per direction.
+swipe 100 800 600 800 300
+swipe 600 800 100 800 300
+swipe 360 1100 360 500 300
+swipe 360 500 360 1100 300
+screenshot end

@@ -1,0 +1,4 @@
+out key 1 code=97 97
+out key 2 code=55 55
+out key 3 code=10 enter
+out key 4 code=8 backspace

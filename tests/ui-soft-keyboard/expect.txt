@@ -1,0 +1,6 @@
+# The keyboard state itself is read from dumpsys input_method by the
+# keyboard steps. Whether the canvas shrinks for it varies between runs, so
+# resize events are not checked.
+out show keyboard
+out hide keyboard
+screen-changed open closed

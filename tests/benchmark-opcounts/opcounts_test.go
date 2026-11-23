@@ -2,7 +2,7 @@
 
 // Package benchmarkopcounts checks the operation counts in the benchmark
 // app's suite.json, which the app divides by its median times for ops/ms.
-// Run it with: go test -tags cxopcount ./gotests/benchmark-opcounts
+// Run it with: go test -tags cxopcount ./tests/benchmark-opcounts
 package benchmarkopcounts
 
 import (

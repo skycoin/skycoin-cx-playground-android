@@ -1,0 +1,8 @@
+package main
+
+// Port of femto_tool_t of tools/tool_registry.h, without the execute pointer.
+type ToolDefinition struct {
+	name str
+	description str
+	inputSchemaJson str
+}

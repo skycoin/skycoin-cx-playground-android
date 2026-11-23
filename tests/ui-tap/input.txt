@@ -1,0 +1,7 @@
+# Three taps at screen pixels. The app prints them in canvas pixels, which
+# start below the top bar.
+screenshot start
+tap 100 500
+tap 600 700
+tap 360 1000
+screenshot end

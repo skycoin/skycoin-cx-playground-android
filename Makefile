@@ -19,7 +19,7 @@ check-bundle: ## Fail if the committed bundle is stale
 
 test: ## Run the tests, including every bundled CX app headless
 	go test ./...
-	go test -tags cxopcount ./gotests/benchmark-opcounts
+	go test -tags cxopcount ./tests/benchmark-opcounts
 
 vet:
 	go vet ./...
@@ -42,7 +42,7 @@ RIG_IMAGE ?= cx-android-rig
 emulator-image: ## Build the headless Android emulator image
 	docker build -t $(RIG_IMAGE) docker/emulator
 
-emulator-smoke: ## Boot the rig, build the APK, run every test in tests/, stop the rig
+emulator-smoke: ## Boot the rig, build the APK, run every emulator test in tests/, stop the rig
 	docker image inspect $(RIG_IMAGE) > /dev/null 2>&1 || $(MAKE) emulator-image
 	go run ./cmd/emulator-driver suite -boot -stop -image $(RIG_IMAGE)
 

@@ -1,0 +1,3 @@
+stdout saved bytes=1045 err=<nil>
+finished app="Femtoclaw replay" err=<nil>
+file-equals stdout.txt ../../microagents/femtoclaw/tests/replay-determinism/expected-output.txt

@@ -1,0 +1,22 @@
+package main
+
+import "sys/string"
+
+// Port of build_tool_results of agent/agent_loop.c, printed. The cron_add
+// input patch of patch_tool_input_with_context only changes what cron_add
+// receives, and cron_add is not ported, so the patch is left out.
+func agentToolResults(reply LlmReply) (content str) {
+	content = "["
+	for i := 0; i < len(reply.calls); i++ {
+		var input str = reply.calls[i].inputJson
+		if string.ByteLength(input) == 0 {
+			input = "{}"
+		}
+		var output str = toolRegistryExecute(reply.calls[i].name, input)
+		if i > 0 {
+			content = string.Concatenation(content, ",")
+		}
+		content = string.Concatenation(content, joinStrings([]str{"{\"type\":\"tool_result\",\"tool_use_id\":", jsonEscapeString(reply.calls[i].id), ",\"content\":", jsonEscapeString(output), "}"}))
+	}
+	content = string.Concatenation(content, "]")
+}

@@ -1,0 +1,3 @@
+# The scene does not change, so one capture after it is on screen is enough.
+wait 500
+screenshot scene

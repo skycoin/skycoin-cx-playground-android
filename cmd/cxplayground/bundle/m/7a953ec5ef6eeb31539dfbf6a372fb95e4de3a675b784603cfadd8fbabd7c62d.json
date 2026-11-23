@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Rotation",
+  "description": "Test demo: prints each resize and where taps land after a turn",
+  "kind": "gfx",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 838,
+      "sha256": "ba795011046eeed094922c734acad2526c801c1284ac9366c3c2706b9a16291d",
+      "chunks": [
+        "ba795011046eeed094922c734acad2526c801c1284ac9366c3c2706b9a16291d"
+      ]
+    }
+  ]
+}

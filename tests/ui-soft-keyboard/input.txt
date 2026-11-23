@@ -1,0 +1,11 @@
+# The rig has a hardware keyboard, so emulator.txt lets the soft keyboard
+# show anyway. Taps go to the top of the canvas, above the keyboard.
+keyboard hidden
+tap 360 450
+keyboard shown
+wait 500
+screenshot open
+tap 360 450
+keyboard hidden
+wait 500
+screenshot closed

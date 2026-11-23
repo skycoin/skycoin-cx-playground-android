@@ -1,0 +1,2 @@
+out line 1: [Hello, CX world!] 16 bytes
+out line 2: [421] 3 bytes

@@ -1,0 +1,6 @@
+# Directions only: the first point of an adb swipe is not always where it
+# was asked to start.
+out swipe 1 right
+out swipe 2 left
+out swipe 3 up
+out swipe 4 down

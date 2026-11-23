@@ -1,0 +1,17 @@
+# One line per benchmark and executor, from benchsuite.ResultLine.
+out suite phone scale, 1 runs per benchmark and executor
+out count    old pass
+out count    vm  pass
+out fib      old pass
+out fib      vm  pass
+out array    old pass
+out array    vm  pass
+out struct   old pass
+out struct   vm  pass
+out memtest  old pass
+out memtest  vm  pass
+out primes   old pass
+out primes   vm  pass
+out saved /data/user/0/com.skycoin.cxplayground/files/benchmark-results/
+file-contains results.json "schema": "cx-playground-benchmark/1"
+file-contains results.json "runs": 1

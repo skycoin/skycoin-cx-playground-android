@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Terminal grid text",
+  "description": "Test demo: text at rows and columns of the monospaced grid, with a block cursor",
+  "kind": "gfx",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 1943,
+      "sha256": "58b7624119077044de6206879e93f97bbdc602d3f5f2372b2f3d4837b3101e53",
+      "chunks": [
+        "58b7624119077044de6206879e93f97bbdc602d3f5f2372b2f3d4837b3101e53"
+      ]
+    }
+  ]
+}

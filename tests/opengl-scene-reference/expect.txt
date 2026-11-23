@@ -1,0 +1,4 @@
+out scene drawn
+# The canvas only, so the clock in the status bar and the app hash in the
+# top bar do not count.
+screen-matches scene 0 364 720 820

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Terminal grid scroll",
+  "description": "Test demo: a terminal that scrolls up one row per line once the grid is full",
+  "kind": "gfx",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 1193,
+      "sha256": "3d203d0ceef1bc47799f81c956e94be89253afa585fdb9657824b1256f622b44",
+      "chunks": [
+        "3d203d0ceef1bc47799f81c956e94be89253afa585fdb9657824b1256f622b44"
+      ]
+    }
+  ]
+}

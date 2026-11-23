@@ -1,0 +1,6 @@
+# Text drawn at rows and columns of the grid, from app.CellSize, and a
+# block cursor that typing moves along row 4.
+wait 1000
+screenshot start
+text abc
+screenshot typed

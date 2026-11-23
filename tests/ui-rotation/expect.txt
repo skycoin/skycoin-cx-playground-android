@@ -1,0 +1,5 @@
+out resize landscape 1184 x 390
+out tap at 1100 320 on 1184 x 390
+out resize portrait 720 x 820
+screen-changed portrait landscape
+screen-matches landscape 0 330 1184 390

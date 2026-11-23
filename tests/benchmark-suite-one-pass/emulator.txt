@@ -1,0 +1,7 @@
+# The benchmark app from apps/benchmarks, started at once with one run per
+# benchmark and executor. It draws no CX frames, so the start line marks it
+# ready.
+app Benchmark suite
+ready start app="Benchmark suite"
+setprop debug.cxplayground.benchmark.runs 1
+timeout 120

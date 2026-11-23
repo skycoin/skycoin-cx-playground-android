@@ -1,0 +1,11 @@
+# The grid starts with 30 lines, more than its 21 rows, so line 10 is on
+# top. Each ENTER adds a line and scrolls the grid up one row. The tap comes
+# first because an ENTER sent as the first input after the start is
+# sometimes lost before it reaches the app.
+wait 1000
+screenshot start
+tap 360 900
+key ENTER
+key ENTER
+key ENTER
+screenshot scrolled

@@ -1,0 +1,11 @@
+# The turn may pass through a size in between, so only the end sizes are
+# checked.
+out grid cols=42 rows=21
+out resize 1184 x 390
+out grid cols=70 rows=10
+out resize 720 x 820
+out grid cols=42 rows=21
+screen-changed portrait landscape
+screen-matches portrait 0 364 720 820
+screen-matches landscape 0 330 1184 390
+screen-matches back 0 364 720 820

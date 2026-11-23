@@ -1,0 +1,5 @@
+# The port replays its tape inside the app. Test mode saves the program's
+# standard output, which the driver pulls and compares with the host replay.
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot end

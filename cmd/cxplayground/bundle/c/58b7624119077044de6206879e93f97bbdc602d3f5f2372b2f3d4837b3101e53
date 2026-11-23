@@ -1,0 +1,74 @@
+package main
+
+import "sys/app"
+import "sys/string"
+
+// put draws text with its first character in the cell at row, col.
+func put(s str, row i32, col i32, cw f32, ch f32, r f32, g f32, b f32) {
+	app.Text(s, f32.mul(i32.f32(col), cw), f32.mul(i32.f32(row), ch), 0.0, r, g, b, 1.0)
+}
+
+// gridChanged reports whether a w by h canvas holds another number of cells
+// than cols by rows.
+func gridChanged(w i32, h i32, cw f32, ch f32, cols i32, rows i32) (changed bool) {
+	changed = false
+	if f32.i32(f32.div(i32.f32(w), cw)) != cols {
+		changed = true
+	}
+	if f32.i32(f32.div(i32.f32(h), ch)) != rows {
+		changed = true
+	}
+}
+
+func main() {
+	var w i32
+	var h i32
+	var cw f32
+	var ch f32
+	var cols i32 = 0
+	var rows i32 = 0
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var typed str = ""
+	var crow i32 = 4
+	var ccol i32 = 2
+
+	for bool.not(app.ShouldClose()) {
+		w, h = app.ScreenSize()
+		cw, ch = app.CellSize()
+		if cw > 0.0 {
+			if gridChanged(w, h, cw, ch, cols, rows) {
+				cols = f32.i32(f32.div(i32.f32(w), cw))
+				rows = f32.i32(f32.div(i32.f32(h), ch))
+				printf("grid cols=%d rows=%d\n", cols, rows)
+			}
+		}
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			if kind == app.KEY {
+				if code == app.KEY_ENTER {
+					crow = crow + 1
+					ccol = 2
+				} else {
+					typed = string.Concatenation(typed, app.Rune(code))
+					ccol = ccol + 1
+				}
+				printf("cursor row=%d col=%d\n", crow, ccol)
+			}
+			kind, ex, ey, code = app.PollEvent()
+		}
+
+		app.Clear(0.0, 0.0, 0.0)
+		if cw > 0.0 {
+			put("0123456789012345678901234567890123456789", 0, 0, cw, ch, 0.45, 0.45, 0.45)
+			put("row 1 col 0", 1, 0, cw, ch, 1.0, 1.0, 1.0)
+			put("row 2 col 10", 2, 10, cw, ch, 1.0, 0.85, 0.3)
+			put("row 3 col 20", 3, 20, cw, ch, 0.4, 0.8, 1.0)
+			put(string.Concatenation("> ", typed), 4, 0, cw, ch, 0.6, 1.0, 0.6)
+			app.Rect(f32.mul(i32.f32(ccol), cw), f32.mul(i32.f32(crow), ch), cw, ch, 0.6, 1.0, 0.6, 1.0)
+		}
+		app.Frame()
+	}
+}

@@ -1,0 +1,3 @@
+wait-for out saved
+pull benchmark-results/*.json results.json
+screenshot end

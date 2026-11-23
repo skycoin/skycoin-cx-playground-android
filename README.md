@@ -46,6 +46,15 @@ cxmanifest bundle -o cmd/cxplayground/bundle apps/*
 cxmanifest verify cmd/cxplayground/bundle
 ```
 
+Two optional `cxapp.json` fields serve programs that read files. `args` is
+the program's `os.Args`, as the `++` arguments of cx, and goes into the
+manifest. `include` lists files and directories outside the app directory,
+relative to it, whose files `cxmanifest` adds under their base names, so an
+app can use sources kept elsewhere without a copy. The app writes the files
+of an app that are not CX sources to `app-files/<hash>/` in its files dir
+and makes that the program's sandbox root, which its `os` file operations
+resolve against. `os.Exit` ends the program, not the app.
+
 Fetching apps over the network is deferred. `store.Source` is the seam: a
 loader that can return an index, a manifest and a chunk by hash plugs in
 without changes to verification or the UI.
@@ -67,6 +76,7 @@ package with `import "sys/app"`.
 | `app.ShowKeyboard()`, `app.HideKeyboard()` | the soft keyboard |
 | `app.ShouldClose() bool` | the user pressed back |
 | `app.Rune(code i32) str` | a key code as text, as `sprintf` has no `%c` |
+| `app.CellSize() (w, h f32)` | the advance and line height of one character of the app font, the cell of a terminal grid |
 
 Console output from `printf` and `string.PrintLine` is shown on screen, and so
 are compile and runtime errors.
@@ -82,17 +92,79 @@ make emulator-image   # build the image
 make emulator-smoke   # boot it, build the APK, run tests/, print the timing table
 ```
 
-Each folder under `tests/` is one test. `app/` is the CX app, which `make
-bundle` adds to the APK. `input.txt` lists the events to inject and the
-screenshots to take, and `expect.txt` the test mode lines that must appear in
-logcat, in order. Results go to `results/<time>/<test>/`: the PNGs, the
-logcat and the timing table.
+Each folder under `tests/` is one test. A folder with an `app/` or an
+`emulator.txt` is an emulator test, and the driver skips the others, which
+hold go tests. `app/` is the CX app, which `make bundle` adds to the APK.
+`input.txt` lists the steps and `expect.txt` the checks. Results go to
+`results/<time>/<test>/`: the PNGs, pulled files, the logcat and the timing
+table.
+
+| `input.txt` step | Does |
+| --- | --- |
+| `text <string>`, `key <NAME or code>` | types, `key ENTER` or `key KEYCODE_7`, a bare number is a key code |
+| `tap <x> <y>`, `swipe <x1> <y1> <x2> <y2> [ms]` | touch, in screen pixels of the 720x1280 rig display |
+| `rotate <0..3>` | turns the display with `settings put system user_rotation`, which works on a phone too |
+| `screenshot <name>` | saves the screen |
+| `wait <ms>`, `wait-for <text>` | pauses, or waits for a test mode line containing text |
+| `keyboard shown\|hidden` | waits for that soft keyboard state in `dumpsys input_method` |
+| `pull <path> <name>` | saves a file the app published in test mode, path relative to its files dir, globs allowed |
+
+Each injected step is timed until the frame that reflects it, `rotate` until
+the frame after its resize event.
+
+| `expect.txt` line | Passes when |
+| --- | --- |
+| any other text | a test mode line contains it, after the line the previous one matched |
+| `screen-changed <a> <b>` | two screenshots differ |
+| `screen-matches <name> [x y w h]` | the screenshot, or the region, matches `expected/<name>.png` within `-tolerance` per channel and `-max-diff` of the pixels |
+| `file-equals <pulled> <path>` | a pulled file equals a file of the repository, path relative to the test folder |
+| `file-contains <pulled> <text>` | a pulled file contains the text |
+
+Regions keep the status bar clock and the top bar with the app hash out of
+the comparison. `suite -update-references` writes the captured regions to
+`expected/` instead of comparing them, for a new test or a deliberate change.
+
+`emulator.txt` holds optional settings:
+
+| Line | Does |
+| --- | --- |
+| `app <name>` | runs a bundled app from `apps/` instead of `app/` |
+| `ready <text>` | waits for this test mode line instead of the first frame, for apps that draw no CX frames |
+| `setprop <name> <value>` | sets a property before the start and clears it after |
+| `before <command>`, `after <command>` | device shell commands around the test |
+| `timeout <seconds>` | for `wait-for` and the checks, 10 by default |
 
 The app enters test mode when the system property `debug.cxplayground.test`
 is 1, and `debug.cxplayground.autostart` names an app to run at launch. Test
 mode logs each frame the program draws, the last event the program polled
 before drawing it, the texts it shows, each queued event with a sequence
-number and each line of console output, all starting with `cxtest`.
+number and each line of console output, all starting with `cxtest`. It also
+saves the standard output of each program to `cxtest/stdout.txt` in the
+app's files dir. It publishes that file and the benchmark results it saves
+through logcat as base64 lines with a SHA-256, since `run-as` cannot read
+the files of the release APK that gogio builds. `debug.cxplayground.benchmark.runs` starts the benchmark
+suite at once with that many runs.
+
+| Test | Checks |
+| --- | --- |
+| `type-echo` | text, a key and a tap reach the program and its frames |
+| `terminal-grid-text` | text at rows and columns of the grid from `app.CellSize`, a block cursor that typing moves |
+| `terminal-grid-scroll` | a full grid scrolls up one row per line |
+| `terminal-grid-resize-on-rotation` | the grid takes 70 by 10 cells in landscape and 42 by 21 again in portrait |
+| `opengl-scene-reference` | a fixed scene of rectangles, circles, a triangle and lines against a reference image |
+| `ui-key-input` | single key events, letters, digits, ENTER and DEL |
+| `ui-text-input` | text with spaces and punctuation, and backspace |
+| `ui-tap` | taps arrive at the right canvas pixels |
+| `ui-swipe` | swipes in four directions |
+| `ui-soft-keyboard` | `app.ShowKeyboard` and `app.HideKeyboard` open and close the soft keyboard |
+| `ui-rotation` | resize events on a turn and a tap in landscape |
+| `benchmark-suite-one-pass` | one pass of the benchmark suite, every benchmark passes and the JSON document is saved |
+| `femtoclaw-replay-in-emulator` | the femtoclaw CX port replays its tape in the app with output byte identical to the host replay |
+| `benchmark-hashes` (go) | expected hashes against the math and skycoin-cx, and every program run from the bundle on both executors prints them |
+| `benchmark-opcounts` (go) | the operation counts in `suite.json` (needs `-tags cxopcount`) |
+| `results-schema-roundtrip` (go) | a document encodes and decodes unchanged, malformed ones are refused |
+| `collector-accept-reject` (go) | the collector stores a valid upload and refuses duplicates, bad and oversized ones |
+| `femtoclaw-replay-in-app-runtime` (go) | the bundled femtoclaw app run through `store` and `cxrun` on the host prints the host replay's bytes, twice |
 
 ## Benchmark suite
 
@@ -117,7 +189,7 @@ The choices below were made without a spec and are provisional.
 - **ops/ms.** The app is not built with the `cxopcount` tag, because counting
   costs time in the loop. The operation counts of each program are measured
   once on a host and stored in `suite.json`, and
-  `go test -tags cxopcount ./gotests/benchmark-opcounts` checks them (`make test`
+  `go test -tags cxopcount ./tests/benchmark-opcounts` checks them (`make test`
   runs it). The old executor counts expressions and the vm counts
   instructions, so ops/ms is only comparable within one executor.
 - **Upload.** POST of the document to `BENCHMARK_UPLOAD_URL`, set at build time
@@ -173,18 +245,6 @@ build/benchmark-collector -addr 127.0.0.1:8090 -db benchmark-runs.db
 
 It is not deployed anywhere. Where it runs and which URL the app uploads to
 are open.
-
-### Tests
-
-One folder per test under `gotests/`. They are go tests, kept apart from
-`tests/`, where the emulator driver expects every folder to hold an `app/`:
-
-| Folder | Checks |
-| --- | --- |
-| `benchmark-hashes` | expected hashes against the math and skycoin-cx, and every program run from the bundle on both executors prints them |
-| `benchmark-opcounts` | the operation counts in `suite.json` (needs `-tags cxopcount`) |
-| `results-schema-roundtrip` | a document encodes and decodes unchanged, malformed ones are refused |
-| `collector-accept-reject` | the collector stores a valid upload and refuses duplicates, bad and oversized ones |
 
 ## Known limits
 

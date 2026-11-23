@@ -1,0 +1,23 @@
+package main
+
+import "sys/string"
+
+// Port of tool_read_file_execute of tools/tool_files.c.
+func toolReadFile(inputJson str) (output str) {
+	var start i32 = jsonSkipSpace(inputJson, 0)
+	if !string.EqualityByByteValue(string.SubstringByByteRange(inputJson, start, start + 1), "{") {
+		output = "Error: invalid JSON input"
+		return
+	}
+	path, pathFound := jsonStringField(inputJson, start, "path")
+	if !pathFound || !toolValidatePath(path) {
+		output = "Error: path must start with /spiffs/ and must not contain '..'"
+		return
+	}
+	content, found := fileRead(path)
+	if !found {
+		output = joinStrings([]str{"Error: file not found: ", path})
+		return
+	}
+	output = content
+}

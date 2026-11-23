@@ -1,0 +1,7 @@
+# 720 x 820 canvas pixels in cells of the 14 sp app font on the rig display.
+out grid cols=42 rows=21
+out cursor row=4 col=5
+screen-changed start typed
+# Rows 0 to 4 of the grid, below the top bar.
+screen-matches start 0 364 720 228
+screen-matches typed 0 364 720 228

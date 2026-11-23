@@ -1,0 +1,10 @@
+# Landscape and back. Each turn resizes the canvas and the grid. The wait
+# lets any system dim after the app start pass before the first capture.
+wait 1000
+screenshot portrait
+rotate 1
+wait 500
+screenshot landscape
+rotate 0
+wait 500
+screenshot back

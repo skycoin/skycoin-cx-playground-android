@@ -1,0 +1,7 @@
+# Single key events: a letter, a digit, ENTER and DEL, as adb input keyevent
+# sends them. A bare number would be a key code, so the digit is KEYCODE_7.
+key A
+key KEYCODE_7
+key ENTER
+key DEL
+screenshot end

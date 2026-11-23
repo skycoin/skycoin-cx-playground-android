@@ -1,0 +1,6 @@
+# Canvas pixels: the canvas starts 364 screen pixels down.
+out tap 1 at 100 136
+out tap 2 at 600 336
+out tap 3 at 360 636
+screen-changed start end
+screen-matches end 0 364 720 820
