@@ -1,0 +1,7 @@
+# One step per line, run in order after the app shows its first frame.
+# tap and swipe take screen pixels on the 720x1280 rig display.
+screenshot start
+text hello
+key ENTER
+tap 130 820
+screenshot end

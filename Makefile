@@ -1,4 +1,4 @@
-.PHONY: bundle check-bundle test vet apk install
+.PHONY: bundle check-bundle test vet apk install emulator-image emulator-smoke
 
 GOGIO_REF := 0magnet
 APPID := com.skycoin.cxplayground
@@ -9,10 +9,10 @@ ANDROID_NDK_ROOT ?= $(ANDROID_HOME)/ndk/30.0.16248370
 export ANDROID_HOME ANDROID_NDK_ROOT
 
 bundle: ## Rebuild the embedded app bundle from apps/
-	go run ./cmd/cxmanifest bundle -o cmd/cxplayground/bundle apps/*
+	go run ./cmd/cxmanifest bundle -o cmd/cxplayground/bundle apps/* tests/*/app
 
 check-bundle: ## Fail if the committed bundle is stale
-	go run ./cmd/cxmanifest bundle -o build/bundle-check apps/* > /dev/null
+	go run ./cmd/cxmanifest bundle -o build/bundle-check apps/* tests/*/app > /dev/null
 	diff -r build/bundle-check cmd/cxplayground/bundle
 
 test: ## Run the tests, including every bundled CX app headless
@@ -31,3 +31,12 @@ apk: build/gogio/gogio check-bundle ## Build the APK for $(ARCH)
 install: apk ## Install the APK on the adb device and start it
 	adb install -r $(APK)
 	adb shell am start -n $(APPID)/org.gioui.GioActivity
+
+RIG_IMAGE ?= cx-android-rig
+
+emulator-image: ## Build the headless Android emulator image
+	docker build -t $(RIG_IMAGE) docker/emulator
+
+emulator-smoke: ## Boot the rig, build the APK, run every test in tests/, stop the rig
+	docker image inspect $(RIG_IMAGE) > /dev/null 2>&1 || $(MAKE) emulator-image
+	go run ./cmd/emulator-driver suite -boot -stop -image $(RIG_IMAGE)

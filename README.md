@@ -71,6 +71,29 @@ package with `import "sys/app"`.
 Console output from `printf` and `string.PrintLine` is shown on screen, and so
 are compile and runtime errors.
 
+## Emulator test rig
+
+`docker/emulator` is a headless Android emulator image (x86_64, no Google
+Play, KVM). `cmd/emulator-driver` drives the app through adb, so it also
+works against a phone with `-serial`.
+
+```
+make emulator-image   # build the image
+make emulator-smoke   # boot it, build the APK, run tests/, print the timing table
+```
+
+Each folder under `tests/` is one test. `app/` is the CX app, which `make
+bundle` adds to the APK. `input.txt` lists the events to inject and the
+screenshots to take, and `expect.txt` the test mode lines that must appear in
+logcat, in order. Results go to `results/<time>/<test>/`: the PNGs, the
+logcat and the timing table.
+
+The app enters test mode when the system property `debug.cxplayground.test`
+is 1, and `debug.cxplayground.autostart` names an app to run at launch. Test
+mode logs each frame the program draws, the last event the program polled
+before drawing it, the texts it shows, each queued event with a sequence
+number and each line of console output, all starting with `cxtest`.
+
 ## Known limits
 
 A program cannot be interrupted. Back stops a `gfx` program at its next

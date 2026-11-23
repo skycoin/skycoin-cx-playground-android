@@ -1,0 +1,8 @@
+# Lines that must appear in the app's test mode logcat, in this order.
+out ready
+Type echo | > _ | last: nothing typed yet | taps: 0
+out typed: hello
+last: hello
+out tap 1 at
+taps: 1
+screen-changed start end

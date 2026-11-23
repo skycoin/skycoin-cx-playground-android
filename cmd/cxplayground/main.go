@@ -90,6 +90,12 @@ type ui struct {
 	focused  bool
 	edit     []rune // what the IME believes the text field holds
 	leaveReq bool
+
+	// Test mode, see testmode.go. drawn is the program frame on screen.
+	trace       *tracer
+	drawn       programFrame
+	tracedFrame int
+	tracedTexts string
 }
 
 func run(w *app.Window) error {
@@ -119,6 +125,11 @@ func run(w *app.Window) error {
 		log.Printf("cxplayground: %v", e)
 	}
 	u.rows = make([]widget.Clickable, len(u.apps))
+	if ts := loadTestSettings(); ts.enabled {
+		u.trace = &tracer{}
+		u.trace.printf("test mode on, autostart %q", ts.autostart)
+		u.autostart(ts.autostart)
+	}
 
 	var ops op.Ops
 	for {
@@ -136,6 +147,7 @@ func run(w *app.Window) error {
 			e.Frame(gtx.Ops)
 			if u.host != nil {
 				u.host.frameShown()
+				u.traceFrame()
 			}
 		}
 	}
@@ -214,8 +226,10 @@ func (u *ui) layoutList(gtx layout.Context) {
 func (u *ui) start(a *store.App) {
 	u.cur, u.result, u.leaveReq, u.focused, u.edit = a, "", false, false, nil
 	u.runID++
-	u.host = newHost(u.w.Invalidate)
-	u.out = &console{invalidate: u.w.Invalidate}
+	u.host = newHost(u.w.Invalidate, u.trace)
+	u.out = &console{invalidate: u.w.Invalidate, trace: u.trace}
+	u.drawn, u.tracedFrame, u.tracedTexts = programFrame{}, 0, ""
+	u.trace.printf("start app=%q hash=%s", a.Manifest.Name, a.Hash)
 	u.done = make(chan struct{})
 	u.started = time.Now()
 	h, out, done := u.host, u.out, u.done
@@ -233,6 +247,7 @@ func (u *ui) start(a *store.App) {
 			fmt.Fprintf(out, "error: %v\n", err)
 		}
 		log.Printf("cxplayground: %s finished: %v", a.Manifest.Name, err)
+		u.trace.printf("finished app=%q err=%v", a.Manifest.Name, err)
 	}()
 }
 
@@ -275,8 +290,12 @@ func (u *ui) layoutRun(gtx layout.Context) {
 		u.layoutList(gtx)
 		return
 	}
-	cmds, drew := u.host.takeFrame()
-	gfx := u.cur.Manifest.Kind == "gfx" && drew && !done
+	f := u.host.takeFrame()
+	cmds := f.cmds
+	gfx := u.cur.Manifest.Kind == "gfx" && f.number > 0 && !done
+	if gfx {
+		u.drawn = f
+	}
 
 	layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
@@ -481,4 +500,33 @@ func (u *ui) applyEdit(gtx layout.Context, tag event.Tag, r key.Range, s string)
 	n := len(next)
 	gtx.Execute(key.SnippetCmd{Tag: tag, Snippet: key.Snippet{Range: key.Range{End: n}, Text: string(next)}})
 	gtx.Execute(key.SelectionCmd{Tag: tag, Range: key.Range{Start: n, End: n}, Caret: key.Caret{}})
+}
+
+// autostart runs the app with the given manifest name, for the test driver.
+func (u *ui) autostart(name string) {
+	if name == "" {
+		return
+	}
+	for i := range u.apps {
+		if u.apps[i].Manifest.Name == name {
+			u.start(&u.apps[i])
+			return
+		}
+	}
+	u.trace.printf("autostart: no app named %q", name)
+}
+
+// traceFrame reports a program frame once it is on screen, with the last
+// event it reflects and, when they changed, the texts it shows.
+func (u *ui) traceFrame() {
+	f := u.drawn
+	if u.trace == nil || f.number == u.tracedFrame {
+		return
+	}
+	u.tracedFrame = f.number
+	u.trace.printf("frame n=%d event=%d", f.number, f.afterEvent)
+	if t := frameTexts(f.cmds); t != u.tracedTexts {
+		u.tracedTexts = t
+		u.trace.printf("text n=%d %s", f.number, t)
+	}
 }

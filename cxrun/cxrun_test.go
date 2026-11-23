@@ -56,15 +56,22 @@ func readApp(t *testing.T, dir string) map[string][]byte {
 	return files
 }
 
-// TestApps runs every bundled app twice in one process.
+// TestApps runs every bundled app, and every test folder app, twice in one
+// process.
 func TestApps(t *testing.T) {
 	dirs, _ := filepath.Glob("../apps/*")
+	testApps, _ := filepath.Glob("../tests/*/app")
+	dirs = append(dirs, testApps...)
 	if len(dirs) == 0 {
 		t.Fatal("no apps")
 	}
 	for round := 0; round < 2; round++ {
 		for _, d := range dirs {
-			t.Run(filepath.Base(d), func(t *testing.T) {
+			name := filepath.Base(d)
+			if name == "app" {
+				name = filepath.Base(filepath.Dir(d))
+			}
+			t.Run(name, func(t *testing.T) {
 				h := &fakeHost{events: []Event{
 					{Kind: EvTouchDown, X: 300, Y: 1300}, {Kind: EvTouchMove, X: 320, Y: 1310},
 					{Kind: EvTouchUp, X: 320, Y: 1310}, {Kind: EvTouchUp, X: 100, Y: 300}, {Kind: EvTouchUp, X: 700, Y: 300}, {Kind: EvTouchUp, X: 100, Y: 300}, {Kind: EvKey, Code: 'h'}, {Kind: EvKey, Code: 'i'},
