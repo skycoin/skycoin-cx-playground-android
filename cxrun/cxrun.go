@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	packages "github.com/skycoin/skycoin-cx/t0-packages"
 	types "github.com/skycoin/skycoin-cx/t0-types"
@@ -18,9 +19,7 @@ import (
 	globals "github.com/skycoin/skycoin-cx/t2-globals"
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
-	execute "github.com/skycoin/skycoin-cx/t4-execute"
 	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
-	printer "github.com/skycoin/skycoin-cx/t5-cx-runtime-printer"
 	cxos "github.com/skycoin/skycoin-cx/t5-cxos"
 	cxinit "github.com/skycoin/skycoin-cx/t7-init"
 	cxparsing "github.com/skycoin/skycoin-cx/t9-cxparsing"
@@ -115,10 +114,17 @@ var ErrCompile = errors.New("compilation failed")
 // in the output.
 var ErrRuntime = errors.New("runtime error")
 
-// Run compiles the .cx files in files, entry first, and runs main. Program
-// output, including compiler errors, is written to out. Only one program
-// runs at a time.
-func Run(files map[string][]byte, entry string, h Host, out io.Writer) (err error) {
+// Run compiles the .cx files in files, entry first, and runs main on the old
+// executor. Program output, including compiler errors, is written to out.
+// Only one program runs at a time.
+func Run(files map[string][]byte, entry string, h Host, out io.Writer) error {
+	_, err := RunOn(files, entry, ExecutorOld, h, out)
+	return err
+}
+
+// RunOn is Run on executor. It returns how long main ran, compile time
+// excluded. h may be nil for a program that does not use the app package.
+func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out io.Writer) (elapsed time.Duration, err error) {
 	runMu.Lock()
 	defer runMu.Unlock()
 
@@ -133,7 +139,7 @@ func Run(files map[string][]byte, entry string, h Host, out io.Writer) (err erro
 		names = append([]string{entry}, names...)
 	}
 	if len(names) == 0 {
-		return errors.New("no .cx files")
+		return 0, errors.New("no .cx files")
 	}
 	srcs := make([]string, len(names))
 	for i, n := range names {
@@ -142,7 +148,7 @@ func Run(files map[string][]byte, entry string, h Host, out io.Writer) (err erro
 
 	restore, err := captureOutput(out)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer restore()
 
@@ -156,23 +162,15 @@ func Run(files map[string][]byte, entry string, h Host, out io.Writer) (err erro
 
 	resetCompiler()
 	if err := cxparsing.ParseSourceStrings(srcs, names); err != nil {
-		return ErrCompile
+		return 0, ErrCompile
 	}
 	if _, err := actions.AST.GetFunction(actions.AST.CXProgramNameIntern(constants.MAIN_FUNC), actions.AST.CxIrState.CxIrStateNameMain); err != nil {
-		return errors.New("no main function in package main")
+		return 0, errors.New("no main function in package main")
 	}
 	if err := cxparsing.AddInitFunction(actions.AST); err != nil {
-		return err
+		return 0, err
 	}
-	if err := execute.RunCompiled(actions.AST, 0, nil); err != nil {
-		return err
-	}
-	if actions.AST.RuntimeError.RuntimeErrorRecordRaised {
-		printer.PrinterRuntimeErrorPrint(actions.AST)
-		fmt.Println()
-		return ErrRuntime
-	}
-	return nil
+	return runCompiledOn(executor)
 }
 
 // captureOutput sends os.Stdout and os.Stderr to out until restore is called.

@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/0magnet/gio v0.10.4-0.20261113210149-b0467ff35c7e
 	github.com/skycoin/skycoin-cx v0.0.0-20261123002813-df4c987910ae
+	go.etcd.io/bbolt v1.5.0
 )
 
 require (

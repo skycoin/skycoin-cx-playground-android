@@ -125,6 +125,7 @@ github.com/skycoin/skycoin-cx/t2-globals
 github.com/skycoin/skycoin-cx/t3-ast
 github.com/skycoin/skycoin-cx/t3-cx-runtime-vm
 github.com/skycoin/skycoin-cx/t4-actions
+github.com/skycoin/skycoin-cx/t4-cx-compiler-lower
 github.com/skycoin/skycoin-cx/t4-execute
 github.com/skycoin/skycoin-cx/t4-opcodes
 github.com/skycoin/skycoin-cx/t5-cipher
@@ -137,6 +138,12 @@ github.com/skycoin/skycoin-cx/t6-cxfx
 github.com/skycoin/skycoin-cx/t7-init
 github.com/skycoin/skycoin-cx/t8-cxparsingcompletor
 github.com/skycoin/skycoin-cx/t9-cxparsing
+# go.etcd.io/bbolt v1.5.0
+## explicit; go 1.25.0
+go.etcd.io/bbolt
+go.etcd.io/bbolt/errors
+go.etcd.io/bbolt/internal/common
+go.etcd.io/bbolt/internal/freelist
 # golang.org/x/exp/shiny v0.0.0-20261121134650-e1094eeca1b5
 ## explicit; go 1.26.0
 golang.org/x/exp/shiny/driver/gldriver
