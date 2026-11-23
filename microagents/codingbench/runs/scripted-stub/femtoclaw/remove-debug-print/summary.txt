@@ -1,0 +1,1 @@
+solved=yes turns=2 calls=1 sent=17932 received=608 wall_ms=2018

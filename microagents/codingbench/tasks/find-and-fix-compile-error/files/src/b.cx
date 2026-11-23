@@ -1,0 +1,9 @@
+package main
+
+func one() (r i32) {
+	r = 1
+}
+
+func two() (r i32) {
+	r = 2
+}

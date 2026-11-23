@@ -1,0 +1,14 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=99
+Stub f02722a97614: the tools returned 1 result(s):
+/spiffs/skills/tea.md
+/spiffs/skills/weather.md
+
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=81
+Stub 3268efe32038: the tools returned 1 result(s):
+# Tea
+Brew for three minutes.
+

@@ -1,0 +1,13 @@
+telegram	3003	A new file [[tool write_file {"path":"/spiffs/todo.md","content":"- buy milk\\n- call Ana\\n"}]]
+telegram	3003	Overwrite it [[tool write_file {"path":"/spiffs/todo.md","content":"- nothing left\\n"}]]
+telegram	3003	Read it back [[tool read_file {"path":"/spiffs/todo.md"}]]
+telegram	3003	Empty content [[tool write_file {"path":"/spiffs/blank.md","content":""}]]
+telegram	3003	Unicode content [[tool write_file {"path":"/spiffs/u.md","content":"café — naïve ✓\\n"}]]
+telegram	3003	A directory that does not exist [[tool write_file {"path":"/spiffs/nodir/x.md","content":"x"}]]
+telegram	3003	A path outside SPIFFS [[tool write_file {"path":"/tmp/x.md","content":"x"}]]
+telegram	3003	A path that climbs out [[tool write_file {"path":"/spiffs/../x.md","content":"x"}]]
+telegram	3003	No content [[tool write_file {"path":"/spiffs/x.md"}]]
+telegram	3003	Content that is a number [[tool write_file {"path":"/spiffs/x.md","content":42}]]
+telegram	3003	Input that is not an object [[tool write_file null]]
+telegram	3003	A new skill [[tool write_file {"path":"/spiffs/skills/greet.md","content":"# Greet\\nSay hello warmly.\\nUse the name if known.\\n"}]]
+telegram	3003	The skill is in the next system prompt, say hi

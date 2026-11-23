@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_get then get_version [[tool memory_get {"key":"u_color"}]] [[then]] [[tool get_version {}]]

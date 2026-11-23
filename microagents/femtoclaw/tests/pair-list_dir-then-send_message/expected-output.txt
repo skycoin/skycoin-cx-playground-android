@@ -1,0 +1,7 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=15
+Pair test ping.
+--- outbound channel=telegram chat_id=3003 bytes=99
+Stub 630187a45fde: the tools returned 1 result(s):
+OK: Message queued for delivery to telegram:3003

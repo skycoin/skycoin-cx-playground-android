@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delay then set_persona [[tool delay {"milliseconds":250}]] [[then]] [[tool set_persona {"persona":"witty"}]]

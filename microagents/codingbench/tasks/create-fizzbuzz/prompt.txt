@@ -1,0 +1,1 @@
+Create /spiffs/fizzbuzz.cx that prints the numbers 1 to 15, one per line, with Fizz for multiples of 3, Buzz for multiples of 5 and FizzBuzz for both.

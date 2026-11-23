@@ -1,0 +1,6 @@
+--- channel bytes=69
+Stub 1d5a29d4d3bf: the tools returned 1 result(s):
+Mock: 0 user tools
+--- telegram chat_id=777 bytes=69
+Stub 1d5a29d4d3bf: the tools returned 1 result(s):
+Mock: 0 user tools

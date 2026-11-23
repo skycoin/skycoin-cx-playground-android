@@ -16,7 +16,8 @@ timezone handling and `get_current_time`.
 - `before/` is the host harness, adapted from the femtoclaw one. `shim/`
   stands in for ESP-IDF and FreeRTOS.
 - `port/` is the CX port, one declaration per `nnn-name.cx` file.
-- `tests/` has one folder per test.
+- `tests/` has one folder per test. The `tool-`, `pair-` and `chain-` folders
+  are generated from `tests.table`, see the main README.
 - `record.sh TEST_DIR` records a test again.
 
 ## What is ported
@@ -24,10 +25,11 @@ timezone handling and `get_current_time`.
 The Anthropic provider path of the agent loop: build the system prompt from
 SOUL.md, USER.md, MEMORY.md and the daily notes of the last three days, load
 the chat session, call the model with the tool list, run the tools it asks
-for, loop until a final answer, save the session and send the reply. Two
-tools are ported, `get_current_time` and `read_file`. The other ten stay
-registered, so the tool list sent to the model is the original one.
-`web_search`, the cron tools and the GPIO tools return
+for, loop until a final answer, save the session and send the reply, with
+the skill summary of `skills/` in the system prompt. Five tools are ported:
+`get_current_time`, `read_file`, `write_file`, `edit_file` and `list_dir`.
+The other seven stay registered, so the tool list sent to the model is the
+original one. `web_search`, the cron tools and the GPIO tools return
 `Error: tool '<name>' is not available in the host build` in both the port
 and the harness.
 
@@ -41,11 +43,15 @@ and switches to Pacific, and local time is computed for those two zones.
 Left out: Wi-Fi, Telegram, Feishu, WebSocket, GPIO, OTA, the serial CLI, the
 OpenAI provider path, the HTTP CONNECT proxy (and its chunked decoder), NVS,
 the FreeRTOS task setup, the cron_add input patch (it only changes what
-cron_add receives), skill enumeration (it never matches on a host directory,
-so it is empty in both), `settimeofday` (the clock wrapper is the clock), and
-the fixed C buffer sizes. `write_file`, `edit_file` and `list_dir` are real
-in the harness, since they live in `tool_files.c` beside `read_file`, but the
-port answers them as not available; no test calls them.
+cron_add receives), `settimeofday` (the clock wrapper is the clock), and
+the fixed C buffer sizes.
+
+SPIFFS has no directories, only file names with slashes in them, and
+`list_dir` and the skill summary read it with `opendir("/spiffs")`. The
+harness shims `opendir` and `readdir` to list every file below `spiffs/` by
+its relative path in byte order, and the port's `dir-list` wrapper lists the
+same way, both through `backendstore listdir`. A device lists in SPIFFS
+order, which is not covered.
 
 The API key is not part of the request body. The harness sets one in
 `before/shim/mimi_secrets.h` because `llm_chat_tools` refuses to run without
@@ -53,7 +59,8 @@ it.
 
 ## Tape
 
-The records are those of the femtoclaw port plus one:
+The records are those of the femtoclaw port, `file-write` and `dir-list`
+among them, plus one:
 
 ```
 net-head	https://api.telegram.org/	ok	Mon, 23 Nov 2026 10:44:24 GMT
@@ -72,43 +79,51 @@ same path.
 | mimi_config.h, bus/message_bus.h channel names | 000-configuration-values.cx |
 | (new) text building without sprintf | 001-join-strings.cx |
 | (new) wrappers: mode, state, byte table, tape | 002 to 020 |
-| (new) file wrapper | 021-file-read.cx, 022-file-append.cx |
-| (new) clock wrapper, the port of `time(NULL)` | 023-clock-now.cx |
-| (new) network wrapper for POST | 024-url-path.cx to 026-net-post.cx |
-| (new) network wrapper for HEAD | 027-live-net-head.cx, 028-net-head.cx |
-| bus/message_bus.h : mimi_msg_t | 029-inbound-message.cx |
-| bus/message_bus.c : message_bus_pop_inbound (wrapper) | 030-inbound-next.cx |
-| cJSON : print_string, parse, print unformatted | 031 to 042 |
-| libc : localtime_r, mktime, strftime for UTC0 and PST8PDT | 043 to 049 |
-| memory/memory_store.c : get_date_str | 050-memory-date-string.cx |
-| memory/memory_store.c : memory_read_long_term | 051-memory-read-long-term.cx |
-| memory/memory_store.c : memory_read_recent | 052-memory-read-recent.cx |
-| agent/context_builder.c : append_file | 053-context-append-file.cx |
-| agent/context_builder.c : context_build_system_prompt | 054-context-build-system-prompt.cx |
-| memory/session_mgr.c : session_path | 055-session-path.cx |
-| memory/session_mgr.c : session_append | 056-session-append.cx |
-| memory/session_mgr.c : session_get_history_json | 057-session-history-messages.cx |
-| tools/tool_registry.h : mimi_tool_t | 058-tool-definition.cx |
-| tools/tool_registry.c : tool_registry_init | 059-tool-definitions.cx |
-| tools/tool_registry.c : build_tools_json | 060-tools-json.cx |
-| tools/tool_files.c : validate_path | 061-tool-validate-path.cx |
-| tools/tool_files.c : tool_read_file_execute | 062-tool-read-file.cx |
-| tools/tool_get_time.c : parse_and_set_time | 063-http-date-words.cx, 064-time-parse-http-date.cx |
-| tools/tool_get_time.c : tool_get_time_execute, fetch_time_direct | 065-tool-get-time.cx |
-| before/harness.c : tool stubs | 066-tool-unavailable.cx |
-| tools/tool_registry.c : tool_registry_execute | 067-tool-registry-execute.cx |
-| llm/llm_proxy.h : llm_tool_call_t | 068-tool-call.cx |
-| llm/llm_proxy.h : llm_response_t | 069-llm-reply.cx |
-| llm/llm_proxy.c : llm_chat_tools, request body | 070-llm-request-body.cx |
-| llm/llm_proxy.c : llm_chat_tools, response parsing | 071-llm-parse-reply.cx |
-| llm/llm_proxy.c : llm_chat_tools | 072-llm-chat-tools.cx |
-| agent/agent_loop.c : build_assistant_content | 073-agent-assistant-content.cx |
-| agent/agent_loop.c : append_turn_context_prompt | 074-agent-turn-context.cx |
-| agent/agent_loop.c : build_tool_results | 075-agent-tool-results.cx |
-| before/harness.c : message_bus_push_outbound | 076-message-bus-push-outbound.cx |
-| agent/agent_loop.c : agent_loop_task, one message | 077-agent-process-message.cx |
-| agent/agent_loop.c : agent_loop_task, the loop | 078-agent-loop-run.cx |
-| main/mimi.c : app_main, reduced to start and stop | 079-main.cx |
+| (new) file wrapper | 021-file-read.cx, 022-file-append.cx, 023-file-write.cx |
+| (new) directory wrapper, the port of opendir and readdir on SPIFFS | 024-dir-list.cx |
+| (new) clock wrapper, the port of `time(NULL)` | 025-clock-now.cx |
+| (new) network wrapper for POST | 026-url-path.cx to 028-net-post.cx |
+| (new) network wrapper for HEAD | 029-live-net-head.cx, 030-net-head.cx |
+| bus/message_bus.h : mimi_msg_t | 031-inbound-message.cx |
+| bus/message_bus.c : message_bus_pop_inbound (wrapper) | 032-inbound-next.cx |
+| cJSON : print_string, parse, print unformatted, GetObjectItem | 033 to 045 |
+| libc : localtime_r, mktime, strftime for UTC0 and PST8PDT | 046 to 052 |
+| memory/memory_store.c : get_date_str | 053-memory-date-string.cx |
+| memory/memory_store.c : memory_read_long_term | 054-memory-read-long-term.cx |
+| memory/memory_store.c : memory_read_recent | 055-memory-read-recent.cx |
+| (new) fgets into a fixed buffer | 056-skill-read-line.cx |
+| skills/skill_loader.c : extract_title | 057-skill-extract-title.cx |
+| skills/skill_loader.c : extract_description | 058-skill-extract-description.cx |
+| skills/skill_loader.c : skill_loader_build_summary | 059-skill-build-summary.cx |
+| agent/context_builder.c : append_file | 060-context-append-file.cx |
+| agent/context_builder.c : context_build_system_prompt | 061-context-build-system-prompt.cx |
+| memory/session_mgr.c : session_path | 062-session-path.cx |
+| memory/session_mgr.c : session_append | 063-session-append.cx |
+| memory/session_mgr.c : session_get_history_json | 064-session-history-messages.cx |
+| tools/tool_registry.h : mimi_tool_t | 065-tool-definition.cx |
+| tools/tool_registry.c : tool_registry_init | 066-tool-definitions.cx |
+| tools/tool_registry.c : build_tools_json | 067-tools-json.cx |
+| tools/tool_files.c : validate_path | 068-tool-validate-path.cx |
+| tools/tool_files.c : tool_read_file_execute | 069-tool-read-file.cx |
+| tools/tool_files.c : tool_write_file_execute | 070-tool-write-file.cx |
+| tools/tool_files.c : tool_edit_file_execute | 071-tool-edit-file.cx |
+| tools/tool_files.c : tool_list_dir_execute | 072-tool-list-dir.cx |
+| tools/tool_get_time.c : parse_and_set_time | 073-http-date-words.cx, 074-time-parse-http-date.cx |
+| tools/tool_get_time.c : tool_get_time_execute, fetch_time_direct | 075-tool-get-time.cx |
+| before/harness.c : tool stubs | 076-tool-unavailable.cx |
+| tools/tool_registry.c : tool_registry_execute | 077-tool-registry-execute.cx |
+| llm/llm_proxy.h : llm_tool_call_t | 078-tool-call.cx |
+| llm/llm_proxy.h : llm_response_t | 079-llm-reply.cx |
+| llm/llm_proxy.c : llm_chat_tools, request body | 080-llm-request-body.cx |
+| llm/llm_proxy.c : llm_chat_tools, response parsing | 081-llm-parse-reply.cx |
+| llm/llm_proxy.c : llm_chat_tools | 082-llm-chat-tools.cx |
+| agent/agent_loop.c : build_assistant_content | 083-agent-assistant-content.cx |
+| agent/agent_loop.c : append_turn_context_prompt | 084-agent-turn-context.cx |
+| agent/agent_loop.c : build_tool_results | 085-agent-tool-results.cx |
+| before/harness.c : message_bus_push_outbound | 086-message-bus-push-outbound.cx |
+| agent/agent_loop.c : agent_loop_task, one message | 087-agent-process-message.cx |
+| agent/agent_loop.c : agent_loop_task, the loop | 088-agent-loop-run.cx |
+| main/mimi.c : app_main, reduced to start and stop | 089-main.cx |
 
 ## Running the port
 

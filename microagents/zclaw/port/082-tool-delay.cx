@@ -1,0 +1,27 @@
+package main
+
+// Port of tools_delay_handler of tools_gpio.c. vTaskDelay of the host mock
+// only counts the delay, so no time passes.
+func toolDelay(inputJson str) (ok bool, result str) {
+	ok = false
+	var milliseconds i32 = 0
+	var isNumber bool = false
+	position, found := jsonObjectField(inputJson, 0, "milliseconds")
+	if found {
+		milliseconds, isNumber = jsonNumberInt(inputJson, position)
+	}
+	if !isNumber {
+		result = "Error: 'milliseconds' required (number)"
+		return
+	}
+	if milliseconds <= 0 {
+		result = "Error: milliseconds must be positive"
+		return
+	}
+	if milliseconds > ZclawDelayMaxMs {
+		result = joinStrings([]str{"Error: max delay is ", i32.str(ZclawDelayMaxMs), " ms (got ", i32.str(milliseconds), ")"})
+		return
+	}
+	result = joinStrings([]str{"Waited ", i32.str(milliseconds), " ms"})
+	ok = true
+}

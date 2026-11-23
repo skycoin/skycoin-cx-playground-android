@@ -1,0 +1,5 @@
+telegram	777	1000	Set first [[tool memory_set {"key":"u_pet","value":"cat"}]]
+telegram	777	2000	Delete it [[tool memory_delete {"key":"u_pet"}]]
+telegram	777	3000	Delete it again [[tool memory_delete {"key":"u_pet"}]]
+telegram	777	4000	A system key [[tool memory_delete {"key":"api_key"}]]
+telegram	777	5000	No key [[tool memory_delete]]

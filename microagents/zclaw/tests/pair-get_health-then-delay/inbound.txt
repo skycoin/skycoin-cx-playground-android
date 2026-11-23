@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_health then delay [[tool get_health {}]] [[then]] [[tool delay {"milliseconds":250}]]

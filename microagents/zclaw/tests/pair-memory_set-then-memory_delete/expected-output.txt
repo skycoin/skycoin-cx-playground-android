@@ -1,0 +1,6 @@
+--- channel bytes=67
+Stub 8b241cf20594: the tools returned 1 result(s):
+Deleted: u_color
+--- telegram chat_id=777 bytes=67
+Stub 8b241cf20594: the tools returned 1 result(s):
+Deleted: u_color

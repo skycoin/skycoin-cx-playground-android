@@ -1,0 +1,1 @@
+One CX file under /spiffs/src/ does not compile. List the files, find it and fix it so that cx src/a.cx src/b.cx src/c.cx prints 6.

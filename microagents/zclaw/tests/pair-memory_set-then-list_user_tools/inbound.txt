@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_set then list_user_tools [[tool memory_set {"key":"u_color","value":"teal"}]] [[then]] [[tool list_user_tools {}]]

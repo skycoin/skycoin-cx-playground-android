@@ -4,7 +4,8 @@ import "sys/string"
 import "sys/os"
 
 // fileAppend is the file system wrapper for appending to a file. A replay
-// does not write; it checks that the port appends what the recording did.
+// checks that the port appends what the recording did, and writes only with
+// ++apply=1.
 func fileAppend(path str, content str) (appended bool) {
 	appended = true
 	if gWrapperState.mode == WrapperModeReplay {
@@ -14,6 +15,13 @@ func fileAppend(path str, content str) (appended bool) {
 		}
 		if !string.EqualityByByteValue(fields[2], content) {
 			fatalStop(joinStrings([]str{"file-append to '", path, "' differs from the tape"}))
+		}
+		if gWrapperState.applyWrites {
+			existing, found := os.ReadAllText(liveFilePath(path))
+			if !found {
+				existing = ""
+			}
+			appended = liveFileWrite(liveFilePath(path), string.Concatenation(existing, content))
 		}
 		return
 	}

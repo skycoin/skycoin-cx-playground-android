@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delay then delete_user_tool [[tool delay {"milliseconds":250}]] [[then]] [[tool delete_user_tool {"name":"water_plants"}]]

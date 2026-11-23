@@ -1,0 +1,14 @@
+package main
+
+// Port of tools_delete_user_tool_handler of tools_system.c with
+// user_tools_delete of the host mock, which finds no tool to delete.
+func toolDeleteUserTool(inputJson str) (ok bool, result str) {
+	ok = false
+	name, nameFound := jsonStringField(inputJson, 0, "name")
+	if !nameFound {
+		result = "Error: 'name' required"
+		return
+	}
+	result = joinStrings([]str{"Tool '", name, "' not found"})
+	ok = true
+}

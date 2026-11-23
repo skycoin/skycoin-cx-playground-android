@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_set then get_persona [[tool memory_set {"key":"u_color","value":"teal"}]] [[then]] [[tool get_persona {}]]

@@ -1,0 +1,1 @@
+telegram	3003	Pair list_dir then write_file [[tool list_dir {}]] [[then]] [[tool write_file {"path":"/spiffs/notes.md","content":"Shopping: milk, eggs, bread.\\n"}]]

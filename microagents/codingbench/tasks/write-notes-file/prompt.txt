@@ -1,0 +1,1 @@
+Write /spiffs/NOTES.md with exactly one line: Build with cx main.cx

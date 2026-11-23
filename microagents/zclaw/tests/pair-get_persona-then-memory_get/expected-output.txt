@@ -1,0 +1,6 @@
+--- channel bytes=74
+Stub 6af3000627dc: the tools returned 1 result(s):
+Key 'u_color' not found
+--- telegram chat_id=777 bytes=74
+Stub 6af3000627dc: the tools returned 1 result(s):
+Key 'u_color' not found

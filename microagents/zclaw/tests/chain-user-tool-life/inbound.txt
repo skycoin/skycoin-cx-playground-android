@@ -1,0 +1,1 @@
+telegram	777	1000	Tools [[tool create_tool {"name":"fan","description":"Fan on","action":"Set pin 6 high"}]] [[then]] [[tool list_user_tools]] [[then]] [[tool fan]] [[then]] [[tool delete_user_tool {"name":"fan"}]]

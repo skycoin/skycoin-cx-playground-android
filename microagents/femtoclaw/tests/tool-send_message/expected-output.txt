@@ -1,0 +1,46 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=42 bytes=20
+Hello from the test.
+--- outbound channel=telegram chat_id=3003 bytes=97
+Stub 1b7b6ab36c85: the tools returned 1 result(s):
+OK: Message queued for delivery to telegram:42
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=websocket chat_id=ws1 bytes=10
+Hi socket.
+--- outbound channel=telegram chat_id=3003 bytes=99
+Stub b5497dff1fd6: the tools returned 1 result(s):
+OK: Message queued for delivery to websocket:ws1
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub 16628a7f0e63: the tools returned 1 result(s):
+Error: missing or empty 'chat_id'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub 7e17d71b82d2: the tools returned 1 result(s):
+Error: missing or empty 'chat_id'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub e8686b4eae90: the tools returned 1 result(s):
+Error: missing or empty 'message'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub 24b14bbdc336: the tools returned 1 result(s):
+Error: missing or empty 'chat_id'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=averyveryverylo chat_id=1234567890123456789012345678901 bytes=9
+Long ids.
+--- outbound channel=telegram chat_id=3003 bytes=133
+Stub 58e146c2e577: the tools returned 1 result(s):
+OK: Message queued for delivery to averyveryverylo:1234567890123456789012345678901
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=84
+Stub 7d6882282114: the tools returned 1 result(s):
+Error: missing or empty 'chat_id'

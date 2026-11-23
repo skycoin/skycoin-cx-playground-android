@@ -1,0 +1,58 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=73
+Stub 855328578435: the tools returned 1 result(s):
+Shopping: milk, eggs.
+
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=92
+Stub c75187044dd2: the tools returned 1 result(s):
+Error: file not found: /spiffs/missing.md
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 2fea9b68e58f: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 588d686a702b: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=73
+Stub cd7b66c657fa: the tools returned 1 result(s):
+Shopping: milk, eggs.
+
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 433061f23af3: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub d34770a6ae96: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 0b0cb5363bca: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=51
+Stub 5103a91f9aaf: the tools returned 1 result(s):
+
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=128
+Stub 257393082c6b: the tools returned 1 result(s):
+# Weather
+Ask for the city first.
+Then answer in one line.
+
+## Steps
+1. Ask.
+

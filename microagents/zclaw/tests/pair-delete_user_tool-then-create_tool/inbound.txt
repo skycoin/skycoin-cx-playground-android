@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delete_user_tool then create_tool [[tool delete_user_tool {"name":"water_plants"}]] [[then]] [[tool create_tool {"name":"water_plants","description":"Water the plants","action":"Turn on pin 5 for 3 seconds"}]]

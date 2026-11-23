@@ -1,0 +1,1 @@
+telegram	3003	Send my notes to 42 [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool send_message {"chat_id":"42","message":"{{result 1}}"}]]

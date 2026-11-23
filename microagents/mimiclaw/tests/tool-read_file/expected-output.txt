@@ -1,0 +1,58 @@
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=73
+Stub eb1195d48071: the tools returned 1 result(s):
+Shopping: milk, eggs.
+
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=92
+Stub a175db101ab6: the tools returned 1 result(s):
+Error: file not found: /spiffs/missing.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 1cd3e2f3cc17: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 5ec1e4da06c1: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=73
+Stub 8441058add55: the tools returned 1 result(s):
+Shopping: milk, eggs.
+
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub e23d3f06c36f: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub c3b24fa17f78: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 241ac877934b: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=51
+Stub 264173678ea5: the tools returned 1 result(s):
+
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=128
+Stub 3694d0d79143: the tools returned 1 result(s):
+# Weather
+Ask for the city first.
+Then answer in one line.
+
+## Steps
+1. Ask.
+

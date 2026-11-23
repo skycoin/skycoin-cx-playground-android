@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_get then delete_user_tool [[tool memory_get {"key":"u_color"}]] [[then]] [[tool delete_user_tool {"name":"water_plants"}]]

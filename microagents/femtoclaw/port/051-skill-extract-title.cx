@@ -1,0 +1,26 @@
+package main
+
+import "sys/string"
+
+// Port of extract_title of skills/skill_loader.c: drop a leading "# ",
+// trim trailing newlines, carriage returns and spaces, and keep what fits
+// in a buffer of size bytes.
+func skillExtractTitle(line str, size i32) (title str) {
+	title = line
+	if string.ByteIndexOfFirstSubstring(title, "# ") == 0 {
+		title = string.SubstringByByteRange(title, 2, string.ByteLength(title))
+	}
+	var length i32 = string.ByteLength(title)
+	var trimming bool = true
+	for trimming && length > 0 {
+		var last str = string.SubstringByByteRange(title, length - 1, length)
+		trimming = string.EqualityByByteValue(last, "\n") || string.EqualityByByteValue(last, "\r") || string.EqualityByByteValue(last, " ")
+		if trimming {
+			length--
+		}
+	}
+	if length > size - 1 {
+		length = size - 1
+	}
+	title = string.SubstringByByteRange(title, 0, length)
+}

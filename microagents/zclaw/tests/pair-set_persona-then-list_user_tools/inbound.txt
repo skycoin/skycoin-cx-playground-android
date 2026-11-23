@@ -1,0 +1,1 @@
+telegram	777	1000	Pair set_persona then list_user_tools [[tool set_persona {"persona":"witty"}]] [[then]] [[tool list_user_tools {}]]

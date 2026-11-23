@@ -91,3 +91,14 @@ FILE *host_fopen(const char *path, const char *mode);
 time_t host_time(time_t *out);
 #define fopen(path, mode) host_fopen((path), (mode))
 #define time(out) host_time(out)
+
+/* SPIFFS is flat, so opendir("/spiffs") lists every file below spiffs/ in
+ * the run directory by its relative path, in byte order, as the port's
+ * dir-list wrapper does. Both get the listing from backendstore listdir. */
+#include <dirent.h>
+DIR *host_opendir(const char *path);
+struct dirent *host_readdir(DIR *dir);
+int host_closedir(DIR *dir);
+#define opendir(path) host_opendir(path)
+#define readdir(dir) host_readdir(dir)
+#define closedir(dir) host_closedir(dir)

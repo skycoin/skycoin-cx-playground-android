@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_version then delete_user_tool [[tool get_version {}]] [[then]] [[tool delete_user_tool {"name":"water_plants"}]]

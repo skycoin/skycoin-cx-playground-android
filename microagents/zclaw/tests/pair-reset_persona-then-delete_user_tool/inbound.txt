@@ -1,0 +1,1 @@
+telegram	777	1000	Pair reset_persona then delete_user_tool [[tool reset_persona {}]] [[then]] [[tool delete_user_tool {"name":"water_plants"}]]

@@ -1,0 +1,1 @@
+telegram	3003	Copy my notes [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool write_file {"path":"/spiffs/copy.md","content":"{{result 1}}"}]] [[then]] [[tool read_file {"path":"/spiffs/copy.md"}]]

@@ -1,0 +1,1 @@
+/spiffs/greet.cx prints "Helo, world". Fix the typo so it prints "Hello, world".

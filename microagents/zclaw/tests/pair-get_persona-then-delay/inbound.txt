@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_persona then delay [[tool get_persona {}]] [[then]] [[tool delay {"milliseconds":250}]]

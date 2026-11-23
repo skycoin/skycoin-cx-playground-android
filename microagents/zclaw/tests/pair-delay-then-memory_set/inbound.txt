@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delay then memory_set [[tool delay {"milliseconds":250}]] [[then]] [[tool memory_set {"key":"u_color","value":"teal"}]]

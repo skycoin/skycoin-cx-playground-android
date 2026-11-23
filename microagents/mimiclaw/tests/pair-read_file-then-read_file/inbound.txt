@@ -1,0 +1,1 @@
+telegram	3003	Pair read_file then read_file [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool read_file {"path":"/spiffs/notes.md"}]]

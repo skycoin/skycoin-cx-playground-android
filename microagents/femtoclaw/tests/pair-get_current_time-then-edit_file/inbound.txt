@@ -1,0 +1,1 @@
+telegram	3003	Pair get_current_time then edit_file [[tool get_current_time {}]] [[then]] [[tool edit_file {"path":"/spiffs/notes.md","old_string":"milk","new_string":"oat milk"}]]

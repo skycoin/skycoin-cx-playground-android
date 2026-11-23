@@ -1,0 +1,1 @@
+telegram	3003	Chain [[tool write_file {"path":"/spiffs/chain.md","content":"alpha beta\\n"}]] [[then]] [[tool read_file {"path":"/spiffs/chain.md"}]] [[then]] [[tool edit_file {"path":"/spiffs/chain.md","old_string":"beta","new_string":"gamma"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/c"}]] [[then]] [[tool read_file {"path":"/spiffs/chain.md"}]]

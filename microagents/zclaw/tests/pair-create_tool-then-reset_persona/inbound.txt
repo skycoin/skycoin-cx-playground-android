@@ -1,0 +1,1 @@
+telegram	777	1000	Pair create_tool then reset_persona [[tool create_tool {"name":"water_plants","description":"Water the plants","action":"Turn on pin 5 for 3 seconds"}]] [[then]] [[tool reset_persona {}]]

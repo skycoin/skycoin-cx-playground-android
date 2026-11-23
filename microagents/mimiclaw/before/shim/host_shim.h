@@ -100,3 +100,14 @@ time_t host_time(time_t *out);
  * clock is the tape, so the call does nothing. */
 int host_settimeofday(const struct timeval *tv, const void *tz);
 #define settimeofday(tv, tz) host_settimeofday((tv), (tz))
+
+/* SPIFFS is flat, so opendir("/spiffs") lists every file below spiffs/ in
+ * the run directory by its relative path, in byte order, as the port's
+ * dir-list wrapper does. Both get the listing from backendstore listdir. */
+#include <dirent.h>
+DIR *host_opendir(const char *path);
+struct dirent *host_readdir(DIR *dir);
+int host_closedir(DIR *dir);
+#define opendir(path) host_opendir(path)
+#define readdir(dir) host_readdir(dir)
+#define closedir(dir) host_closedir(dir)

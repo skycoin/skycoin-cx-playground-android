@@ -1,0 +1,3 @@
+telegram	777	1000	At start [[tool get_persona]]
+telegram	777	2000	After a change [[tool set_persona {"persona":"technical"}]]
+telegram	777	3000	Again [[tool get_persona {}]]

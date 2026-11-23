@@ -1,0 +1,6 @@
+--- channel bytes=64
+Stub daf510d782ef: the tools returned 1 result(s):
+Waited 250 ms
+--- telegram chat_id=777 bytes=64
+Stub daf510d782ef: the tools returned 1 result(s):
+Waited 250 ms

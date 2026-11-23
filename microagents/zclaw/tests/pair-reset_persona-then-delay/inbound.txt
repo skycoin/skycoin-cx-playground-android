@@ -1,0 +1,1 @@
+telegram	777	1000	Pair reset_persona then delay [[tool reset_persona {}]] [[then]] [[tool delay {"milliseconds":250}]]

@@ -1,0 +1,9 @@
+package main
+
+import "sys/string"
+
+func main() {
+	gCount = gCount + 2
+	gCount = gCount * 10
+	string.PrintLine(i32.str(gCount))
+}

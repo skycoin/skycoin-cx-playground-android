@@ -1,0 +1,88 @@
+--- channel bytes=96
+Stub f99b1a528429: the tools returned 1 result(s):
+Created tool 'water_plants': Water the plants
+--- telegram chat_id=777 bytes=96
+Stub f99b1a528429: the tools returned 1 result(s):
+Created tool 'water_plants': Water the plants
+--- channel bytes=105
+Stub 4d85b935fbe7: you said "The next request lists it, say hi". I see 5 message(s) in this conversation.
+--- telegram chat_id=777 bytes=105
+Stub 4d85b935fbe7: you said "The next request lists it, say hi". I see 5 message(s) in this conversation.
+--- channel bytes=77
+Stub 78390aae9f0c: the tools returned 1 result(s):
+Unknown tool: water_plants
+--- telegram chat_id=777 bytes=77
+Stub 78390aae9f0c: the tools returned 1 result(s):
+Unknown tool: water_plants
+--- channel bytes=105
+Stub d05d02b95de6: the tools returned 1 result(s):
+Error: name must be alphanumeric/underscore, no spaces
+--- telegram chat_id=777 bytes=105
+Stub d05d02b95de6: the tools returned 1 result(s):
+Error: name must be alphanumeric/underscore, no spaces
+--- channel bytes=100
+Stub 0620b053300c: the tools returned 1 result(s):
+Error: 'description' required (short description)
+--- telegram chat_id=777 bytes=100
+Stub 0620b053300c: the tools returned 1 result(s):
+Error: 'description' required (short description)
+--- channel bytes=100
+Stub 78b435026227: the tools returned 1 result(s):
+Error: 'action' required (what to do when called)
+--- telegram chat_id=777 bytes=100
+Stub 78b435026227: the tools returned 1 result(s):
+Error: 'action' required (what to do when called)
+--- channel bytes=93
+Stub 0cc4e54df1dd: the tools returned 1 result(s):
+Error: 'name' required (string, no spaces)
+--- telegram chat_id=777 bytes=93
+Stub 0cc4e54df1dd: the tools returned 1 result(s):
+Error: 'name' required (string, no spaces)
+--- channel bytes=105
+Stub 41103efa3778: the tools returned 1 result(s):
+Created tool 'a_very_long_tool_name_that_is_cut': Long
+--- telegram chat_id=777 bytes=105
+Stub 41103efa3778: the tools returned 1 result(s):
+Created tool 'a_very_long_tool_name_that_is_cut': Long
+--- channel bytes=72
+Stub 87b55290880c: the tools returned 1 result(s):
+Created tool 't3': d3
+--- telegram chat_id=777 bytes=72
+Stub 87b55290880c: the tools returned 1 result(s):
+Created tool 't3': d3
+--- channel bytes=72
+Stub 38c20e11574e: the tools returned 1 result(s):
+Created tool 't4': d4
+--- telegram chat_id=777 bytes=72
+Stub 38c20e11574e: the tools returned 1 result(s):
+Created tool 't4': d4
+--- channel bytes=72
+Stub 3a7e80a2611c: the tools returned 1 result(s):
+Created tool 't5': d5
+--- telegram chat_id=777 bytes=72
+Stub 3a7e80a2611c: the tools returned 1 result(s):
+Created tool 't5': d5
+--- channel bytes=72
+Stub c912f7c93845: the tools returned 1 result(s):
+Created tool 't6': d6
+--- telegram chat_id=777 bytes=72
+Stub c912f7c93845: the tools returned 1 result(s):
+Created tool 't6': d6
+--- channel bytes=72
+Stub bf787e7eb3f2: the tools returned 1 result(s):
+Created tool 't7': d7
+--- telegram chat_id=777 bytes=72
+Stub bf787e7eb3f2: the tools returned 1 result(s):
+Created tool 't7': d7
+--- channel bytes=72
+Stub 35491f99dd08: the tools returned 1 result(s):
+Created tool 't8': d8
+--- telegram chat_id=777 bytes=72
+Stub 35491f99dd08: the tools returned 1 result(s):
+Created tool 't8': d8
+--- channel bytes=108
+Stub a64f5fef7784: the tools returned 1 result(s):
+Error: failed to create tool (duplicate or limit reached)
+--- telegram chat_id=777 bytes=108
+Stub a64f5fef7784: the tools returned 1 result(s):
+Error: failed to create tool (duplicate or limit reached)

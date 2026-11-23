@@ -1,0 +1,3 @@
+telegram	777	1000	Set one [[tool set_persona {"persona":"witty"}]]
+telegram	777	2000	Reset [[tool reset_persona]]
+telegram	777	3000	Reset with arguments [[tool reset_persona {"persona":"witty"}]]

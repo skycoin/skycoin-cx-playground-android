@@ -1,0 +1,1 @@
+telegram	777	1000	Copy [[tool memory_set {"key":"u_a","value":"apple"}]] [[then]] [[tool memory_get {"key":"u_a"}]] [[then]] [[tool memory_set {"key":"u_b","value":"{{result 1}}"}]] [[then]] [[tool memory_get {"key":"u_b"}]]

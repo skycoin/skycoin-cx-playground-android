@@ -1,0 +1,7 @@
+package main
+
+import "sys/string"
+
+func main() {
+	string.PrintLine(i32.str(one() + two() + three()))
+}

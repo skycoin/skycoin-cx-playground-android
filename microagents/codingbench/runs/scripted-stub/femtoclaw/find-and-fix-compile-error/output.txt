@@ -1,0 +1,5 @@
+--- outbound channel=telegram chat_id=1 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=1 bytes=110
+Stub f785b609d96c: the tools returned 1 result(s):
+OK: edited /spiffs/src/c.cx (replaced 8 bytes with 6 bytes)

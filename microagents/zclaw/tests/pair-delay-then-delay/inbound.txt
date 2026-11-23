@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delay then delay [[tool delay {"milliseconds":250}]] [[then]] [[tool delay {"milliseconds":250}]]

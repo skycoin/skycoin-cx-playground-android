@@ -1,0 +1,86 @@
+# Generated tests of femtoclaw, see ../testgen. Messages use the escapes of
+# inbound.txt, so a JSON \n inside a directive is written \\n.
+inbound	telegram	3003
+file	config/SOUL.md	You are calm and brief.\n
+file	config/USER.md	Name: Sam\nCity: Lisbon\n
+file	memory/MEMORY.md	Sam likes tea.\n
+file	notes.md	Shopping: milk, eggs.\n
+file	empty.md	
+file	sessions/.keep	
+file	skills/weather.md	# Weather\nAsk for the city first.\nThen answer in one line.\n\n## Steps\n1. Ask.\n
+
+# The call each pair test makes of a tool.
+pair	get_current_time	{}
+pair	read_file	{"path":"/spiffs/notes.md"}
+pair	write_file	{"path":"/spiffs/notes.md","content":"Shopping: milk, eggs, bread.\\n"}
+pair	edit_file	{"path":"/spiffs/notes.md","old_string":"milk","new_string":"oat milk"}
+pair	list_dir	{}
+
+case	get_current_time	What time is it? [[tool get_current_time {}]]
+case	get_current_time	Unused arguments [[tool get_current_time {"timezone":"Europe/Lisbon"}]]
+case	get_current_time	Input that is not an object [[tool get_current_time "now"]]
+
+case	read_file	Read my notes [[tool read_file {"path":"/spiffs/notes.md"}]]
+case	read_file	A file that is missing [[tool read_file {"path":"/spiffs/missing.md"}]]
+case	read_file	A path outside SPIFFS [[tool read_file {"path":"/etc/passwd"}]]
+case	read_file	A path that climbs out [[tool read_file {"path":"/spiffs/../etc/passwd"}]]
+case	read_file	The key in capitals [[tool read_file {"PATH":"/spiffs/notes.md"}]]
+case	read_file	A path that is a number [[tool read_file {"path":7}]]
+case	read_file	Input that is not an object [[tool read_file "/spiffs/notes.md"]]
+case	read_file	No arguments at all [[tool read_file]]
+case	read_file	An empty file [[tool read_file {"path":"/spiffs/empty.md"}]]
+case	read_file	A skill file [[tool read_file {"path":"/spiffs/skills/weather.md"}]]
+
+case	write_file	A new file [[tool write_file {"path":"/spiffs/todo.md","content":"- buy milk\\n- call Ana\\n"}]]
+case	write_file	Overwrite it [[tool write_file {"path":"/spiffs/todo.md","content":"- nothing left\\n"}]]
+case	write_file	Read it back [[tool read_file {"path":"/spiffs/todo.md"}]]
+case	write_file	Empty content [[tool write_file {"path":"/spiffs/blank.md","content":""}]]
+case	write_file	Unicode content [[tool write_file {"path":"/spiffs/u.md","content":"café — naïve ✓\\n"}]]
+case	write_file	A directory that does not exist [[tool write_file {"path":"/spiffs/nodir/x.md","content":"x"}]]
+case	write_file	A path outside SPIFFS [[tool write_file {"path":"/tmp/x.md","content":"x"}]]
+case	write_file	A path that climbs out [[tool write_file {"path":"/spiffs/../x.md","content":"x"}]]
+case	write_file	No content [[tool write_file {"path":"/spiffs/x.md"}]]
+case	write_file	Content that is a number [[tool write_file {"path":"/spiffs/x.md","content":42}]]
+case	write_file	Input that is not an object [[tool write_file null]]
+case	write_file	A new skill [[tool write_file {"path":"/spiffs/skills/greet.md","content":"# Greet\\nSay hello warmly.\\nUse the name if known.\\n"}]]
+case	write_file	The skill is in the next system prompt, say hi
+
+case	edit_file	Replace a word [[tool edit_file {"path":"/spiffs/notes.md","old_string":"milk","new_string":"oat milk"}]]
+case	edit_file	Only the first match changes [[tool edit_file {"path":"/spiffs/notes.md","old_string":"s","new_string":"S"}]]
+case	edit_file	Read it back [[tool read_file {"path":"/spiffs/notes.md"}]]
+case	edit_file	Text that is not there [[tool edit_file {"path":"/spiffs/notes.md","old_string":"bread","new_string":"rice"}]]
+case	edit_file	A file that is missing [[tool edit_file {"path":"/spiffs/missing.md","old_string":"a","new_string":"b"}]]
+case	edit_file	An empty file [[tool edit_file {"path":"/spiffs/empty.md","old_string":"a","new_string":"b"}]]
+case	edit_file	An empty old string inserts at the start [[tool edit_file {"path":"/spiffs/memory/MEMORY.md","old_string":"","new_string":"Note: "}]]
+case	edit_file	Unicode on both sides [[tool edit_file {"path":"/spiffs/config/USER.md","old_string":"Lisbon","new_string":"Zürich ✓"}]]
+case	edit_file	No new string [[tool edit_file {"path":"/spiffs/notes.md","old_string":"eggs"}]]
+case	edit_file	A path outside SPIFFS [[tool edit_file {"path":"/etc/hosts","old_string":"a","new_string":"b"}]]
+case	edit_file	Keys in capitals [[tool edit_file {"Path":"/spiffs/notes.md","OLD_STRING":"eggs","New_String":"jam"}]]
+case	edit_file	Input that is not an object [[tool edit_file 3]]
+
+case	list_dir	Everything [[tool list_dir {}]]
+case	list_dir	One folder [[tool list_dir {"prefix":"/spiffs/memory/"}]]
+case	list_dir	A prefix that matches nothing [[tool list_dir {"prefix":"/spiffs/none/"}]]
+case	list_dir	A prefix that is a number [[tool list_dir {"prefix":5}]]
+case	list_dir	Input that is not an object [[tool list_dir "x"]]
+case	list_dir	A file this turn wrote shows up [[tool write_file {"path":"/spiffs/memory/2026-11-23.md","content":"Met Ana.\\n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/memory/"}]]
+
+chain	write-read-edit-list	Chain [[tool write_file {"path":"/spiffs/chain.md","content":"alpha beta\\n"}]] [[then]] [[tool read_file {"path":"/spiffs/chain.md"}]] [[then]] [[tool edit_file {"path":"/spiffs/chain.md","old_string":"beta","new_string":"gamma"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/c"}]] [[then]] [[tool read_file {"path":"/spiffs/chain.md"}]]
+chain	copy-file-through-result	Copy my notes [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool write_file {"path":"/spiffs/copy.md","content":"{{result 1}}"}]] [[then]] [[tool read_file {"path":"/spiffs/copy.md"}]]
+chain	create-skill-then-use	Make a skill [[tool write_file {"path":"/spiffs/skills/tea.md","content":"# Tea\\nBrew for three minutes.\\n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/skills/"}]]
+chain	create-skill-then-use	Use the tea skill [[tool read_file {"path":"/spiffs/skills/tea.md"}]]
+chain	two-tools-per-step	Both at once [[tool read_file {"path":"/spiffs/notes.md"}]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool edit_file {"path":"/spiffs/notes.md","old_string":"eggs","new_string":"figs"}]] [[tool read_file {"path":"/spiffs/notes.md"}]]
+chain	over-the-iteration-limit	Eleven steps [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/n"}]]
+
+pair	send_message	{"chat_id":"3003","message":"Pair test ping."}
+
+case	send_message	Tell chat 42 [[tool send_message {"chat_id":"42","message":"Hello from the test."}]]
+case	send_message	Another channel [[tool send_message {"chat_id":"ws1","message":"Hi socket.","channel":"websocket"}]]
+case	send_message	No chat id [[tool send_message {"message":"Lost."}]]
+case	send_message	An empty chat id [[tool send_message {"chat_id":"","message":"Lost."}]]
+case	send_message	An empty message [[tool send_message {"chat_id":"42","message":""}]]
+case	send_message	A chat id that is a number [[tool send_message {"chat_id":42,"message":"Lost."}]]
+case	send_message	Names cut to the buffers [[tool send_message {"chat_id":"123456789012345678901234567890123456789","message":"Long ids.","channel":"averyveryverylongchannel"}]]
+case	send_message	Input that is not an object [[tool send_message "hi"]]
+
+chain	read-then-send-the-result	Send my notes to 42 [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool send_message {"chat_id":"42","message":"{{result 1}}"}]]

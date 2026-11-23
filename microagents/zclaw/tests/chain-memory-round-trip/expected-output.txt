@@ -1,0 +1,6 @@
+--- channel bytes=73
+Stub 2a4d9c958ca8: the tools returned 1 result(s):
+Key 'u_city' not found
+--- telegram chat_id=777 bytes=73
+Stub 2a4d9c958ca8: the tools returned 1 result(s):
+Key 'u_city' not found

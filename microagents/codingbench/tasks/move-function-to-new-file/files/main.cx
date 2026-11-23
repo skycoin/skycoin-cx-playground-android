@@ -1,0 +1,11 @@
+package main
+
+import "sys/string"
+
+func greeting(name str) (text str) {
+	text = string.Concatenation("Welcome, ", name)
+}
+
+func main() {
+	string.PrintLine(greeting("Ana"))
+}

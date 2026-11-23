@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_persona then reset_persona [[tool get_persona {}]] [[then]] [[tool reset_persona {}]]

@@ -18,3 +18,6 @@ var MimiSoulFile str = "/spiffs/config/SOUL.md"
 var MimiUserFile str = "/spiffs/config/USER.md"
 var MimiChannelTelegram str = "telegram"
 var MimiChannelSystem str = "system"
+
+// MAX_FILE_SIZE of tools/tool_files.c.
+var ToolFilesMaxFileSize i32 = 32768

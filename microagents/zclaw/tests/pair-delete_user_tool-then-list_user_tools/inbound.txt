@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delete_user_tool then list_user_tools [[tool delete_user_tool {"name":"water_plants"}]] [[then]] [[tool list_user_tools {}]]

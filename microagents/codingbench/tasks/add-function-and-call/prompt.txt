@@ -1,0 +1,1 @@
+Add a function square(x i32) (r i32) that returns x * x to /spiffs/lib.cx, and change /spiffs/main.cx to print square(7) after what it prints now. Run it as cx main.cx lib.cx.

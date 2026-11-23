@@ -17,3 +17,10 @@ var FemtoSoulFile str = "/spiffs/config/SOUL.md"
 var FemtoUserFile str = "/spiffs/config/USER.md"
 var FemtoChannelTelegram str = "telegram"
 var FemtoChannelSystem str = "system"
+
+// MAX_FILE_SIZE of tools/tool_files.c.
+var ToolFilesMaxFileSize i32 = 32768
+
+// The sizes of the channel and chat_id arrays of femto_msg_t.
+var FemtoMessageChannelLength i32 = 16
+var FemtoMessageChatIdLength i32 = 32

@@ -21,6 +21,9 @@
 
 #undef fopen
 #undef time
+#undef opendir
+#undef readdir
+#undef closedir
 
 #include <stdarg.h>
 
@@ -121,6 +124,52 @@ time_t host_time(time_t *out)
     time_t t = (time_t)strtoll(s_records[i].fields[1], NULL, 10);
     if (out) *out = t;
     return t;
+}
+
+typedef struct {
+    char **names;
+    int count;
+    int next;
+    struct dirent entry;
+} host_dir_t;
+
+DIR *host_opendir(const char *path)
+{
+    if (strcmp(path, "/spiffs") != 0) return NULL;
+    char command[1024];
+    snprintf(command, sizeof(command), "%s listdir -root spiffs", s_client_command);
+    FILE *p = popen(command, "r");
+    if (!p) return NULL;
+    host_dir_t *d = calloc(1, sizeof(*d));
+    char line[1024];
+    while (fgets(line, sizeof(line), p)) {
+        line[strcspn(line, "\n")] = '\0';
+        d->names = realloc(d->names, (d->count + 1) * sizeof(char *));
+        d->names[d->count++] = strdup(line);
+    }
+    if (pclose(p) != 0) {
+        host_closedir((DIR *)d);
+        return NULL;
+    }
+    return (DIR *)d;
+}
+
+struct dirent *host_readdir(DIR *dir)
+{
+    host_dir_t *d = (host_dir_t *)dir;
+    if (d->next >= d->count) return NULL;
+    memset(&d->entry, 0, sizeof(d->entry));
+    strncpy(d->entry.d_name, d->names[d->next++], sizeof(d->entry.d_name) - 1);
+    return &d->entry;
+}
+
+int host_closedir(DIR *dir)
+{
+    host_dir_t *d = (host_dir_t *)dir;
+    for (int i = 0; i < d->count; i++) free(d->names[i]);
+    free(d->names);
+    free(d);
+    return 0;
 }
 
 esp_err_t message_bus_pop_inbound(femto_msg_t *msg, uint32_t timeout_ms)
@@ -284,7 +333,6 @@ esp_err_t tool_web_search_execute(const char *in, char *out, size_t size) { (voi
 esp_err_t tool_cron_add_execute(const char *in, char *out, size_t size) { (void)in; return tool_unavailable("cron_add", out, size); }
 esp_err_t tool_cron_list_execute(const char *in, char *out, size_t size) { (void)in; return tool_unavailable("cron_list", out, size); }
 esp_err_t tool_cron_remove_execute(const char *in, char *out, size_t size) { (void)in; return tool_unavailable("cron_remove", out, size); }
-esp_err_t tool_send_message_execute(const char *in, char *out, size_t size) { (void)in; return tool_unavailable("send_message", out, size); }
 esp_err_t tool_gpio_control_execute(const char *in, char *out, size_t size) { (void)in; return tool_unavailable("gpio_control", out, size); }
 
 int main(int argc, char **argv)

@@ -1,0 +1,6 @@
+--- channel bytes=73
+Stub bc8a05b8d31b: the tools returned 1 result(s):
+Key not found: u_color
+--- telegram chat_id=777 bytes=73
+Stub bc8a05b8d31b: the tools returned 1 result(s):
+Key not found: u_color

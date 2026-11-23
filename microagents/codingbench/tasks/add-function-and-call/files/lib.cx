@@ -1,0 +1,5 @@
+package main
+
+func double(x i32) (r i32) {
+	r = x + x
+}

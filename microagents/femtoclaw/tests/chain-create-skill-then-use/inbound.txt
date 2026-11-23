@@ -1,0 +1,2 @@
+telegram	3003	Make a skill [[tool write_file {"path":"/spiffs/skills/tea.md","content":"# Tea\\nBrew for three minutes.\\n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/skills/"}]]
+telegram	3003	Use the tea skill [[tool read_file {"path":"/spiffs/skills/tea.md"}]]

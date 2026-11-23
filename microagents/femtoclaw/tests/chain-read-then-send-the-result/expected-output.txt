@@ -1,0 +1,8 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=42 bytes=22
+Shopping: milk, eggs.
+
+--- outbound channel=telegram chat_id=3003 bytes=97
+Stub ba358dbda2fc: the tools returned 1 result(s):
+OK: Message queued for delivery to telegram:42

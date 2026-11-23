@@ -1,0 +1,1 @@
+telegram	777	1000	Pair delay then memory_delete [[tool delay {"milliseconds":250}]] [[then]] [[tool memory_delete {"key":"u_color"}]]

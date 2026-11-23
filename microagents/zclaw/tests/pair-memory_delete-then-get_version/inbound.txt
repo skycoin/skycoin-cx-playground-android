@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_delete then get_version [[tool memory_delete {"key":"u_color"}]] [[then]] [[tool get_version {}]]

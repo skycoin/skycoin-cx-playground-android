@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_set then create_tool [[tool memory_set {"key":"u_color","value":"teal"}]] [[then]] [[tool create_tool {"name":"water_plants","description":"Water the plants","action":"Turn on pin 5 for 3 seconds"}]]

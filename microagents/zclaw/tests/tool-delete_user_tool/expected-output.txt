@@ -1,0 +1,24 @@
+--- channel bytes=79
+Stub f7633eb145dd: the tools returned 1 result(s):
+Created tool 'lamp': Lamp on
+--- telegram chat_id=777 bytes=79
+Stub f7633eb145dd: the tools returned 1 result(s):
+Created tool 'lamp': Lamp on
+--- channel bytes=72
+Stub d519c6af828a: the tools returned 1 result(s):
+Tool 'lamp' not found
+--- telegram chat_id=777 bytes=72
+Stub d519c6af828a: the tools returned 1 result(s):
+Tool 'lamp' not found
+--- channel bytes=73
+Stub fa1b9a5186d0: the tools returned 1 result(s):
+Error: 'name' required
+--- telegram chat_id=777 bytes=73
+Stub fa1b9a5186d0: the tools returned 1 result(s):
+Error: 'name' required
+--- channel bytes=73
+Stub 99d7640933e3: the tools returned 1 result(s):
+Error: 'name' required
+--- telegram chat_id=777 bytes=73
+Stub 99d7640933e3: the tools returned 1 result(s):
+Error: 'name' required

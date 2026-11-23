@@ -1,0 +1,1 @@
+telegram	777	1000	Six steps [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]]

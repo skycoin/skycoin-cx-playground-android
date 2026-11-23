@@ -1,0 +1,6 @@
+--- channel bytes=80
+Stub 8893abc0a6b3: the tools returned 1 result(s):
+Tool 'water_plants' not found
+--- telegram chat_id=777 bytes=80
+Stub 8893abc0a6b3: the tools returned 1 result(s):
+Tool 'water_plants' not found

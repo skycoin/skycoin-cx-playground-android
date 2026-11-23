@@ -1,0 +1,1 @@
+telegram	3003	Pair write_file then edit_file [[tool write_file {"path":"/spiffs/notes.md","content":"Shopping: milk, eggs, bread.\\n"}]] [[then]] [[tool edit_file {"path":"/spiffs/notes.md","old_string":"milk","new_string":"oat milk"}]]

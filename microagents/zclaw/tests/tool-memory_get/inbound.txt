@@ -1,0 +1,6 @@
+telegram	777	1000	Set first [[tool memory_set {"key":"u_pet","value":"cat"}]]
+telegram	777	2000	Read it [[tool memory_get {"key":"u_pet"}]]
+telegram	777	3000	A key never set [[tool memory_get {"key":"u_none"}]]
+telegram	777	4000	A system key [[tool memory_get {"key":"wifi_pass"}]]
+telegram	777	5000	No key [[tool memory_get {}]]
+telegram	777	6000	A key that is a number [[tool memory_get {"key":12}]]

@@ -1,0 +1,2 @@
+telegram	777	1000	At start [[tool get_health]]
+telegram	777	2000	After more requests [[tool get_health {}]]

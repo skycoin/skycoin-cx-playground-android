@@ -1,0 +1,1 @@
+[[{"tool":"write_file","input":{"path":"/spiffs/hello.cx","content":"package main\n\nimport \"sys/string\"\n\nfunc main() {\n\tstring.PrintLine(\"hello\")\n}\n"}}]]

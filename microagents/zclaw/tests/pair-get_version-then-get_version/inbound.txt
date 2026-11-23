@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_version then get_version [[tool get_version {}]] [[then]] [[tool get_version {}]]

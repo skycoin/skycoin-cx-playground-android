@@ -1,0 +1,6 @@
+telegram	3003	Everything [[tool list_dir {}]]
+telegram	3003	One folder [[tool list_dir {"prefix":"/spiffs/memory/"}]]
+telegram	3003	A prefix that matches nothing [[tool list_dir {"prefix":"/spiffs/none/"}]]
+telegram	3003	A prefix that is a number [[tool list_dir {"prefix":5}]]
+telegram	3003	Input that is not an object [[tool list_dir "x"]]
+telegram	3003	A file this turn wrote shows up [[tool write_file {"path":"/spiffs/memory/2026-11-23.md","content":"Met Ana.\\n"}]] [[then]] [[tool list_dir {"prefix":"/spiffs/memory/"}]]

@@ -1,0 +1,30 @@
+package main
+
+import "sys/string"
+
+// Port of tool_send_message_execute of tools/tool_send_message.c. The
+// channel and chat id are cut to the char arrays of femto_msg_t.
+func toolSendMessage(inputJson str) (output str) {
+	chatId, chatIdFound := jsonStringField(inputJson, 0, "chat_id")
+	message, messageFound := jsonStringField(inputJson, 0, "message")
+	channel, channelFound := jsonStringField(inputJson, 0, "channel")
+	if !chatIdFound || string.ByteLength(chatId) == 0 {
+		output = "Error: missing or empty 'chat_id'"
+		return
+	}
+	if !messageFound || string.ByteLength(message) == 0 {
+		output = "Error: missing or empty 'message'"
+		return
+	}
+	if !channelFound {
+		channel = FemtoChannelTelegram
+	}
+	if string.ByteLength(channel) > FemtoMessageChannelLength - 1 {
+		channel = string.SubstringByByteRange(channel, 0, FemtoMessageChannelLength - 1)
+	}
+	if string.ByteLength(chatId) > FemtoMessageChatIdLength - 1 {
+		chatId = string.SubstringByByteRange(chatId, 0, FemtoMessageChatIdLength - 1)
+	}
+	messageBusPushOutbound(channel, chatId, message)
+	output = joinStrings([]str{"OK: Message queued for delivery to ", channel, ":", chatId})
+}

@@ -1,0 +1,1 @@
+telegram	3003	Pair get_current_time then write_file [[tool get_current_time {}]] [[then]] [[tool write_file {"path":"/spiffs/notes.md","content":"Shopping: milk, eggs, bread.\\n"}]]

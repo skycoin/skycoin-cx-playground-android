@@ -1,0 +1,105 @@
+# Generated tests of zclaw, see ../testgen. Messages use the escapes of
+# inbound.txt, so a JSON \n inside a directive is written \\n. zclaw runs
+# the first tool call of a reply only, so pairs and chains use [[then]].
+inbound	telegram	777	{uptime}
+
+# The call each pair test makes of a tool.
+pair	memory_set	{"key":"u_color","value":"teal"}
+pair	memory_get	{"key":"u_color"}
+pair	memory_delete	{"key":"u_color"}
+pair	set_persona	{"persona":"witty"}
+pair	get_persona	{}
+pair	reset_persona	{}
+pair	delay	{"milliseconds":250}
+pair	get_version	{}
+pair	get_health	{}
+pair	create_tool	{"name":"water_plants","description":"Water the plants","action":"Turn on pin 5 for 3 seconds"}
+pair	list_user_tools	{}
+pair	delete_user_tool	{"name":"water_plants"}
+
+case	memory_set	Remember my locker [[tool memory_set {"key":"u_locker","value":"B12"}]]
+case	memory_set	Change it [[tool memory_set {"key":"u_locker","value":"C7"}]]
+case	memory_set	A system key [[tool memory_set {"key":"wifi_pass","value":"x"}]]
+case	memory_set	A key without the user prefix [[tool memory_set {"key":"color","value":"x"}]]
+case	memory_set	A key that is too long [[tool memory_set {"key":"u_abcdefghijklmnop","value":"x"}]]
+case	memory_set	A key with a space [[tool memory_set {"key":"u_a b","value":"x"}]]
+case	memory_set	An empty key [[tool memory_set {"key":"","value":"x"}]]
+case	memory_set	No value [[tool memory_set {"key":"u_locker"}]]
+case	memory_set	A value that is a number [[tool memory_set {"key":"u_locker","value":5}]]
+case	memory_set	The keys in capitals [[tool memory_set {"KEY":"u_pet","Value":"cat"}]]
+case	memory_set	Input that is not an object [[tool memory_set "u_locker"]]
+
+case	memory_get	Set first [[tool memory_set {"key":"u_pet","value":"cat"}]]
+case	memory_get	Read it [[tool memory_get {"key":"u_pet"}]]
+case	memory_get	A key never set [[tool memory_get {"key":"u_none"}]]
+case	memory_get	A system key [[tool memory_get {"key":"wifi_pass"}]]
+case	memory_get	No key [[tool memory_get {}]]
+case	memory_get	A key that is a number [[tool memory_get {"key":12}]]
+
+case	memory_delete	Set first [[tool memory_set {"key":"u_pet","value":"cat"}]]
+case	memory_delete	Delete it [[tool memory_delete {"key":"u_pet"}]]
+case	memory_delete	Delete it again [[tool memory_delete {"key":"u_pet"}]]
+case	memory_delete	A system key [[tool memory_delete {"key":"api_key"}]]
+case	memory_delete	No key [[tool memory_delete]]
+
+case	set_persona	Be witty [[tool set_persona {"persona":"witty"}]]
+case	set_persona	In capitals [[tool set_persona {"persona":"FRIENDLY"}]]
+case	set_persona	Unknown persona [[tool set_persona {"persona":"pirate"}]]
+case	set_persona	No persona [[tool set_persona {}]]
+case	set_persona	A persona that is a number [[tool set_persona {"persona":1}]]
+
+case	get_persona	At start [[tool get_persona]]
+case	get_persona	After a change [[tool set_persona {"persona":"technical"}]]
+case	get_persona	Again [[tool get_persona {}]]
+
+case	reset_persona	Set one [[tool set_persona {"persona":"witty"}]]
+case	reset_persona	Reset [[tool reset_persona]]
+case	reset_persona	Reset with arguments [[tool reset_persona {"persona":"witty"}]]
+
+case	delay	Wait a bit [[tool delay {"milliseconds":250}]]
+case	delay	The longest wait [[tool delay {"milliseconds":60000}]]
+case	delay	Too long [[tool delay {"milliseconds":70000}]]
+case	delay	Zero [[tool delay {"milliseconds":0}]]
+case	delay	Negative [[tool delay {"milliseconds":-5}]]
+case	delay	A fraction is cut [[tool delay {"milliseconds":1.9}]]
+case	delay	Beyond the int range [[tool delay {"milliseconds":99999999999}]]
+case	delay	A string number [[tool delay {"milliseconds":"100"}]]
+case	delay	No milliseconds [[tool delay {}]]
+case	delay	Input that is not an object [[tool delay 100]]
+
+case	get_version	Which version [[tool get_version]]
+case	get_version	With arguments [[tool get_version {"verbose":true}]]
+
+case	get_health	At start [[tool get_health]]
+case	get_health	After more requests [[tool get_health {}]]
+
+case	create_tool	Make a tool [[tool create_tool {"name":"water_plants","description":"Water the plants","action":"Turn on pin 5 for 3 seconds"}]]
+case	create_tool	The next request lists it, say hi
+case	create_tool	Call it [[tool water_plants {}]]
+case	create_tool	A name with a space [[tool create_tool {"name":"bad name","description":"d","action":"a"}]]
+case	create_tool	No description [[tool create_tool {"name":"t1","action":"a"}]]
+case	create_tool	No action [[tool create_tool {"name":"t1","description":"d"}]]
+case	create_tool	No name [[tool create_tool {"description":"d","action":"a"}]]
+case	create_tool	A name cut to 23 bytes [[tool create_tool {"name":"a_very_long_tool_name_that_is_cut","description":"Long","action":"a"}]]
+case	create_tool	Third [[tool create_tool {"name":"t3","description":"d3","action":"a"}]]
+case	create_tool	Fourth [[tool create_tool {"name":"t4","description":"d4","action":"a"}]]
+case	create_tool	Fifth [[tool create_tool {"name":"t5","description":"d5","action":"a"}]]
+case	create_tool	Sixth [[tool create_tool {"name":"t6","description":"d6","action":"a"}]]
+case	create_tool	Seventh [[tool create_tool {"name":"t7","description":"d7","action":"a"}]]
+case	create_tool	Eighth [[tool create_tool {"name":"t8","description":"d8","action":"a"}]]
+case	create_tool	The ninth is over the limit [[tool create_tool {"name":"t9","description":"d9","action":"a"}]]
+
+case	list_user_tools	None yet [[tool list_user_tools]]
+case	list_user_tools	Make one [[tool create_tool {"name":"lamp","description":"Lamp on","action":"Set pin 4 high"}]]
+case	list_user_tools	One now [[tool list_user_tools {}]]
+
+case	delete_user_tool	Make one [[tool create_tool {"name":"lamp","description":"Lamp on","action":"Set pin 4 high"}]]
+case	delete_user_tool	Delete it [[tool delete_user_tool {"name":"lamp"}]]
+case	delete_user_tool	No name [[tool delete_user_tool {}]]
+case	delete_user_tool	A name that is a number [[tool delete_user_tool {"name":3}]]
+
+chain	memory-round-trip	Round trip [[tool memory_set {"key":"u_city","value":"Porto"}]] [[then]] [[tool memory_get {"key":"u_city"}]] [[then]] [[tool memory_delete {"key":"u_city"}]] [[then]] [[tool memory_get {"key":"u_city"}]]
+chain	persona-round-trip	Personas [[tool set_persona {"persona":"friendly"}]] [[then]] [[tool get_persona]] [[then]] [[tool reset_persona]] [[then]] [[tool get_persona]]
+chain	user-tool-life	Tools [[tool create_tool {"name":"fan","description":"Fan on","action":"Set pin 6 high"}]] [[then]] [[tool list_user_tools]] [[then]] [[tool fan]] [[then]] [[tool delete_user_tool {"name":"fan"}]]
+chain	copy-memory-through-result	Copy [[tool memory_set {"key":"u_a","value":"apple"}]] [[then]] [[tool memory_get {"key":"u_a"}]] [[then]] [[tool memory_set {"key":"u_b","value":"{{result 1}}"}]] [[then]] [[tool memory_get {"key":"u_b"}]]
+chain	over-the-round-limit	Six steps [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]] [[then]] [[tool get_version]]

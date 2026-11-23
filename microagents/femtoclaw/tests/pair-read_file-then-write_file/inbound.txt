@@ -1,0 +1,1 @@
+telegram	3003	Pair read_file then write_file [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool write_file {"path":"/spiffs/notes.md","content":"Shopping: milk, eggs, bread.\\n"}]]

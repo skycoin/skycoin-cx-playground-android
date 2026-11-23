@@ -1,0 +1,1 @@
+telegram	3003	Pair get_current_time then get_current_time [[tool get_current_time {}]] [[then]] [[tool get_current_time {}]]

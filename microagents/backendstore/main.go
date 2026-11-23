@@ -8,6 +8,8 @@
 //	backendstore head -url URL
 //	backendstore list -store F
 //	backendstore stop -url URL
+//	backendstore listdir -root DIR
+//	backendstore import -tape F -store F
 package main
 
 import (
@@ -20,9 +22,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,6 +62,10 @@ func main() {
 		err = runList(os.Args[2:])
 	case "stop":
 		err = runStop(os.Args[2:])
+	case "listdir":
+		err = runListDir(os.Args[2:])
+	case "import":
+		err = runImport(os.Args[2:])
 	default:
 		usage()
 	}
@@ -68,7 +76,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: backendstore serve|stub|post|head|list|stop [flags]")
+	fmt.Fprintln(os.Stderr, "usage: backendstore serve|stub|post|head|list|stop|listdir|import [flags]")
 	os.Exit(2)
 }
 
@@ -381,23 +389,20 @@ func StubReplyFor(body []byte) (int, []byte, error) {
 
 	var text string
 	if err := json.Unmarshal(last.Content, &text); err != nil {
-		var blocks []struct {
-			Type    string `json:"type"`
-			Content string `json:"content"`
-		}
-		if err := json.Unmarshal(last.Content, &blocks); err != nil {
+		results, err := toolResults(last.Content)
+		if err != nil {
 			return 0, nil, err
 		}
-		var results []string
-		for _, b := range blocks {
-			if b.Type == "tool_result" {
-				results = append(results, b.Content)
-			}
+		if calls := stubNextStep(req.Messages, tag, results); len(calls) > 0 {
+			reply.StopReason = "tool_use"
+			reply.Content = append([]stubContentBlock{{Type: "text", Text: "Next step."}}, calls...)
+			return marshalStub(http.StatusOK, reply)
 		}
 		reply.Content = []stubContentBlock{{Type: "text", Text: fmt.Sprintf(
 			"Stub %s: the tools returned %d result(s):\n%s", tag, len(results), strings.Join(results, "\n---\n"))}}
 		return marshalStub(http.StatusOK, reply)
 	}
+	text, _, _ = strings.Cut(text, stepSeparator)
 
 	if status, found := stubStatusDirective(text); found {
 		return marshalStub(status, stubError{Type: "error", Error: stubErrorDetail{Type: "overloaded_error", Message: fmt.Sprintf("Stub %s: status %d", tag, status)}})
@@ -425,6 +430,60 @@ func StubReplyFor(body []byte) (int, []byte, error) {
 	reply.Content = []stubContentBlock{{Type: "text", Text: fmt.Sprintf(
 		"Stub %s: you said \"%s\". I see %d message(s) in this conversation.", tag, text, len(req.Messages))}}
 	return marshalStub(http.StatusOK, reply)
+}
+
+// stepSeparator splits the directives of a message into model steps. The
+// stub answers the message with the tools of step 1, the results of those
+// tools with the tools of step 2, and so on, then with its summary text.
+const stepSeparator = "[[then]]"
+
+func toolResults(content json.RawMessage) ([]string, error) {
+	var blocks []struct {
+		Type    string `json:"type"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(content, &blocks); err != nil {
+		return nil, err
+	}
+	var results []string
+	for _, b := range blocks {
+		if b.Type == "tool_result" {
+			results = append(results, b.Content)
+		}
+	}
+	return results, nil
+}
+
+// stubNextStep returns the tool calls of the next step of the last user
+// text message, or none when that message has no further step. In a step,
+// "{{result N}}" is replaced by result N of the previous step, escaped for
+// use inside a JSON string, so a later step can depend on an earlier one.
+func stubNextStep(messages []struct {
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
+}, tag string, results []string) []stubContentBlock {
+	step := 0
+	for i := len(messages) - 1; i >= 0; i-- {
+		var text string
+		if messages[i].Role != "user" {
+			continue
+		}
+		if json.Unmarshal(messages[i].Content, &text) != nil {
+			step++
+			continue
+		}
+		steps := strings.Split(text, stepSeparator)
+		if step >= len(steps) {
+			return nil
+		}
+		directives := steps[step]
+		for n := len(results); n >= 1; n-- {
+			escaped, _ := json.Marshal(results[n-1])
+			directives = strings.ReplaceAll(directives, fmt.Sprintf("{{result %d}}", n), string(escaped[1:len(escaped)-1]))
+		}
+		return stubToolDirectives(directives, tag)
+	}
+	return nil
 }
 
 func pathInput(path string) json.RawMessage {
@@ -549,4 +608,102 @@ func stubToolDirectives(text, tag string) []stubContentBlock {
 		}
 		calls = append(calls, stubContentBlock{Type: "tool_use", ID: fmt.Sprintf("toolu_%s_%d", tag, len(calls)+1), Name: name, Input: json.RawMessage(compact.Bytes())})
 	}
+}
+
+// runListDir prints the regular files under root, recursively, as paths
+// relative to root, one per line in byte order. SPIFFS has no directories,
+// only names with slashes in them, so this is the listing a device shows.
+// The port's dir-list wrapper and the C harness's readdir shim use it.
+func runListDir(args []string) error {
+	flags := flag.NewFlagSet("listdir", flag.ExitOnError)
+	root := flags.String("root", "spiffs", "directory to list")
+	flags.Parse(args)
+	names, err := listFiles(*root)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		fmt.Println(name)
+	}
+	return nil
+}
+
+func listFiles(root string) ([]string, error) {
+	var names []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Type().IsRegular() {
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			names = append(names, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	sort.Strings(names)
+	return names, err
+}
+
+// runImport fills a store from the net-request and net-reply records of a
+// tape. A port in record mode writes those records for exactly the requests
+// the record store saw, so the result answers the same requests.
+func runImport(args []string) error {
+	flags := flag.NewFlagSet("import", flag.ExitOnError)
+	tapePath := flags.String("tape", "tape.txt", "tape file")
+	storePath := flags.String("store", "store.bolt", "bbolt store file to create")
+	flags.Parse(args)
+	tape, err := os.ReadFile(*tapePath)
+	if err != nil {
+		return err
+	}
+	db, err := bolt.Open(*storePath, 0o644, &bolt.Options{Timeout: 5 * time.Second})
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	s := &memoServer{db: db}
+	var request []byte
+	for _, line := range strings.Split(string(tape), "\n") {
+		fields := strings.Split(line, "\t")
+		switch {
+		case fields[0] == "net-request" && len(fields) == 3:
+			request = []byte(TapeUnescape(fields[2]))
+		case fields[0] == "net-reply" && len(fields) == 3 && request != nil:
+			status, err := strconv.Atoi(fields[1])
+			if err != nil {
+				return err
+			}
+			if err := s.store(RequestKey(request), request, status, []byte(TapeUnescape(fields[2]))); err != nil {
+				return err
+			}
+			request = nil
+		}
+	}
+	return nil
+}
+
+// TapeUnescape undoes the \n, \t, \r and \\ escapes of a tape field.
+func TapeUnescape(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\\' && i+1 < len(s) {
+			i++
+			switch s[i] {
+			case 'n':
+				b.WriteByte('\n')
+			case 't':
+				b.WriteByte('\t')
+			case 'r':
+				b.WriteByte('\r')
+			default:
+				b.WriteByte(s[i])
+			}
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }

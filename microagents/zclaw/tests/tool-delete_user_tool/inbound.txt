@@ -1,0 +1,4 @@
+telegram	777	1000	Make one [[tool create_tool {"name":"lamp","description":"Lamp on","action":"Set pin 4 high"}]]
+telegram	777	2000	Delete it [[tool delete_user_tool {"name":"lamp"}]]
+telegram	777	3000	No name [[tool delete_user_tool {}]]
+telegram	777	4000	A name that is a number [[tool delete_user_tool {"name":3}]]

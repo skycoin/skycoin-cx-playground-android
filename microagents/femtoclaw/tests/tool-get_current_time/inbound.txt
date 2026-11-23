@@ -1,0 +1,3 @@
+telegram	3003	What time is it? [[tool get_current_time {}]]
+telegram	3003	Unused arguments [[tool get_current_time {"timezone":"Europe/Lisbon"}]]
+telegram	3003	Input that is not an object [[tool get_current_time "now"]]

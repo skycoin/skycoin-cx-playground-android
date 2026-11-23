@@ -1,0 +1,6 @@
+--- channel bytes=70
+Stub d774613606b6: the tools returned 1 result(s):
+zclaw vtest-version
+--- telegram chat_id=777 bytes=70
+Stub d774613606b6: the tools returned 1 result(s):
+zclaw vtest-version

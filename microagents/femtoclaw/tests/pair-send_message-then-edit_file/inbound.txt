@@ -1,0 +1,1 @@
+telegram	3003	Pair send_message then edit_file [[tool send_message {"chat_id":"3003","message":"Pair test ping."}]] [[then]] [[tool edit_file {"path":"/spiffs/notes.md","old_string":"milk","new_string":"oat milk"}]]

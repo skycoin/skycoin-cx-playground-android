@@ -1,0 +1,30 @@
+--- channel bytes=69
+Stub 1afcad473256: the tools returned 1 result(s):
+Saved: u_pet = cat
+--- telegram chat_id=777 bytes=69
+Stub 1afcad473256: the tools returned 1 result(s):
+Saved: u_pet = cat
+--- channel bytes=65
+Stub 281de06c8be9: the tools returned 1 result(s):
+Deleted: u_pet
+--- telegram chat_id=777 bytes=65
+Stub 281de06c8be9: the tools returned 1 result(s):
+Deleted: u_pet
+--- channel bytes=71
+Stub c6cccd0fc2ec: the tools returned 1 result(s):
+Key not found: u_pet
+--- telegram chat_id=777 bytes=71
+Stub c6cccd0fc2ec: the tools returned 1 result(s):
+Key not found: u_pet
+--- channel bytes=101
+Stub 6612fab41176: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- telegram chat_id=777 bytes=101
+Stub 6612fab41176: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- channel bytes=81
+Stub 614d52630644: the tools returned 1 result(s):
+Error: 'key' required (string)
+--- telegram chat_id=777 bytes=81
+Stub 614d52630644: the tools returned 1 result(s):
+Error: 'key' required (string)

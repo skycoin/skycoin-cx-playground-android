@@ -1,0 +1,1 @@
+[[{"tool":"read_file","input":{"path":"/spiffs/template.cx"}}],[{"tool":"write_file","input":{"path":"/spiffs/app.cx","content":"{{result 1}}"}}],[{"tool":"edit_file","input":{"path":"/spiffs/app.cx","old_string":"TEMPLATE","new_string":"app ready"}}]]

@@ -1,0 +1,1 @@
+telegram	3003	Both at once [[tool read_file {"path":"/spiffs/notes.md"}]] [[tool list_dir {"prefix":"/spiffs/n"}]] [[then]] [[tool edit_file {"path":"/spiffs/notes.md","old_string":"eggs","new_string":"figs"}]] [[tool read_file {"path":"/spiffs/notes.md"}]]

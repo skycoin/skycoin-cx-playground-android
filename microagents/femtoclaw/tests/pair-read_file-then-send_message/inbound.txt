@@ -1,0 +1,1 @@
+telegram	3003	Pair read_file then send_message [[tool read_file {"path":"/spiffs/notes.md"}]] [[then]] [[tool send_message {"chat_id":"3003","message":"Pair test ping."}]]

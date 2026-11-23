@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_delete then memory_get [[tool memory_delete {"key":"u_color"}]] [[then]] [[tool memory_get {"key":"u_color"}]]

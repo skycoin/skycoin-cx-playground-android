@@ -1,0 +1,1 @@
+telegram	3003	Pair list_dir then get_current_time [[tool list_dir {}]] [[then]] [[tool get_current_time {}]]

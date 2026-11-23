@@ -1,0 +1,14 @@
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=99
+Stub 41134275b9e0: the tools returned 1 result(s):
+/spiffs/skills/tea.md
+/spiffs/skills/weather.md
+
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=81
+Stub f3f58f733dd6: the tools returned 1 result(s):
+# Tea
+Brew for three minutes.
+

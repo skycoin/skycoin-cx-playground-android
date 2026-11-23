@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_persona then set_persona [[tool get_persona {}]] [[then]] [[tool set_persona {"persona":"witty"}]]

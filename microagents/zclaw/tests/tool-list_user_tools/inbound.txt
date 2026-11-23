@@ -1,0 +1,3 @@
+telegram	777	1000	None yet [[tool list_user_tools]]
+telegram	777	2000	Make one [[tool create_tool {"name":"lamp","description":"Lamp on","action":"Set pin 4 high"}]]
+telegram	777	3000	One now [[tool list_user_tools {}]]

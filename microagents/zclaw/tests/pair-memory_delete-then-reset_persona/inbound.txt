@@ -1,0 +1,1 @@
+telegram	777	1000	Pair memory_delete then reset_persona [[tool memory_delete {"key":"u_color"}]] [[then]] [[tool reset_persona {}]]

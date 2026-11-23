@@ -1,0 +1,1 @@
+telegram	3003	Pair list_dir then list_dir [[tool list_dir {}]] [[then]] [[tool list_dir {}]]

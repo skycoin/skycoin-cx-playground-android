@@ -1,0 +1,6 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=73
+Stub 337c7f51b508: the tools returned 1 result(s):
+Shopping: milk, eggs.
+

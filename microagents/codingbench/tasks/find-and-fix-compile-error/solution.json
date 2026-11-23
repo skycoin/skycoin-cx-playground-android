@@ -1,0 +1,1 @@
+[[{"tool":"list_dir","input":{"prefix":"/spiffs/src/"}}],[{"tool":"read_file","input":{"path":"/spiffs/src/a.cx"}},{"tool":"read_file","input":{"path":"/spiffs/src/b.cx"}},{"tool":"read_file","input":{"path":"/spiffs/src/c.cx"}}],[{"tool":"edit_file","input":{"path":"/spiffs/src/c.cx","old_string":"r = 3 +\n","new_string":"r = 3\n"}}]]

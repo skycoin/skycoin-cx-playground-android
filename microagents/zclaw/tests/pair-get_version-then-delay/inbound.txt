@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_version then delay [[tool get_version {}]] [[then]] [[tool delay {"milliseconds":250}]]

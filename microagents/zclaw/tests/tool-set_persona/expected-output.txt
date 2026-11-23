@@ -1,0 +1,30 @@
+--- channel bytes=72
+Stub 599d4c6fe224: the tools returned 1 result(s):
+Persona set to witty.
+--- telegram chat_id=777 bytes=72
+Stub 599d4c6fe224: the tools returned 1 result(s):
+Persona set to witty.
+--- channel bytes=75
+Stub 47809218dfb6: the tools returned 1 result(s):
+Persona set to friendly.
+--- telegram chat_id=777 bytes=75
+Stub 47809218dfb6: the tools returned 1 result(s):
+Persona set to friendly.
+--- channel bytes=124
+Stub 4b9503df4ecf: the tools returned 1 result(s):
+Error: unknown persona 'pirate' (use neutral, friendly, technical, witty)
+--- telegram chat_id=777 bytes=124
+Stub 4b9503df4ecf: the tools returned 1 result(s):
+Error: unknown persona 'pirate' (use neutral, friendly, technical, witty)
+--- channel bytes=85
+Stub 0d6e53816bd2: the tools returned 1 result(s):
+Error: 'persona' required (string)
+--- telegram chat_id=777 bytes=85
+Stub 0d6e53816bd2: the tools returned 1 result(s):
+Error: 'persona' required (string)
+--- channel bytes=85
+Stub b32bb3b9adac: the tools returned 1 result(s):
+Error: 'persona' required (string)
+--- telegram chat_id=777 bytes=85
+Stub b32bb3b9adac: the tools returned 1 result(s):
+Error: 'persona' required (string)

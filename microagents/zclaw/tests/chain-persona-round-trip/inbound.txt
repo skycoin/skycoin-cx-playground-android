@@ -1,0 +1,1 @@
+telegram	777	1000	Personas [[tool set_persona {"persona":"friendly"}]] [[then]] [[tool get_persona]] [[then]] [[tool reset_persona]] [[then]] [[tool get_persona]]

@@ -1,0 +1,12 @@
+--- channel bytes=70
+Stub dc26671d52ce: the tools returned 1 result(s):
+zclaw vtest-version
+--- telegram chat_id=777 bytes=70
+Stub dc26671d52ce: the tools returned 1 result(s):
+zclaw vtest-version
+--- channel bytes=70
+Stub 4aac18da525b: the tools returned 1 result(s):
+zclaw vtest-version
+--- telegram chat_id=777 bytes=70
+Stub 4aac18da525b: the tools returned 1 result(s):
+zclaw vtest-version

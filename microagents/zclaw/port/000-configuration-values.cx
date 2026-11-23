@@ -1,7 +1,8 @@
 package main
 
 // Port of config.h for the anthropic backend with its default model, and of
-// the parts of nvs_keys.h, memory_keys.h and mock_memory.c the port uses.
+// the parts of nvs_keys.h, memory_keys.h, tools_gpio.c, mock_memory.c and
+// mock_system_diag_deps.c the port uses.
 
 var ZclawApiUrl str = "https://api.anthropic.com/v1/messages"
 var ZclawModel str = "claude-sonnet-4-6"
@@ -34,3 +35,9 @@ var ZclawMemoryKeyLength i32 = 31
 var ZclawMemoryValueLength i32 = 511
 var ZclawSourceChannel str = "channel"
 var ZclawSourceTelegram str = "telegram"
+var ZclawDelayMaxMs i32 = 60000
+var ZclawMaxDynamicTools i32 = 8
+var ZclawToolNameMaxLength i32 = 24
+var ZclawToolDescriptionMaxLength i32 = 128
+var ZclawCronMaxActionLength i32 = 256
+var ZclawMockVersion str = "test-version"

@@ -1,0 +1,1 @@
+telegram	777	1000	Pair get_health then get_persona [[tool get_health {}]] [[then]] [[tool get_persona {}]]

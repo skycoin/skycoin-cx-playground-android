@@ -1,0 +1,6 @@
+--- channel bytes=70
+Stub 96f2a4f82aa1: the tools returned 1 result(s):
+zclaw vtest-version
+--- telegram chat_id=777 bytes=70
+Stub 96f2a4f82aa1: the tools returned 1 result(s):
+zclaw vtest-version

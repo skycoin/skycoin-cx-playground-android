@@ -1,0 +1,2 @@
+telegram	777	1000	Which version [[tool get_version]]
+telegram	777	2000	With arguments [[tool get_version {"verbose":true}]]

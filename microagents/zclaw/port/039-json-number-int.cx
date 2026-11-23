@@ -1,0 +1,87 @@
+package main
+
+import "sys/string"
+
+// jsonNumberInt reads the number at position as cJSON keeps it in
+// valueint: strtod, then the value cut toward zero and held to the i32
+// range. isNumber is false for anything but a number, as cJSON_IsNumber.
+func jsonNumberInt(s str, position i32) (value i32, isNumber bool) {
+	value = 0
+	var digits str = "0123456789"
+	var count i32 = string.ByteLength(s)
+	var i i32 = position
+	var negative bool = string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 1), "-")
+	if negative {
+		i++
+	}
+	isNumber = i < count && string.ByteIndexOfFirstSubstring(digits, string.SubstringByByteRange(s, i, i + 1)) >= 0
+	if !isNumber {
+		return
+	}
+	var mantissa i64 = 0L
+	var scale i32 = 0
+	var inFraction bool = false
+	var scanning bool = true
+	for scanning && i < count {
+		var c str = string.SubstringByByteRange(s, i, i + 1)
+		var digit i32 = string.ByteIndexOfFirstSubstring(digits, c)
+		if digit >= 0 {
+			if mantissa < 100000000000000L {
+				mantissa = mantissa * 10L + i32.i64(digit)
+				if inFraction {
+					scale--
+				}
+			} else if !inFraction {
+				scale++
+			}
+			i++
+		} else if string.EqualityByByteValue(c, ".") && !inFraction {
+			inFraction = true
+			i++
+		} else {
+			scanning = false
+		}
+	}
+	var c str = string.SubstringByByteRange(s, i, i + 1)
+	if string.EqualityByByteValue(c, "e") || string.EqualityByByteValue(c, "E") {
+		i++
+		var exponentNegative bool = string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 1), "-")
+		if exponentNegative || string.EqualityByByteValue(string.SubstringByByteRange(s, i, i + 1), "+") {
+			i++
+		}
+		var exponent i32 = 0
+		var digit i32 = string.ByteIndexOfFirstSubstring(digits, string.SubstringByByteRange(s, i, i + 1))
+		for i < count && digit >= 0 {
+			if exponent < 1000 {
+				exponent = exponent * 10 + digit
+			}
+			i++
+			digit = string.ByteIndexOfFirstSubstring(digits, string.SubstringByByteRange(s, i, i + 1))
+		}
+		if exponentNegative {
+			exponent = 0 - exponent
+		}
+		scale = scale + exponent
+	}
+	for scale > 0 && mantissa < 100000000000000L {
+		mantissa = mantissa * 10L
+		scale--
+	}
+	for scale < 0 && mantissa > 0L {
+		mantissa = mantissa / 10L
+		scale++
+	}
+	if scale > 0 && mantissa > 0L {
+		mantissa = 100000000000000L
+	}
+	if negative {
+		mantissa = 0L - mantissa
+	}
+	if mantissa >= 2147483647L {
+		value = 2147483647
+	} else if mantissa <= -2147483648L {
+		value = -2147483647 - 1
+	} else {
+		value = i64.i32(mantissa)
+	}
+}

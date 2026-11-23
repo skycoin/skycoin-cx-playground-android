@@ -1,0 +1,60 @@
+--- channel bytes=64
+Stub 0147df9c6906: the tools returned 1 result(s):
+Waited 250 ms
+--- telegram chat_id=777 bytes=64
+Stub 0147df9c6906: the tools returned 1 result(s):
+Waited 250 ms
+--- channel bytes=66
+Stub d7ed6fa1cf90: the tools returned 1 result(s):
+Waited 60000 ms
+--- telegram chat_id=777 bytes=66
+Stub d7ed6fa1cf90: the tools returned 1 result(s):
+Waited 60000 ms
+--- channel bytes=91
+Stub a1a65b38ae42: the tools returned 1 result(s):
+Error: max delay is 60000 ms (got 70000)
+--- telegram chat_id=777 bytes=91
+Stub a1a65b38ae42: the tools returned 1 result(s):
+Error: max delay is 60000 ms (got 70000)
+--- channel bytes=87
+Stub 93175fb874f5: the tools returned 1 result(s):
+Error: milliseconds must be positive
+--- telegram chat_id=777 bytes=87
+Stub 93175fb874f5: the tools returned 1 result(s):
+Error: milliseconds must be positive
+--- channel bytes=87
+Stub 0bfa40bda86b: the tools returned 1 result(s):
+Error: milliseconds must be positive
+--- telegram chat_id=777 bytes=87
+Stub 0bfa40bda86b: the tools returned 1 result(s):
+Error: milliseconds must be positive
+--- channel bytes=62
+Stub ffdf00922a20: the tools returned 1 result(s):
+Waited 1 ms
+--- telegram chat_id=777 bytes=62
+Stub ffdf00922a20: the tools returned 1 result(s):
+Waited 1 ms
+--- channel bytes=96
+Stub d18ceed72be7: the tools returned 1 result(s):
+Error: max delay is 60000 ms (got 2147483647)
+--- telegram chat_id=777 bytes=96
+Stub d18ceed72be7: the tools returned 1 result(s):
+Error: max delay is 60000 ms (got 2147483647)
+--- channel bytes=90
+Stub 0e8230cf36ea: the tools returned 1 result(s):
+Error: 'milliseconds' required (number)
+--- telegram chat_id=777 bytes=90
+Stub 0e8230cf36ea: the tools returned 1 result(s):
+Error: 'milliseconds' required (number)
+--- channel bytes=90
+Stub 26cfaa020825: the tools returned 1 result(s):
+Error: 'milliseconds' required (number)
+--- telegram chat_id=777 bytes=90
+Stub 26cfaa020825: the tools returned 1 result(s):
+Error: 'milliseconds' required (number)
+--- channel bytes=90
+Stub 2d9c7b61da3e: the tools returned 1 result(s):
+Error: 'milliseconds' required (number)
+--- telegram chat_id=777 bytes=90
+Stub 2d9c7b61da3e: the tools returned 1 result(s):
+Error: 'milliseconds' required (number)

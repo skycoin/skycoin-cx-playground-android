@@ -1,0 +1,1 @@
+/spiffs/count.cx prints the numbers 1 to Limit, and Limit is set in /spiffs/config.cx. Make it count to 5. Run it as cx count.cx config.cx.

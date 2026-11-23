@@ -1,0 +1,65 @@
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=88
+Stub d68f221f6cbe: the tools returned 1 result(s):
+OK: wrote 22 bytes to /spiffs/todo.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=88
+Stub 697e6aeb6fa3: the tools returned 1 result(s):
+OK: wrote 15 bytes to /spiffs/todo.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=66
+Stub 4a57fd0c7be9: the tools returned 1 result(s):
+- nothing left
+
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=88
+Stub ede2571ac029: the tools returned 1 result(s):
+OK: wrote 0 bytes to /spiffs/blank.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=85
+Stub 03dc74906f50: the tools returned 1 result(s):
+OK: wrote 21 bytes to /spiffs/u.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=106
+Stub 4d8036c14ca0: the tools returned 1 result(s):
+Error: cannot open file for writing: /spiffs/nodir/x.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 1975860afe40: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 0b9662156092: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=81
+Stub a915b9b1e2c1: the tools returned 1 result(s):
+Error: missing 'content' field
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=81
+Stub 34cb08973d18: the tools returned 1 result(s):
+Error: missing 'content' field
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 5cf9b562f5ad: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=96
+Stub ff29bcc52c8a: the tools returned 1 result(s):
+OK: wrote 49 bytes to /spiffs/skills/greet.md
+--- outbound channel=telegram chat_id=3003 bytes=22
+🐱mimi is working...
+--- outbound channel=telegram chat_id=3003 bytes=119
+Stub a31c78eb2b4a: you said "The skill is in the next system prompt, say hi". I see 21 message(s) in this conversation.

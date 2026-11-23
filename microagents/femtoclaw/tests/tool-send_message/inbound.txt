@@ -1,0 +1,8 @@
+telegram	3003	Tell chat 42 [[tool send_message {"chat_id":"42","message":"Hello from the test."}]]
+telegram	3003	Another channel [[tool send_message {"chat_id":"ws1","message":"Hi socket.","channel":"websocket"}]]
+telegram	3003	No chat id [[tool send_message {"message":"Lost."}]]
+telegram	3003	An empty chat id [[tool send_message {"chat_id":"","message":"Lost."}]]
+telegram	3003	An empty message [[tool send_message {"chat_id":"42","message":""}]]
+telegram	3003	A chat id that is a number [[tool send_message {"chat_id":42,"message":"Lost."}]]
+telegram	3003	Names cut to the buffers [[tool send_message {"chat_id":"123456789012345678901234567890123456789","message":"Long ids.","channel":"averyveryverylongchannel"}]]
+telegram	3003	Input that is not an object [[tool send_message "hi"]]

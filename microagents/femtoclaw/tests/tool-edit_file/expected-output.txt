@@ -1,0 +1,61 @@
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=110
+Stub d310d101d95a: the tools returned 1 result(s):
+OK: edited /spiffs/notes.md (replaced 4 bytes with 8 bytes)
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=110
+Stub c5daca645f00: the tools returned 1 result(s):
+OK: edited /spiffs/notes.md (replaced 1 bytes with 1 bytes)
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=77
+Stub 2356aa0914e3: the tools returned 1 result(s):
+Shopping: oat milk, eggS.
+
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=98
+Stub c93b2ec410f8: the tools returned 1 result(s):
+Error: old_string not found in /spiffs/notes.md
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=92
+Stub cd127f90bac6: the tools returned 1 result(s):
+Error: file not found: /spiffs/missing.md
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=91
+Stub 95489e426f02: the tools returned 1 result(s):
+Error: file too large or empty (0 bytes)
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=118
+Stub 57dbb43568d0: the tools returned 1 result(s):
+OK: edited /spiffs/memory/MEMORY.md (replaced 0 bytes with 6 bytes)
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=117
+Stub e2315bdc4d62: the tools returned 1 result(s):
+OK: edited /spiffs/config/USER.md (replaced 6 bytes with 11 bytes)
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=100
+Stub 910725884bc1: the tools returned 1 result(s):
+Error: missing 'old_string' or 'new_string' field
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 18cec5ccd8ae: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=98
+Stub 5e531ef53b70: the tools returned 1 result(s):
+Error: old_string not found in /spiffs/notes.md
+--- outbound channel=telegram chat_id=3003 bytes=19
+femto is working...
+--- outbound channel=telegram chat_id=3003 bytes=113
+Stub 381a4e470be1: the tools returned 1 result(s):
+Error: path must start with /spiffs/ and must not contain '..'

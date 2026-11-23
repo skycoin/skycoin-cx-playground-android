@@ -1,0 +1,5 @@
+telegram	777	1000	Be witty [[tool set_persona {"persona":"witty"}]]
+telegram	777	2000	In capitals [[tool set_persona {"persona":"FRIENDLY"}]]
+telegram	777	3000	Unknown persona [[tool set_persona {"persona":"pirate"}]]
+telegram	777	4000	No persona [[tool set_persona {}]]
+telegram	777	5000	A persona that is a number [[tool set_persona {"persona":1}]]

@@ -1,0 +1,1 @@
+telegram	3003	Pair send_message then send_message [[tool send_message {"chat_id":"3003","message":"Pair test ping."}]] [[then]] [[tool send_message {"chat_id":"3003","message":"Pair test ping."}]]

@@ -1,0 +1,1 @@
+telegram	3003	Pair edit_file then list_dir [[tool edit_file {"path":"/spiffs/notes.md","old_string":"milk","new_string":"oat milk"}]] [[then]] [[tool list_dir {}]]

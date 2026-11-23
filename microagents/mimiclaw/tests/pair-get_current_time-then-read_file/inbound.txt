@@ -1,0 +1,1 @@
+telegram	3003	Pair get_current_time then read_file [[tool get_current_time {}]] [[then]] [[tool read_file {"path":"/spiffs/notes.md"}]]

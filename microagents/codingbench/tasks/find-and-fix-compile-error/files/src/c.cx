@@ -1,0 +1,5 @@
+package main
+
+func three() (r i32) {
+	r = 3 +
+}

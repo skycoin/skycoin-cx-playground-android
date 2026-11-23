@@ -1,0 +1,1 @@
+telegram	3003	Pair send_message then get_current_time [[tool send_message {"chat_id":"3003","message":"Pair test ping."}]] [[then]] [[tool get_current_time {}]]

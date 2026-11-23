@@ -1,0 +1,9 @@
+package main
+
+import "sys/string"
+
+func main() {
+	var name str = "Ana"
+	string.PrintLine("DEBUG name set")
+	string.PrintLine(string.Concatenation("Hi ", name))
+}

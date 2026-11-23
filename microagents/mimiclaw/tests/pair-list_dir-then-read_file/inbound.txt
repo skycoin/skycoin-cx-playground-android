@@ -1,0 +1,1 @@
+telegram	3003	Pair list_dir then read_file [[tool list_dir {}]] [[then]] [[tool read_file {"path":"/spiffs/notes.md"}]]

@@ -1,0 +1,8 @@
+package main
+
+// Port of tools_list_user_tools_handler of tools_system.c with
+// user_tools_list of the host mock, which only counts the tools.
+func toolListUserTools(inputJson str) (ok bool, result str) {
+	result = joinStrings([]str{"Mock: ", i32.str(len(gAgentState.userToolNames)), " user tools"})
+	ok = true
+}

@@ -1,0 +1,6 @@
+--- channel bytes=71
+Stub 9a4a80aec5ab: the tools returned 1 result(s):
+Tool 'fan' not found
+--- telegram chat_id=777 bytes=71
+Stub 9a4a80aec5ab: the tools returned 1 result(s):
+Tool 'fan' not found

@@ -1,0 +1,1 @@
+Copy /spiffs/template.cx to /spiffs/app.cx, then change the message in app.cx from TEMPLATE to app ready. Leave template.cx as it is.

@@ -1,0 +1,66 @@
+--- channel bytes=72
+Stub 6c7722f61f52: the tools returned 1 result(s):
+Saved: u_locker = B12
+--- telegram chat_id=777 bytes=72
+Stub 6c7722f61f52: the tools returned 1 result(s):
+Saved: u_locker = B12
+--- channel bytes=71
+Stub ef610f26dfe2: the tools returned 1 result(s):
+Saved: u_locker = C7
+--- telegram chat_id=777 bytes=71
+Stub ef610f26dfe2: the tools returned 1 result(s):
+Saved: u_locker = C7
+--- channel bytes=101
+Stub 38cb29478adb: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- telegram chat_id=777 bytes=101
+Stub 38cb29478adb: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- channel bytes=101
+Stub d1aae4844aef: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- telegram chat_id=777 bytes=101
+Stub d1aae4844aef: the tools returned 1 result(s):
+Error: key must start with 'u_' (user memory only)
+--- channel bytes=74
+Stub e1bda61802d9: the tools returned 1 result(s):
+Error: key max 15 chars
+--- telegram chat_id=777 bytes=74
+Stub e1bda61802d9: the tools returned 1 result(s):
+Error: key max 15 chars
+--- channel bytes=93
+Stub ac0842819210: the tools returned 1 result(s):
+Error: key must be alphanumeric/underscore
+--- telegram chat_id=777 bytes=93
+Stub ac0842819210: the tools returned 1 result(s):
+Error: key must be alphanumeric/underscore
+--- channel bytes=67
+Stub 9c89cc2e39b6: the tools returned 1 result(s):
+Error: empty key
+--- telegram chat_id=777 bytes=67
+Stub 9c89cc2e39b6: the tools returned 1 result(s):
+Error: empty key
+--- channel bytes=83
+Stub dca35a84aa81: the tools returned 1 result(s):
+Error: 'value' required (string)
+--- telegram chat_id=777 bytes=83
+Stub dca35a84aa81: the tools returned 1 result(s):
+Error: 'value' required (string)
+--- channel bytes=83
+Stub 94decf4d8ceb: the tools returned 1 result(s):
+Error: 'value' required (string)
+--- telegram chat_id=777 bytes=83
+Stub 94decf4d8ceb: the tools returned 1 result(s):
+Error: 'value' required (string)
+--- channel bytes=69
+Stub 61a532add9e8: the tools returned 1 result(s):
+Saved: u_pet = cat
+--- telegram chat_id=777 bytes=69
+Stub 61a532add9e8: the tools returned 1 result(s):
+Saved: u_pet = cat
+--- channel bytes=81
+Stub 68688b58d699: the tools returned 1 result(s):
+Error: 'key' required (string)
+--- telegram chat_id=777 bytes=81
+Stub 68688b58d699: the tools returned 1 result(s):
+Error: 'key' required (string)

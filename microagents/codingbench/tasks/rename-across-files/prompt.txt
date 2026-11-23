@@ -1,0 +1,1 @@
+Rename the global variable gCount to gTotal everywhere in /spiffs/state.cx and /spiffs/main.cx. The program must print the same. Run it as cx main.cx state.cx.

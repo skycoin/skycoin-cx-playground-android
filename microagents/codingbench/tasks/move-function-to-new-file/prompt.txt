@@ -1,0 +1,1 @@
+Move the function greeting out of /spiffs/main.cx into a new file /spiffs/util.cx, so that cx main.cx util.cx prints the same as before and main.cx no longer defines it.
