@@ -259,8 +259,8 @@ The choices below were made without a spec and are provisional.
   instructions, so ops/ms is only comparable within one executor.
 - **Upload.** POST of the document to `BENCHMARK_UPLOAD_URL`, set at build time
   with `make apk BENCHMARK_UPLOAD_URL=https://host/runs`. It is empty by
-  default, and then the app says that upload is disabled. No server is
-  chosen yet.
+  default, and then the app says that upload is disabled. Release APKs
+  upload to the collector below.
 - **Device profile.** Android release and API level, manufacturer, model and
   ABI from `getprop`, core count, highest `cpuinfo_max_freq`, `MemTotal`, and
   the app, skycoin-cx and Go versions. The only identifier is a random run ID.
@@ -308,8 +308,17 @@ make collector
 build/benchmark-collector -addr 127.0.0.1:8090 -db benchmark-runs.db
 ```
 
-It is not deployed anywhere. Where it runs and which URL the app uploads to
-are open.
+It runs at https://bench.skywire.dev on prod02, and release APKs are built
+with `make apk BENCHMARK_UPLOAD_URL=https://bench.skywire.dev/runs`. The
+service is `cx-benchmark-collector.service`, which runs
+`/usr/local/bin/cx-benchmark-collector` on `127.0.0.1:8090` with a dynamic
+user and stores the runs in `/var/lib/cx-benchmark-collector/runs.db`.
+Caddy proxies the host to it with a 1 MB request body limit.
+
+To redeploy, build with `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o
+cx-benchmark-collector ./cmd/benchmark-collector`, copy the binary to the
+host, install it over `/usr/local/bin/cx-benchmark-collector` and run
+`systemctl restart cx-benchmark-collector`. The runs file stays.
 
 ## Known limits
 
