@@ -4,10 +4,12 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -93,6 +95,7 @@ type ui struct {
 	leaveReq bool
 
 	// Test mode, see testmode.go. drawn is the program frame on screen.
+	test        testSettings
 	trace       *tracer
 	drawn       programFrame
 	tracedFrame int
@@ -127,7 +130,7 @@ func run(w *app.Window) error {
 	}
 	u.rows = make([]widget.Clickable, len(u.apps))
 	if ts := loadTestSettings(); ts.enabled {
-		u.trace = &tracer{}
+		u.test, u.trace = ts, &tracer{}
 		u.trace.printf("test mode on, autostart %q", ts.autostart)
 		u.autostart(ts.autostart)
 	}
@@ -230,6 +233,10 @@ func (u *ui) start(a *store.App) {
 	if a.Manifest.Kind == "benchmark" {
 		u.host, u.bench = nil, newBenchmarkScreen(u.src, *a, u.w.Invalidate, u.trace)
 		u.trace.printf("start app=%q hash=%s", a.Manifest.Name, a.Hash)
+		if u.test.benchmarkRuns > 0 && u.bench.files != nil {
+			u.bench.runs = u.test.benchmarkRuns
+			u.bench.start(u.w.Invalidate)
+		}
 		return
 	}
 	u.bench = nil
@@ -248,10 +255,19 @@ func (u *ui) start(a *store.App) {
 			fmt.Fprintf(out, "verification failed: %v\n", err)
 			return
 		}
+		opts := cxrun.Options{Args: a.Manifest.Args, Stderr: out}
+		if opts.Dir, err = writeDataFiles(*a, files); err != nil {
+			fmt.Fprintf(out, "data files: %v\n", err)
+			return
+		}
 		log.Printf("cxplayground: running %s (%s)", a.Manifest.Name, a.Hash)
-		err = cxrun.Run(files, a.Manifest.Entry, h, out)
+		var stdout bytes.Buffer
+		err = cxrun.RunWith(files, a.Manifest.Entry, opts, h, io.MultiWriter(out, &stdout))
 		if err != nil {
 			fmt.Fprintf(out, "error: %v\n", err)
+		}
+		if u.trace != nil {
+			saveTestStdout(u.trace, stdout.Bytes())
 		}
 		log.Printf("cxplayground: %s finished: %v", a.Manifest.Name, err)
 		u.trace.printf("finished app=%q err=%v", a.Manifest.Name, err)
@@ -385,6 +401,7 @@ func (u *ui) layoutConsole(gtx layout.Context) layout.Dimensions {
 // layoutCanvas routes input to the program and draws its last frame.
 func (u *ui) layoutCanvas(gtx layout.Context, cmds []cxrun.Cmd) layout.Dimensions {
 	size := gtx.Constraints.Max
+	u.host.cell.Store(u.measureCell(gtx))
 	u.host.setSize(size)
 	tag := &u.canvas
 	defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
@@ -437,6 +454,21 @@ func (u *ui) layoutCanvas(gtx layout.Context, cmds []cxrun.Cmd) layout.Dimension
 	}
 	draw(gtx, u.th.Shaper, cmds)
 	return layout.Dimensions{Size: size}
+}
+
+// measureCell returns the advance and line height of one character of the
+// app font, from a 100 character line so the advance keeps its fraction.
+func (u *ui) measureCell(gtx layout.Context) f32.Point {
+	const n = 100
+	g := gtx
+	g.Constraints = layout.Constraints{Max: image.Pt(1<<20, 1<<20)}
+	m := op.Record(gtx.Ops)
+	dims, info := widget.Label{MaxLines: 1}.LayoutDetailed(g, u.th.Shaper, mono, textSize, strings.Repeat("M", n), op.CallOp{})
+	m.Stop()
+	if info.Truncated > 0 {
+		return f32.Point{}
+	}
+	return f32.Pt(float32(dims.Size.X)/n, float32(dims.Size.Y))
 }
 
 func rgba(c cxrun.Cmd) color.NRGBA {

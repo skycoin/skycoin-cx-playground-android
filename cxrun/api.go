@@ -1,6 +1,8 @@
 package cxrun
 
 import (
+	"fmt"
+
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
 	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
@@ -44,6 +46,7 @@ func register(p *cxast.CXProgram) {
 	fn("HideKeyboard", opHideKeyboard, nil, nil)
 	fn("ShouldClose", opShouldClose, nil, in(boolean))
 	fn("Rune", opRune, in(i32), in(str))
+	fn("CellSize", opCellSize, nil, in(f32, f32))
 
 	for i, c := range []struct {
 		name string
@@ -124,6 +127,24 @@ func opHideKeyboard(*cxast.CXProgram, []cxast.CXValue, []cxast.CXValue) { host.K
 
 func opShouldClose(p *cxast.CXProgram, _ []cxast.CXValue, out []cxast.CXValue) {
 	out[0].Set_bool(p, host.ShouldClose())
+}
+
+func opCellSize(p *cxast.CXProgram, _ []cxast.CXValue, out []cxast.CXValue) {
+	w, h := host.CellSize()
+	out[0].Set_f32(p, w)
+	out[1].Set_f32(p, h)
+}
+
+// ExitError is returned when the program calls os.Exit, which ends the
+// program instead of the process that runs it.
+type ExitError struct{ Code int32 }
+
+func (e *ExitError) Error() string { return fmt.Sprintf("os.Exit(%d)", e.Code) }
+
+// opExit stops the run loop with a panic that the loop records and
+// runCompiledOn turns into an ExitError.
+func opExit(p *cxast.CXProgram, in []cxast.CXValue, _ []cxast.CXValue) {
+	panic(&ExitError{Code: in[0].Get_i32(p)})
 }
 
 // opRune turns a key code into text. CX's sprintf has no %c.

@@ -175,3 +175,24 @@ func WriteBundle(dir string, apps []Built) ([]manifest.Hash, error) {
 	}
 	return hashes, os.WriteFile(filepath.Join(dir, IndexFile), index.Bytes(), 0o644)
 }
+
+// WriteDataFiles writes the files of an app that are not CX sources under
+// dir, the sandbox root a program reads them from, and returns whether there
+// were any.
+func WriteDataFiles(dir string, files map[string][]byte) (bool, error) {
+	wrote := false
+	for name, b := range files {
+		if strings.HasSuffix(name, ".cx") {
+			continue
+		}
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			return wrote, err
+		}
+		if err := os.WriteFile(p, b, 0o600); err != nil {
+			return wrote, err
+		}
+		wrote = true
+	}
+	return wrote, nil
+}

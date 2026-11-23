@@ -30,6 +30,7 @@ type benchmarkScreen struct {
 	fewer, more, begin, upload widget.Clickable
 
 	out     *console
+	trace   *tracer
 	started bool
 	done    chan struct{}
 
@@ -40,7 +41,7 @@ type benchmarkScreen struct {
 }
 
 func newBenchmarkScreen(src store.Source, a store.App, invalidate func(), trace *tracer) *benchmarkScreen {
-	s := &benchmarkScreen{runs: 5, out: &console{invalidate: invalidate, trace: trace}, done: make(chan struct{})}
+	s := &benchmarkScreen{runs: 5, out: &console{invalidate: invalidate, trace: trace}, trace: trace, done: make(chan struct{})}
 	files, err := store.Load(src, a)
 	if err != nil {
 		fmt.Fprintf(s.out, "verification failed: %v\n", err)
@@ -85,6 +86,7 @@ func (s *benchmarkScreen) start(invalidate func()) {
 		if path, err := saveBenchmarkResults(doc, encoded); err != nil {
 			fmt.Fprintf(s.out, "not saved: %v\n", err)
 		} else {
+			s.trace.publishFile(filepath.ToSlash(filepath.Join("benchmark-results", filepath.Base(path))), encoded)
 			fmt.Fprintf(s.out, "saved %s\n", path)
 		}
 		fmt.Fprintf(s.out, "\n%s", encoded)

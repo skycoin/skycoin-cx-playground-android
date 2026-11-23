@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0magnet/gio/f32"
+
 	"github.com/skycoin/skycoin-cx-playground-android/cxrun"
 )
 
@@ -17,6 +19,7 @@ type host struct {
 	trace      *tracer
 
 	size   atomic.Value // image.Point
+	cell   atomic.Value // f32.Point, see measureCell
 	closed atomic.Bool
 
 	mu        sync.Mutex
@@ -45,12 +48,18 @@ type programFrame struct {
 func newHost(invalidate func(), trace *tracer) *host {
 	h := &host{invalidate: invalidate, trace: trace, shown: make(chan struct{}, 1)}
 	h.size.Store(image.Point{})
+	h.cell.Store(f32.Point{})
 	return h
 }
 
 func (h *host) Size() (int, int) {
 	p := h.size.Load().(image.Point)
 	return p.X, p.Y
+}
+
+func (h *host) CellSize() (float32, float32) {
+	c := h.cell.Load().(f32.Point)
+	return c.X, c.Y
 }
 
 func (h *host) setSize(p image.Point) {

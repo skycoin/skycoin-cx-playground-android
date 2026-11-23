@@ -15,6 +15,7 @@ import (
 
 	packages "github.com/skycoin/skycoin-cx/t0-packages"
 	types "github.com/skycoin/skycoin-cx/t0-types"
+	util "github.com/skycoin/skycoin-cx/t0-util"
 	constants "github.com/skycoin/skycoin-cx/t1-constants"
 	globals "github.com/skycoin/skycoin-cx/t2-globals"
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
@@ -79,6 +80,9 @@ type Host interface {
 	Keyboard(show bool)
 	// ShouldClose reports that the user asked to leave the program.
 	ShouldClose() bool
+	// CellSize is the size in pixels of one character of the monospaced
+	// app font, the cell of a terminal grid.
+	CellSize() (w, h float32)
 }
 
 var (
@@ -102,6 +106,7 @@ func resetCompiler() {
 	cxinit.RegisterPackages(actions.AST)
 	opcodes.RegisterOpcodes(actions.AST)
 	register(actions.AST)
+	cxast.OpcodeHandlers[cxast.OpCodes["os.Exit"]] = opExit
 	globals.FoundCompileErrors = false
 	actions.LineNo = 0
 }
@@ -122,9 +127,31 @@ func Run(files map[string][]byte, entry string, h Host, out io.Writer) error {
 	return err
 }
 
+// Options are the optional settings of a run.
+type Options struct {
+	// Args is the program's os.Args, as the ++ arguments of cx.
+	Args []string
+	// Dir is the sandbox root that the program's file operations resolve
+	// against. Empty leaves the program without one.
+	Dir string
+	// Stderr receives the program's standard error. Nil sends it to the
+	// output with standard output.
+	Stderr io.Writer
+}
+
+// RunWith is Run with options.
+func RunWith(files map[string][]byte, entry string, opts Options, h Host, out io.Writer) error {
+	_, err := runOn(files, entry, ExecutorOld, opts, h, out)
+	return err
+}
+
 // RunOn is Run on executor. It returns how long main ran, compile time
 // excluded. h may be nil for a program that does not use the app package.
 func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out io.Writer) (elapsed time.Duration, err error) {
+	return runOn(files, entry, executor, Options{}, h, out)
+}
+
+func runOn(files map[string][]byte, entry string, executor Executor, opts Options, h Host, out io.Writer) (elapsed time.Duration, err error) {
 	runMu.Lock()
 	defer runMu.Unlock()
 
@@ -146,7 +173,7 @@ func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out
 		srcs[i] = string(files[n])
 	}
 
-	restore, err := captureOutput(out)
+	restore, err := captureOutput(out, opts.Stderr)
 	if err != nil {
 		return 0, err
 	}
@@ -161,6 +188,14 @@ func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out
 	}()
 
 	resetCompiler()
+	if opts.Dir != "" {
+		root, fileError := util.ProgramSandboxRootOpen(opts.Dir)
+		if fileError != nil {
+			return 0, errors.New(fileError.FileErrorMessage)
+		}
+		defer root.Close()
+		actions.AST.ProgramSandboxRoot = root
+	}
 	if err := cxparsing.ParseSourceStrings(srcs, names); err != nil {
 		return 0, ErrCompile
 	}
@@ -170,27 +205,44 @@ func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out
 	if err := cxparsing.AddInitFunction(actions.AST); err != nil {
 		return 0, err
 	}
-	return runCompiledOn(executor)
+	return runCompiledOn(executor, opts.Args)
 }
 
-// captureOutput sends os.Stdout and os.Stderr to out until restore is called.
-// CX prints with fmt.Println and compile errors go to os.Stderr.
-func captureOutput(out io.Writer) (restore func(), err error) {
-	r, w, err := os.Pipe()
+// captureOutput sends os.Stdout to out, and os.Stderr to stderr or to out
+// when stderr is nil, until restore is called. CX prints with fmt.Println
+// and compile errors and warnings go to os.Stderr.
+func captureOutput(out, stderr io.Writer) (restore func(), err error) {
+	oldOut, oldErr := os.Stdout, os.Stderr
+	var closers []func()
+	pipe := func(dst io.Writer) (*os.File, error) {
+		r, w, err := os.Pipe()
+		if err != nil {
+			return nil, err
+		}
+		done := make(chan struct{})
+		go func() {
+			io.Copy(dst, r)
+			close(done)
+		}()
+		closers = append(closers, func() { w.Close(); <-done; r.Close() })
+		return w, nil
+	}
+	w, err := pipe(out)
 	if err != nil {
 		return nil, err
 	}
-	oldOut, oldErr := os.Stdout, os.Stderr
-	os.Stdout, os.Stderr = w, w
-	done := make(chan struct{})
-	go func() {
-		io.Copy(out, r)
-		close(done)
-	}()
+	wErr := w
+	if stderr != nil {
+		if wErr, err = pipe(stderr); err != nil {
+			closers[0]()
+			return nil, err
+		}
+	}
+	os.Stdout, os.Stderr = w, wErr
 	return func() {
 		os.Stdout, os.Stderr = oldOut, oldErr
-		w.Close()
-		<-done
-		r.Close()
+		for _, c := range closers {
+			c()
+		}
 	}, nil
 }

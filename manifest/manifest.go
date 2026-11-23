@@ -52,13 +52,14 @@ func (h Hash) Valid() bool {
 
 // Manifest lists the files of one app.
 type Manifest struct {
-	Version     int    `json:"version"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Kind        string `json:"kind,omitempty"`
-	Entry       string `json:"entry"`
-	ChunkSize   int    `json:"chunk_size"`
-	Files       []File `json:"files"`
+	Version     int      `json:"version"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Kind        string   `json:"kind,omitempty"`
+	Entry       string   `json:"entry"`
+	Args        []string `json:"args,omitempty"`
+	ChunkSize   int      `json:"chunk_size"`
+	Files       []File   `json:"files"`
 }
 
 // File is one file of an app. Chunks holds the hash of each ChunkSize piece
@@ -76,6 +77,11 @@ type Meta struct {
 	Description string `json:"description,omitempty"`
 	Kind        string `json:"kind,omitempty"`
 	Entry       string `json:"entry,omitempty"`
+	// Args is the program's os.Args, as the ++ arguments of cx.
+	Args []string `json:"args,omitempty"`
+	// Include lists files and directories outside the app directory, relative
+	// to it, whose regular files BuildDir adds under their base names.
+	Include []string `json:"include,omitempty"`
 }
 
 // Build makes the manifest for every regular file under fsys. It also
@@ -90,7 +96,10 @@ func Build(fsys fs.FS, chunkSize int) (*Manifest, map[Hash][]byte, error) {
 		if err := json.Unmarshal(b, &meta); err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", MetaFile, err)
 		}
-		m.Name, m.Description, m.Kind = meta.Name, meta.Description, meta.Kind
+		if len(meta.Include) > 0 {
+			return nil, nil, errors.New(MetaFile + ": include needs BuildDir")
+		}
+		m.Name, m.Description, m.Kind, m.Args = meta.Name, meta.Description, meta.Kind, meta.Args
 		if meta.Entry != "" {
 			m.Entry = meta.Entry
 		}

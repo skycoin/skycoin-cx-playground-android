@@ -48,7 +48,7 @@ func build(cmd string, args []string) error {
 	if fl.NArg() != 1 {
 		usage()
 	}
-	m, _, err := manifest.Build(os.DirFS(fl.Arg(0)), *chunk)
+	m, _, err := manifest.BuildDir(fl.Arg(0), *chunk)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func bundle(args []string) error {
 	}
 	var apps []store.Built
 	for _, dir := range fl.Args() {
-		m, chunks, err := manifest.Build(os.DirFS(dir), *chunk)
+		m, chunks, err := manifest.BuildDir(dir, *chunk)
 		if err != nil {
 			return fmt.Errorf("%s: %w", dir, err)
 		}

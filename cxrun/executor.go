@@ -37,14 +37,17 @@ const vmOutputSize = 64 << 10
 
 // runCompiledOn runs the parsed program on executor and returns the time the
 // run took, compile time excluded.
-func runCompiledOn(executor Executor) (time.Duration, error) {
+func runCompiledOn(executor Executor, args []string) (time.Duration, error) {
 	switch executor {
 	case ExecutorOld, "":
 		started := time.Now()
-		err := execute.RunCompiled(actions.AST, 0, nil)
+		err := execute.RunCompiled(actions.AST, 0, args)
 		elapsed := time.Since(started)
 		if err != nil {
 			return elapsed, err
+		}
+		if e, ok := actions.AST.RuntimeError.RuntimeErrorRecordPanicValue.(*ExitError); ok {
+			return elapsed, e
 		}
 		if actions.AST.RuntimeError.RuntimeErrorRecordRaised {
 			printer.PrinterRuntimeErrorPrint(actions.AST)
