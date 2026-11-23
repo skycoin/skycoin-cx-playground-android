@@ -3,12 +3,9 @@ package parsingcompletor
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/skycoin/skycoin-cx/t1-constants"
 )
 
 type Lexer struct {
@@ -24,9 +21,9 @@ type Lexer struct {
 	bsize     uint //buffer size
 	nlsemi    bool //whether or not newline is SCOLON
 	eof       bool //eof
-	crash     bool //used for crash behaviour
 	colbefore bool //used for colon keywords
 
+	// VIOLATION: pointer at rest; becomes yySymTypeGid in phase 3.
 	tok *yySymType //symbol read. soon to be depracated for fully new cxgo
 }
 
@@ -38,7 +35,7 @@ const readCountMax = 10
 /* the following code is provided */
 func (s *Lexer) init(r io.Reader, errh func(l, c int, msg string)) {
 	s.scan = r
-	s.l, s.c, s.b, s.r, s.e = 0, 0, -1, 0, 0
+	s.l, s.c, s.b, s.r, s.e = 0, 1, -1, 0, 0
 	s.lineStr = ""
 	s.buf = make([]byte, 1<<LexerBufferMin)
 	s.buf[0] = sentinel
@@ -171,20 +168,18 @@ func (s *Lexer) next() {
 	nlsemi := s.nlsemi
 	s.nlsemi = false
 	if s.eof {
-		if s.crash {
-			os.Exit(constants.CX_COMPILATION_ERROR)
-		}
 		s.tok.yys = -1
 		return
 	}
 redonext:
 	s.stop()
 	s.tok = &yySymType{}
-	s.tok.line = s.l + 1
 
 	for s.ch == ' ' || s.ch == '\t' || s.ch == '\n' && !nlsemi || s.ch == '\r' {
 		s.nextch()
 	}
+	s.tok.line = s.l + 1
+	s.tok.column = s.c + 1
 
 	s.start()
 
@@ -198,13 +193,11 @@ redonext:
 	case -1, 0:
 		s.eof = true
 		s.tok.yys = -1
-		if s.crash {
-			os.Exit(constants.CX_COMPILATION_ERROR)
-		}
 	case '\n':
 		s.nextch()
 		if nlsemi {
 			s.tok.yys = SEMICOLON
+			s.tok.tok = "\n"
 		}
 		s.nlsemi = false
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -240,6 +233,7 @@ redonext:
 	case ';':
 		s.nextch()
 		s.tok.yys = SEMICOLON
+		s.tok.tok = ";"
 	case ':':
 		s.nextch()
 		if s.ch == '=' {
@@ -364,7 +358,13 @@ redonext:
 			goto redonext
 		} else if s.ch == '*' {
 			s.nextch()
-			s.fullComment()
+			// A comment holding a newline acts like a newline
+			// (https://go.dev/ref/spec#Comments).
+			if s.fullComment() && nlsemi {
+				s.tok.yys = SEMICOLON
+				s.tok.tok = "\n"
+				break
+			}
 			goto redonext
 		}
 		s.tok.yys = DIV_OP
@@ -461,7 +461,7 @@ func (s *Lexer) ident() {
 
 	// possibly a keyword
 	lit := s.segment()
-	s.tok = &yySymType{}
+	s.tok = &yySymType{line: s.tok.line, column: s.tok.column, lineStr: s.tok.lineStr}
 	if len(lit) >= 2 {
 		if tok := KeywordMap[string(lit)]; tok != 0 {
 			switch tok {
@@ -674,7 +674,7 @@ func (s *Lexer) number(seenPoint bool) {
 		ok = false
 	}
 
-	s.tok = &yySymType{}
+	s.tok = &yySymType{line: s.tok.line, column: s.tok.column, lineStr: s.tok.lineStr}
 	switch kind {
 	case INT_LITERAL:
 		result, err := strconv.ParseInt(yylex, base, 32)
@@ -757,18 +757,24 @@ func baseName(base int) string {
 	panic("invalid base")
 }
 
-func (s *Lexer) fullComment() {
+// fullComment reads a /* */ comment and reports whether it holds a newline.
+func (s *Lexer) fullComment() bool {
+	newline := false
 	for s.ch >= 0 {
 		for s.ch == '*' {
 			s.nextch()
 			if s.ch == '/' {
 				s.nextch()
-				return
+				return newline
 			}
+		}
+		if s.ch == '\n' {
+			newline = true
 		}
 		s.nextch()
 	}
 	s.errorf("comment not terminated")
+	return newline
 }
 
 func (s *Lexer) lineComment() {
@@ -789,7 +795,7 @@ func (s *Lexer) rawString() {
 			break
 		}
 		if s.ch < 0 {
-			s.errorf("string not terminated")
+			s.errh(s.tok.line, s.tok.column, "string not terminated")
 			break
 		}
 		s.nextch()
@@ -821,15 +827,18 @@ func (s *Lexer) stdString() {
 			continue
 		}
 		if s.ch == '\n' {
-			//TODO: ISSUE #152 (old #133a) THIS FIXES IT.
-			//s.errorf("newline in string")
-			//break
-			s.crash = true
-			s.nextch()
+			// As Go, end the literal at the newline and go on with the next line.
+			s.errh(s.tok.line, s.tok.column, "newline in string")
+			s.tok.yys = STRING_LITERAL
+			s.nlsemi = true
+			return
 		}
 		if s.ch < 0 {
-			s.errorf("string not terminated")
-			break
+			s.errh(s.tok.line, s.tok.column, "string not terminated")
+			// Unquote would only report the same string again.
+			s.tok.yys = STRING_LITERAL
+			s.nlsemi = true
+			return
 		}
 		s.nextch()
 	}

@@ -6,21 +6,29 @@ import (
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
+// opSerialize returns the whole running program, memory included, as a
+// []ui8. The affordance input does not narrow what is serialized yet.
 func opSerialize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	var slcOff types.Pointer
-	byts := ast.SerializeCXProgram(prgrm, true, false)
-	for _, b := range byts {
-		slcOff = ast.WriteToSlice(prgrm, slcOff, []byte{b})
+	byts, err := ast.SerializeCXProgram(prgrm, true, nil)
+	if err != nil {
+		panic(types.CX_RUNTIME_NOT_IMPLEMENTED)
 	}
-
-	outputs[0].Set_ptr(prgrm, slcOff)
+	count := types.Cast_int_to_ptr(len(byts))
+	if count > ast.SliceElementLimit(1) {
+		panic(constants.HEAP_EXHAUSTED_ERROR)
+	}
+	slice := ast.SliceResizeEx(prgrm, 0, count, 1)
+	copy(ast.GetSliceData(prgrm, slice, 1), byts)
+	outputs[0].Set_ptr(prgrm, slice)
 }
 
+// opDeserialize checks that a []ui8 holds a program this cx can load. Bytes
+// that do not are a runtime error. The program itself is not kept.
 func opDeserialize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	off := inputs[0].Get_ptr(prgrm)
-
-	_l := prgrm.Memory[off+types.OBJECT_HEADER_SIZE : off+types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE]
-	l := types.Read_ptr(_l, 4) // TODO:PTR remove hardcode 4
-
-	ast.Deserialize(prgrm.Memory[off+types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE:off+types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE+l], false) // BUG : should be l * elt.TotalSize ?
+	byts := inputs[0].GetSlice_ui8(prgrm)
+	// OBJMODEL: state.CXProgramMng.CXProgramAlloc(), phase 4 #371.
+	// Now a constructor call, site S1309.
+	if _, err := ast.Deserialize(byts, nil); err != nil {
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
+	}
 }

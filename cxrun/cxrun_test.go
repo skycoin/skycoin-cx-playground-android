@@ -94,3 +94,19 @@ func TestApps(t *testing.T) {
 		}
 	}
 }
+
+// TestErrors checks that compile and runtime errors reach the output and that
+// the next program still runs.
+func TestErrors(t *testing.T) {
+	for _, c := range []struct{ src, want string }{
+		{"package main\nfunc main() {\n\tundefinedFn()\n}\n", "main.cx:3:2"},
+		{"package main\nfunc main() {\n\tvar a []i32\n\ti32.print(a[5])\n}\n", "CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE"},
+		{"package main\nfunc main() {\n\ti32.print(1 + 2*3)\n}\n", "7\n"},
+	} {
+		var out bytes.Buffer
+		err := Run(map[string][]byte{"main.cx": []byte(c.src)}, "main.cx", &fakeHost{}, &out)
+		if !strings.Contains(out.String(), c.want) {
+			t.Errorf("err=%v output %q does not contain %q", err, out.String(), c.want)
+		}
+	}
+}

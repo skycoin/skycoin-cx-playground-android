@@ -6,6 +6,10 @@ import (
 	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
 )
 
+// Opcode numbers for the app package. skycoin-cx only registers the opcodes
+// of its own table, so these sit above it and run on the old executor.
+const opcodeBase = 4096
+
 // Constant codes for the app package, clear of the ranges skycoin-cx uses.
 const constBase = 0x7F000000
 
@@ -21,8 +25,10 @@ func register(p *cxast.CXProgram) {
 	cat := func(a, b []*cxast.CXArgument) []*cxast.CXArgument {
 		return append(append([]*cxast.CXArgument{}, a...), b...)
 	}
+	code := opcodeBase
 	fn := func(name string, h handler, inputs, outputs []*cxast.CXArgument) {
-		opcodes.RegisterFunction(p, "app."+name, h, inputs, outputs)
+		registerHost(p, code, "app."+name, h, inputs, outputs)
+		code++
 	}
 
 	fn("ScreenSize", opScreenSize, nil, in(i32, i32))
@@ -123,4 +129,22 @@ func opShouldClose(p *cxast.CXProgram, _ []cxast.CXValue, out []cxast.CXValue) {
 // opRune turns a key code into text. CX's sprintf has no %c.
 func opRune(p *cxast.CXProgram, in []cxast.CXValue, out []cxast.CXValue) {
 	out[0].Set_str(p, string(rune(in[0].Get_i32(p))))
+}
+
+// registerHost is opcodes.RegisterOpCode without its check that code is a row
+// of constants.OpcodeLifecycleTable.
+func registerHost(p *cxast.CXProgram, code int, name string, h handler, inputs, outputs []*cxast.CXArgument) {
+	if code >= len(cxast.OpcodeHandlers) {
+		cxast.OpcodeHandlers = append(cxast.OpcodeHandlers, make([]cxast.OpcodeHandler, code+1-len(cxast.OpcodeHandlers))...)
+	}
+	cxast.OpcodeHandlers[code] = h
+	cxast.OpNames[code] = name
+	cxast.OpCodes[name] = code
+	if inputs == nil {
+		inputs = []*cxast.CXArgument{}
+	}
+	if outputs == nil {
+		outputs = []*cxast.CXArgument{}
+	}
+	cxast.Natives[code] = opcodes.MakeNativeFunction(p, code, inputs, outputs)
 }

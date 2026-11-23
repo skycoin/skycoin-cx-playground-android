@@ -3,14 +3,17 @@
 package cxfx
 
 import (
-	"github.com/skycoin/skycoin-cx/t3-ast"
 	"unicode/utf8"
 
 	"github.com/skycoin/gltext"
 
-	"github.com/skycoin/skycoin-cx/t5-cxos"
+	"github.com/skycoin/skycoin-cx/t0-util"
+	"github.com/skycoin/skycoin-cx/t3-ast"
+
+	"github.com/skycoin/skycoin-cx/t5-cxos" // thin: only ValidFile; could move ValidFile to t0-util or t3-ast, max tier 11 to 10
 )
 
+// VIOLATION: state outside State. Owner: t6-cxfx; moves to FontMng in phase 1.
 var fonts map[string]*gltext.Font = make(map[string]*gltext.Font, 0)
 
 func loadTrueType(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue, fixedPipeline bool) {
@@ -32,13 +35,13 @@ func opGltextLoadTrueTypeCore(prgrm *ast.CXProgram, inputs []ast.CXValue, output
 }
 
 func opGltextPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	if err := fonts[inputs[0].Get_str(prgrm)].Printf(inputs[1].Get_f32(prgrm), inputs[2].Get_f32(prgrm), "%s", inputs[3].Get_str(prgrm)); err != nil {
+	if err := fonts[inputs[0].Get_str(prgrm)].Printf(inputs[1].Get_f32(prgrm), inputs[2].Get_f32(prgrm), "%s", util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[3]))); err != nil {
 		panic(err)
 	}
 }
 
 func opGltextMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	width, height := fonts[inputs[0].Get_str(prgrm)].Metrics(inputs[1].Get_str(prgrm))
+	width, height := fonts[inputs[0].Get_str(prgrm)].Metrics(util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[1])))
 
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
@@ -50,7 +53,7 @@ func opGltextTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 
 func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // refactor
 	font := fonts[inputs[0].Get_str(prgrm)]
-	str := inputs[1].Get_str(prgrm)
+	text := ast.ProgramStringBytesRead(prgrm, &inputs[1])
 	var index int = int(inputs[2].Get_i32(prgrm))
 	var runeValue rune = -1
 	var width int = -1
@@ -59,8 +62,8 @@ func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	var w int = 0
 	var h int = 0
 	var advance int = 0
-	if index < len(str) {
-		runeValue, width = utf8.DecodeRuneInString(str[index:])
+	if index < len(text) {
+		runeValue, width = utf8.DecodeRune(text[index:])
 		g := font.Glyphs()[runeValue-font.Low()]
 		x = g.X
 		y = g.Y

@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 )
 
+// VIOLATION: state outside State. Owner: t0-util; moves to ConfigMng in phase 2.
 var workingDir string
+
+// VIOLATION: state outside State. Owner: t0-util; moves to ConfigMng in phase 2.
 var logFile bool
 
 // CXSetWorkingDir ...
@@ -22,7 +25,7 @@ func CXLogFile(enable bool) {
 
 // CXOpenFile ...
 func CXOpenFile(filename string) (*os.File, error) {
-	filename = filepath.Join(workingDir, filename)
+	filename = cxPath(filename)
 
 	if logFile {
 		fmt.Printf("CXOpenFile: Opening '%s'\n", filename)
@@ -37,13 +40,13 @@ func CXOpenFile(filename string) (*os.File, error) {
 
 // CXCreateFile ...
 func CXCreateFile(filename string) (*os.File, error) {
-	filename = filepath.Join(workingDir, filename)
+	filename = cxPath(filename)
 
 	if logFile {
 		fmt.Printf("Creating file : '%s', '%s'\n", workingDir, filename)
 	}
 
-	file, err := os.Create(filepath.Join(workingDir, filename))
+	file, err := os.Create(filename)
 	if logFile && err != nil {
 		fmt.Printf("Failed to create file : '%s', '%s', err '%v'\n", workingDir, filename, err)
 	}
@@ -57,7 +60,7 @@ func CXRemoveFile(path string) error {
 		fmt.Printf("Removing file : '%s', '%s'\n", workingDir, path)
 	}
 
-	err := os.Remove(fmt.Sprintf("%s%s", workingDir, path))
+	err := os.Remove(cxPath(path))
 
 	if logFile && err != nil {
 		fmt.Printf("Failed to remove file : '%s', '%s', err '%v'\n", workingDir, path, err)
@@ -72,7 +75,7 @@ func CXReadFile(path string) ([]byte, error) {
 		fmt.Printf("Reading file : '%s', '%s'\n", workingDir, path)
 	}
 
-	bytes, err := ioutil.ReadFile(fmt.Sprintf("%s%s", workingDir, path))
+	bytes, err := ioutil.ReadFile(cxPath(path))
 
 	if logFile && err != nil {
 		fmt.Printf("Failed to read file : '%s', '%s', err '%v'\n", workingDir, path, err)
@@ -87,7 +90,7 @@ func CXStatFile(path string) (os.FileInfo, error) {
 		fmt.Printf("Stating file : '%s', '%s'\n", workingDir, path)
 	}
 
-	fileInfo, err := os.Stat(fmt.Sprintf("%s%s", workingDir, path))
+	fileInfo, err := os.Stat(cxPath(path))
 
 	if logFile && err != nil {
 		fmt.Printf("Failed to stat file : '%s', '%s', err '%v'\n", workingDir, path, err)
@@ -102,11 +105,16 @@ func CXMkdirAll(path string, perm os.FileMode) error {
 		fmt.Printf("Creating dir : '%s'\n", path)
 	}
 
-	err := os.MkdirAll(fmt.Sprintf("%s%s", workingDir, path), perm)
+	err := os.MkdirAll(cxPath(path), perm)
 
 	if logFile && err != nil {
 		fmt.Printf("Failed to create dir : '%s', '%s', err '%v'\n", workingDir, path, err)
 	}
 
 	return err
+}
+
+// cxPath returns name relative to the working dir set by CXSetWorkingDir.
+func cxPath(name string) string {
+	return filepath.Join(workingDir, name)
 }

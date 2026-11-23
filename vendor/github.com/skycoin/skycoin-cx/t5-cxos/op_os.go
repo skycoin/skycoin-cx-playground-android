@@ -5,6 +5,7 @@ package cxos
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"os"
 	"os/exec"
@@ -14,8 +15,6 @@ import (
 
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t0-util"
-	"github.com/skycoin/skycoin-cx/t1-constants"
-	"github.com/skycoin/skycoin-cx/t2-globals"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -25,7 +24,10 @@ const (
 	OS_SEEK_END
 )
 
+// VIOLATION: state outside State. Owner: t5-cxos; moves to OsFileMng in phase 1.
 var openFiles []*os.File
+
+// VIOLATION: state outside State. Owner: t5-cxos; moves to OsFileMng in phase 1.
 var freeFiles []int32
 
 // helper function used to validate file handle from i32
@@ -43,7 +45,7 @@ func opOsLogFile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 func opOsReadAllText(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 
-	if byts, err := util.CXReadFile(inputs[0].Get_str(prgrm)); err == nil {
+	if byts, fileError := ast.ProgramSandboxFileRead(prgrm, &inputs[0]); fileError == nil {
 		outputs[0].Set_str(prgrm, string(byts))
 		success = true
 	}
@@ -73,7 +75,7 @@ func getFileHandle(file *os.File) int32 {
 
 func opOsOpen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	handle := int32(-1)
-	if file, err := util.CXOpenFile(inputs[0].Get_str(prgrm)); err == nil {
+	if file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0]); fileError == nil {
 		handle = getFileHandle(file)
 	}
 
@@ -82,7 +84,7 @@ func opOsOpen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 
 func opOsCreate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	handle := int32(-1)
-	if file, err := util.CXCreateFile(inputs[0].Get_str(prgrm)); err == nil {
+	if file, fileError := ast.ProgramSandboxFileCreate(prgrm, &inputs[0]); fileError == nil {
 		handle = getFileHandle(file)
 	}
 
@@ -419,12 +421,16 @@ func getSlice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 	var inpIsSlice, outIsSlice bool
 	var inpSize types.Pointer
 	if inputs[1].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1388.
 		inp1 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[1].TypeSignature.Meta))
 
 		inpType = inp1.Type
 		inpIsSlice = (inp1.GetAssignmentElement(prgrm)).IsSlice()
 		inpSize = (inp1.GetAssignmentElement(prgrm)).Size
 	} else if inputs[1].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1389.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[1].TypeSignature.Meta)
 		inpType = types.Code(sliceDetails.Meta)
 		inpIsSlice = true
@@ -434,11 +440,15 @@ func getSlice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 	}
 
 	if outputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1390.
 		out0 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(outputs[0].TypeSignature.Meta))
 
 		outType = out0.Type
 		outIsSlice = (out0.GetAssignmentElement(prgrm)).IsSlice()
 	} else if outputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1391.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(outputs[0].TypeSignature.Meta)
 
 		outType = types.Code(sliceDetails.Meta)
@@ -448,12 +458,18 @@ func getSlice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 	}
 
 	if inpType != outType || !inpIsSlice || !outIsSlice {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
-	count = inputs[2].Get_ptr(prgrm)
 	outputSlicePointer = outputs[0].Offset
 	sizeofElement = inpSize
+	// The count is a ui64. One past what the heap can hold reads nothing.
+	count64 := inputs[2].Get_ui64(prgrm)
+	if count64 > uint64(ast.SliceElementLimit(sizeofElement)) {
+		outputSliceOffset = ast.GetSliceOffset(prgrm, inputs[1].FramePointer, inputs[1].TypeSignature)
+		return
+	}
+	count = types.Pointer(count64)
 	outputSliceOffset = ast.SliceResize(prgrm, outputs[0].FramePointer, outputs[0].TypeSignature, inputs[1].TypeSignature, count, sizeofElement)
 	return
 }
@@ -779,7 +795,11 @@ func opOsWriteI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 }
 
 func opOsGetWorkingDirectory(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	outputs[0].Set_str(prgrm, globals.CxProgramPath)
+	wd, err := os.Getwd()
+	if err == nil && !strings.HasSuffix(wd, string(os.PathSeparator)) {
+		wd += string(os.PathSeparator)
+	}
+	outputs[0].Set_str(prgrm, wd)
 }
 
 func opOsExit(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
@@ -792,19 +812,19 @@ func opOsRun(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) 
 
 	command := inputs[0].Get_str(prgrm)
 	dir := inputs[3].Get_str(prgrm)
-	args := strings.Split(command, " ")
-	if len(args) <= 0 {
+	args, err := splitCommand(command)
+	if err != nil || len(args) == 0 {
 		runError = OS_RUN_EMPTY_CMD
+		if err != nil {
+			runError = OS_RUN_START_FAILED
+		}
+		outputs[0].Set_i32(prgrm, runError)
+		outputs[1].Set_i32(prgrm, 0)
+		outputs[2].Set_str(prgrm, "")
+		return
 	}
 
-	name := args[0]
-	if len(args) > 1 {
-		args = args[1:]
-	} else {
-		args = []string{}
-	}
-
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = dir
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -856,4 +876,43 @@ func opOsRun(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) 
 	outputs[0].Set_i32(prgrm, runError)
 	outputs[1].Set_i32(prgrm, cmdError)
 	outputs[2].Set_str(prgrm, string(stdOutBytes))
+}
+
+// splitCommand splits an os.Run command into words at spaces and tabs.
+// Single or double quotes group a word. Backslashes are literal, so
+// Windows paths need no escaping.
+func splitCommand(command string) ([]string, error) {
+	var args []string
+	var word strings.Builder
+	inWord := false
+	var quote rune
+	for _, c := range command {
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			} else {
+				word.WriteRune(c)
+			}
+		case c == '\'' || c == '"':
+			quote = c
+			inWord = true
+		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
+			if inWord {
+				args = append(args, word.String())
+				word.Reset()
+				inWord = false
+			}
+		default:
+			word.WriteRune(c)
+			inWord = true
+		}
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("unterminated %c quote", quote)
+	}
+	if inWord {
+		args = append(args, word.String())
+	}
+	return args, nil
 }

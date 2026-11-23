@@ -2,8 +2,9 @@ package actions
 
 import (
 	"fmt"
+	"strings"
 
-	cxpackages "github.com/skycoin/skycoin-cx/t0-packages"
+	cxpackages "github.com/skycoin/skycoin-cx/t0-packages" // thin: only CheckImport, GuiPackage, IsDefaultPackage; no depth gain
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -14,13 +15,18 @@ import (
 //	prgrm - a CXProgram that contains all the data and arrays of the program.
 //	pkgName - name of the package to declare.
 func DeclarePackage(prgrm *ast.CXProgram, pkgName string) {
+	pkgNameGid := prgrm.CXProgramNameIntern(pkgName)
 	// Add a new package to the program if it's not previously defined.
-	if _, err := prgrm.GetPackage(pkgName); err != nil {
-		pkg := ast.MakePackage(pkgName)
+	if _, err := prgrm.GetPackage(pkgNameGid); err != nil {
+		// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
+		// Now a constructor call, site S1088.
+		pkg := ast.MakePackage(pkgNameGid)
+		// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
+		// Now an arena insert, site S1089.
 		prgrm.AddPackage(pkg)
 	}
 
-	_, err := prgrm.SelectPackage(pkgName)
+	_, err := prgrm.SelectPackage(pkgNameGid)
 	if err != nil {
 		panic(err)
 	}
@@ -32,14 +38,23 @@ func DeclarePackage(prgrm *ast.CXProgram, pkgName string) {
 //
 //	prgrm - a CXProgram that contains all the data and arrays of the program.
 //	impName - name of the import to declare.
-//	currentFile - name of the current cx source code file.
+//	currentFile - the current cx source code file.
 //	lineNo - the current line number from the source code.
-func DeclareImport(prgrm *ast.CXProgram, impName string, currentFile string, lineNo int) {
+func DeclareImport(prgrm *ast.CXProgram, impName string, currentFile ast.SourceFileGid, lineNo int) {
 	// Make sure we are inside a package
 	pkg, err := prgrm.GetCurrentPackage()
 	if err != nil {
 		// FIXME: Should give a relevant error message
 		panic(err)
+	}
+
+	if err := cxpackages.CheckImport(impName); err != nil {
+		prgrm.CXProgramCompileErrorAdd(ast.CompileErrorCodeMessage, currentFile, lineNo, ast.CompileErrorOperands{prgrm.CXProgramCompileErrorText(err.Error())})
+		return
+	}
+	if name, found := strings.CutPrefix(impName, cxpackages.SysPrefix); found && cxpackages.GuiPackage(name) && !cxpackages.GuiBuild {
+		prgrm.CXProgramCompileErrorAdd(ast.CompileErrorCodeImportGuiBuildMissing, currentFile, lineNo, ast.CompileErrorOperands{prgrm.CXProgramCompileErrorText(impName)})
+		return
 	}
 
 	// Checking if it's a package in the CX workspace by trying to find a
@@ -62,14 +77,16 @@ func DeclareImport(prgrm *ast.CXProgram, impName string, currentFile string, lin
 		ident = impName
 	}
 
+	identGid := prgrm.CXProgramNameIntern(ident)
+
 	// If the package is already imported, then there is nothing more to be done.
-	if _, err := pkg.GetImport(prgrm, ident); err == nil {
+	if _, err := pkg.GetImport(prgrm, identGid); err == nil {
 		return
 	}
 
 	// If the package is already defined in the program, just add it to
 	// the importing package.
-	if imp, err := prgrm.GetPackage(ident); err == nil {
+	if imp, err := prgrm.GetPackage(identGid); err == nil {
 		pkg.AddImport(prgrm, imp)
 		return
 	}
@@ -78,8 +95,14 @@ func DeclareImport(prgrm *ast.CXProgram, impName string, currentFile string, lin
 	// if we get here during the 2nd pass, it's either a core package or
 	// something is panic-level wrong.
 	if cxpackages.IsDefaultPackage(ident) {
-		imp := ast.MakePackage(ident)
+		// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
+		// Now a constructor call, site S1090.
+		imp := ast.MakePackage(identGid)
+		// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
+		// Now an arena insert, site S1091.
 		impIdx := prgrm.AddPackage(imp)
+		// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+		// Now an arena getter, site S1092.
 		newImp, err := prgrm.GetPackageFromArray(impIdx)
 		if err != nil {
 			panic(err)
@@ -93,6 +116,6 @@ func DeclareImport(prgrm *ast.CXProgram, impName string, currentFile string, lin
 		}
 	} else {
 		// This should never happen.
-		panic(fmt.Sprintf("%v: unkown error when trying to read package '%s'", ast.CompilationError(currentFile, lineNo), ident))
+		panic(fmt.Sprintf("error: %s:%d: unkown error when trying to read package '%s'", prgrm.CXProgramSourceFileText(currentFile), lineNo, ident))
 	}
 }

@@ -1,13 +1,14 @@
 package opcodes
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
-	"github.com/skycoin/skycoin-cx/t1-constants"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
+// VIOLATION: state outside State. Owner: t4-opcodes; moves to TestMng in phase 2.
 var assertSuccess = true
 
 // AssertFailed ...
@@ -20,6 +21,8 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 	var byts1, byts2 []byte
 	var inp0 *ast.CXArgument
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1341.
 		inp0 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 
 		if inp0.Type == types.STR || inp0.PointerTargetType == types.STR {
@@ -44,10 +47,14 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 		byts2 = inputs[1].Get_bytes(prgrm)
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_STRUCT || inputs[0].TypeSignature.Type == ast.TYPE_POINTER_STRUCT {
 		var isStr bool = false
+		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
+		// Now an arena getter, site S1342.
 		structDetails := prgrm.GetCXTypeSignatureStructFromArray(inputs[0].TypeSignature.Meta)
 
 		lenFlds := len(structDetails.Fields)
 		if lenFlds > 0 {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1343.
 			fld := prgrm.GetCXArgFromArray(structDetails.Fields[lenFlds-1])
 			if fld.Type == types.STR || fld.PointerTargetType == types.STR {
 				isStr = true
@@ -65,25 +72,7 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 		panic("type is not known")
 	}
 
-	same = true
-
-	if len(byts1) != len(byts2) {
-		same = false
-		fmt.Println("byts1", byts1)
-		fmt.Println("byts2", byts2)
-	}
-
-	if same {
-		for i, byt := range byts1 {
-			if byt != byts2[i] {
-				same = false
-				fmt.Println("byts1", byts1)
-				fmt.Println("byts2", byts2)
-				break
-			}
-		}
-	}
-
+	same = bytes.Equal(byts1, byts2)
 	message := inputs[2].Get_str(prgrm)
 
 	if !same {
@@ -92,9 +81,9 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 		cxLine, _ := prgrm.GetPreviousCXLine(call.Operator.Expressions, call.Line)
 
 		if message != "" {
-			fmt.Printf("%s: %d: result was not equal to the expected value; %s\n", cxLine.FileName, cxLine.LineNumber, message)
+			fmt.Printf("%s: %d: result was not equal to the expected value; %s\n", prgrm.CXProgramSourceFileText(cxLine.FileName), cxLine.LineNumber, message)
 		} else {
-			fmt.Printf("%s: %d: result was not equal to the expected value\n", cxLine.FileName, cxLine.LineNumber)
+			fmt.Printf("%s: %d: result was not equal to the expected value\n", prgrm.CXProgramSourceFileText(cxLine.FileName), cxLine.LineNumber)
 		}
 	}
 
@@ -113,20 +102,17 @@ func opTest(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 
 func opPanic(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	if !assert(prgrm, inputs, outputs) {
-		panic(constants.CX_ASSERT)
+		panic(types.CX_ASSERT)
 	}
 }
 
 // panicIf/panicIfNot implementation
 func panicIf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue, condition bool) {
-	str := inputs[1].Get_str(prgrm)
 	if inputs[0].Get_bool(prgrm) == condition {
-		call := prgrm.GetCurrentCall()
-		// expr := call.Operator.Expressions[call.Line]
-		cxLine, _ := prgrm.GetPreviousCXLine(call.Operator.Expressions, call.Line)
-
-		fmt.Printf("%s : %d, %s\n", cxLine.FileName, cxLine.LineNumber, str)
-		panic(constants.CX_ASSERT)
+		// The printer prints the line and the message after the loop.
+		prgrm.RuntimeError.RuntimeErrorRecordAssertLine = true
+		prgrm.RuntimeError.RuntimeErrorRecordAssertMessage = inputs[1].Get_ptr(prgrm)
+		panic(types.CX_ASSERT)
 	}
 }
 

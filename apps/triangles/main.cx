@@ -1,7 +1,7 @@
 package main
 
-import "app"
-import "time"
+import "sys/app"
+import "sys/time"
 
 func tri(cx f32, cy f32, r f32, a f32, red f32, green f32, blue f32) {
 	var k f32 = 2.0944

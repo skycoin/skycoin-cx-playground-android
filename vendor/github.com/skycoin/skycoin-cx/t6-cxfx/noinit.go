@@ -9,3 +9,5 @@ import (
 func RegisterPackage(prgrm *ast.CXProgram) {
 
 }
+
+func InitConstants() {}

@@ -1,6 +1,6 @@
 package main
 
-import "time"
+import "sys/time"
 
 // The algorithms of skycoin-cx/benchmarks/cx, run in a loop and timed.
 

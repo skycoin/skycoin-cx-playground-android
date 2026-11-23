@@ -7,14 +7,15 @@ import (
 
 // TODO: rewrite slice api.
 // TODO: remove all offset > 0 tests.
-// TODO: panic(constants.CX_RUNTIME_*) instead of silent failure.
+// TODO: panic(types.CX_RUNTIME_*) instead of silent failure.
 
 // IsValidSliceIndex ...
 func IsValidSliceIndex(prgrm *CXProgram, offset types.Pointer, index types.Pointer, sizeofElement types.Pointer) bool {
 	sliceLen := GetSliceLen(prgrm, offset)
 	bytesLen := sliceLen * sizeofElement
 	index -= types.OBJECT_HEADER_SIZE + constants.SLICE_HEADER_SIZE + offset
-	if index >= 0 && index < bytesLen && (index%sizeofElement) == 0 {
+	// An index before the data wraps to a large value and fails index < bytesLen.
+	if index < bytesLen && (index%sizeofElement) == 0 {
 		return true
 	}
 	return false
@@ -24,6 +25,8 @@ func IsValidSliceIndex(prgrm *CXProgram, offset types.Pointer, index types.Point
 func GetSliceOffset(prgrm *CXProgram, fp types.Pointer, argTypeSig *CXTypeSignature) types.Pointer {
 	var element *CXArgument
 	if argTypeSig.Type == TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S0386.
 		arg := prgrm.GetCXArgFromArray(CXArgumentIndex(argTypeSig.Meta))
 		element = arg.GetAssignmentElement(prgrm)
 
@@ -34,7 +37,7 @@ func GetSliceOffset(prgrm *CXProgram, fp types.Pointer, argTypeSig *CXTypeSignat
 		return types.InvalidPointer
 	} else if argTypeSig.Type == TYPE_SLICE_ATOMIC || argTypeSig.Type == TYPE_POINTER_SLICE_ATOMIC {
 		return types.Read_ptr(prgrm.Memory, GetFinalOffset(prgrm, fp, nil, argTypeSig))
-	} else if argTypeSig.Type == TYPE_STRUCT {
+	} else if argTypeSig.Type == TYPE_STRUCT || argTypeSig.Type == TYPE_POINTER_STRUCT {
 		return types.Read_ptr(prgrm.Memory, GetFinalOffset(prgrm, fp, nil, argTypeSig))
 	} else {
 		panic("type is not known")
@@ -94,11 +97,7 @@ func SliceResizeEx(prgrm *CXProgram, outputSliceOffset types.Pointer, count type
 	var newLen = count
 	var newCap = outputSliceCap
 	if newLen > newCap {
-		if newCap <= 0 {
-			newCap = newLen
-		} else {
-			newCap *= 2
-		}
+		newCap = sliceCapacityGrow(newCap, newLen, sizeofElement)
 		var outputObjectSize = types.OBJECT_HEADER_SIZE + constants.SLICE_HEADER_SIZE + newCap*sizeofElement
 		outputSliceOffset = AllocateSeq(prgrm, outputObjectSize)
 		types.Write_ptr(types.Get_obj_header(prgrm.Memory, outputSliceOffset), types.OBJECT_GC_HEADER_SIZE, outputObjectSize)
@@ -113,10 +112,42 @@ func SliceResizeEx(prgrm *CXProgram, outputSliceOffset types.Pointer, count type
 	return outputSliceOffset
 }
 
+// SliceElementLimit is the most elements of sizeofElement bytes that one
+// slice object can hold within the heap.
+func SliceElementLimit(sizeofElement types.Pointer) types.Pointer {
+	var limit types.Pointer
+	if constants.MAX_HEAP_SIZE > types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE {
+		limit = constants.MAX_HEAP_SIZE - types.OBJECT_HEADER_SIZE - constants.SLICE_HEADER_SIZE
+	}
+	if sizeofElement > 1 {
+		limit /= sizeofElement
+	}
+	return limit
+}
+
+// sliceCapacityGrow doubles capacity up to at least newLen elements. A slice too
+// large for the heap is a heap exhausted error, before its size can wrap.
+func sliceCapacityGrow(capacity types.Pointer, newLen types.Pointer, sizeofElement types.Pointer) types.Pointer {
+	limit := SliceElementLimit(sizeofElement)
+	if newLen > limit {
+		panic(constants.HEAP_EXHAUSTED_ERROR)
+	}
+	grown := limit
+	if capacity <= limit/2 {
+		grown = capacity * 2
+	}
+	if grown < newLen {
+		grown = newLen
+	}
+	return grown
+}
+
 // SliceResize ...
 func SliceResize(prgrm *CXProgram, fp types.Pointer, out *CXTypeSignature, inp *CXTypeSignature, count types.Pointer, sizeofElement types.Pointer) types.Pointer {
 	inputSliceOffset := GetSliceOffset(prgrm, fp, inp)
 	outputSliceOffset := SliceResizeEx(prgrm, inputSliceOffset, count, sizeofElement)
+	// SliceResizeEx may collect, which moves the input slice.
+	inputSliceOffset = GetSliceOffset(prgrm, fp, inp)
 
 	if outputSliceOffset != inputSliceOffset {
 		inputSliceLen := GetSliceLen(prgrm, inputSliceOffset)
@@ -183,8 +214,8 @@ func SliceInsert(prgrm *CXProgram, fp types.Pointer, out *CXTypeSignature, inp *
 		inputSliceLen = GetSliceLen(prgrm, inputSliceOffset)
 	}
 
-	if index < 0 || index > inputSliceLen {
-		panic(constants.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE)
+	if index > inputSliceLen {
+		panic(types.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE)
 	}
 
 	var newLen = inputSliceLen + 1
@@ -206,8 +237,8 @@ func SliceRemove(prgrm *CXProgram, fp types.Pointer, out *CXTypeSignature, inp *
 		inputSliceLen = GetSliceLen(prgrm, inputSliceOffset)
 	}
 
-	if index < 0 || index >= inputSliceLen {
-		panic(constants.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE)
+	if index >= inputSliceLen {
+		panic(types.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE)
 	}
 
 	outputSliceData := GetSliceData(prgrm, outputSliceOffset, sizeofElement)

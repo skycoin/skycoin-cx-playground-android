@@ -1,28 +1,18 @@
 package ast
 
-type CXAtomicOperator struct {
-	Inputs   *CXStruct
-	Outputs  *CXStruct
-	Operator CXFunctionIndex
-
-	Function CXFunctionIndex
-	Package  CXPackageIndex
-	Label    string
-
-	// used for jmp statements
-	ThenLines int
-	ElseLines int
-}
+import stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
 
 // ----------------------------------------------------------------
 //                             `CXAtomicOperator` Getters
 
 func (op *CXAtomicOperator) GetOperatorName(prgrm *CXProgram) string {
+	// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
+	// Now an arena getter, site S0089.
 	opOperator := prgrm.GetFunctionFromArray(op.Operator)
 	if opOperator.IsBuiltIn() {
 		return OpNames[opOperator.AtomicOPCode]
 	}
-	return opOperator.Name
+	return prgrm.CXProgramNameText(opOperator.Name)
 
 }
 
@@ -32,9 +22,13 @@ func (op *CXAtomicOperator) GetOperatorName(prgrm *CXProgram) string {
 // AddInput ...
 func (op *CXAtomicOperator) AddInput(prgrm *CXProgram, typeSignatureIdx CXTypeSignatureIndex) *CXAtomicOperator {
 	if op.Inputs == nil {
+		// OBJMODEL: state.CXStructMng.CXStructAlloc(), phase 4 #336.
+		// Now a heap literal, site S0090.
 		op.Inputs = &CXStruct{Package: op.Package}
 	}
 
+	// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+	// Now an arena getter, site S0091.
 	typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
 	if typeSignature.Package == -1 {
 		typeSignature.Package = op.Package
@@ -42,6 +36,8 @@ func (op *CXAtomicOperator) AddInput(prgrm *CXProgram, typeSignatureIdx CXTypeSi
 
 	// Add Package if arg has no package
 	if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S0092.
 		arg := prgrm.GetCXArgFromArray(CXArgumentIndex(typeSignature.Meta))
 		if arg.Package == -1 {
 			arg.Package = op.Package
@@ -71,9 +67,13 @@ func (op *CXAtomicOperator) GetInputs(prgrm *CXProgram) []CXTypeSignatureIndex {
 // AddOutput ...
 func (op *CXAtomicOperator) AddOutput(prgrm *CXProgram, typeSignatureIdx CXTypeSignatureIndex) *CXAtomicOperator {
 	if op.Outputs == nil {
+		// OBJMODEL: state.CXStructMng.CXStructAlloc(), phase 4 #336.
+		// Now a heap literal, site S0093.
 		op.Outputs = &CXStruct{Package: op.Package}
 	}
 
+	// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+	// Now an arena getter, site S0094.
 	typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
 	if typeSignature.Package == -1 {
 		typeSignature.Package = op.Package
@@ -81,6 +81,8 @@ func (op *CXAtomicOperator) AddOutput(prgrm *CXProgram, typeSignatureIdx CXTypeS
 
 	// Add Package if arg has no package
 	if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S0095.
 		arg := prgrm.GetCXArgFromArray(CXArgumentIndex(typeSignature.Meta))
 		if arg.Package == -1 {
 			arg.Package = op.Package
@@ -107,7 +109,7 @@ func (op *CXAtomicOperator) GetOutputs(prgrm *CXProgram) []CXTypeSignatureIndex 
 // }
 
 // AddLabel ...
-func (op *CXAtomicOperator) AddLabel(lbl string) *CXAtomicOperator {
+func (op *CXAtomicOperator) AddLabel(lbl stringpool.StringGid) *CXAtomicOperator {
 	op.Label = lbl
 	return op
 }

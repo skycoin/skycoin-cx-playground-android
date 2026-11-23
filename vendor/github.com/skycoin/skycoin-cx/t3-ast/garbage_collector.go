@@ -1,161 +1,148 @@
 package ast
 
 import (
+	"slices"
+
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
 )
 
-// MarkAndCompact ...
+// MarkAndCompact collects the heap. It marks every object reachable from the
+// globals and the frames, walking each root by its GCType and recording each
+// reference it reads, then gives each live object its new address, moves the
+// recorded references to the new addresses and slides the objects down.
 func MarkAndCompact(prgrm *CXProgram) {
-	var fp types.Pointer
-	var faddr = constants.NULL_HEAP_ADDRESS_OFFSET
-
-	// marking, setting forward addresses and updating references
-	// global variables
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, glblFldIdx := range pkg.Globals.Fields {
-			glblFld := prgrm.GetCXTypeSignatureFromArray(glblFldIdx)
-
-			var glbl *CXArgument = &CXArgument{}
-			if glblFld.Type == TYPE_CXARGUMENT_DEPRECATE {
-				glbl = prgrm.GetCXArg(CXArgumentIndex(glblFld.Meta))
-			} else {
-				panic("type is not cxargument deprecate.")
-			}
-
-			if (glbl.IsString() || glbl.IsSlice() || glbl.Type == types.STR) && glbl.StructType == nil {
-				// Getting the offset to the object in the heap
-				heapOffset := types.Read_ptr(prgrm.Memory, glbl.Offset)
-				if heapOffset < prgrm.Heap.StartsAt {
-					continue
-				}
-
-				glblType := glbl.Type
-				if glbl.Type == types.POINTER {
-					glblType = glbl.PointerTargetType
-				}
-				MarkObjectsTree(prgrm, glbl.Offset, glblType, glbl.DeclarationSpecifiers[1:])
-			}
-
-			// If `ptr` has fields, we need to navigate the heap and mark its fields too.
-			if glbl.StructType != nil {
-				for _, typeSignatureIdx := range glbl.StructType.Fields {
-					typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
-
-					var fld *CXArgument = &CXArgument{}
-					if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
-						fldIdx := typeSignature.Meta
-						fld = &prgrm.CXArgs[fldIdx]
-					} else {
-						fld = typeSignature.GetCXArgFormat(prgrm)
-					}
-
-					offset := glbl.Offset + fld.Offset
-					// Getting the offset to the object in the heap
-					heapOffset := types.Read_ptr(prgrm.Memory, offset)
-					if heapOffset < prgrm.Heap.StartsAt {
-						continue
-					}
-
-					if fld.IsString() || fld.IsSlice() || fld.Type == types.STR {
-						fldType := fld.Type
-						if fld.Type == types.POINTER {
-							fldType = fld.PointerTargetType
-						}
-						MarkObjectsTree(prgrm, offset, fldType, fld.DeclarationSpecifiers[1:])
-					}
-				}
-			}
-		}
+	gcObjectStartsBuild(prgrm)
+	heap := &prgrm.Heap
+	if heap.Visited == nil {
+		heap.Visited = map[HeapVisit]bool{}
 	}
+	clear(heap.Visited)
+	heap.Slots = heap.Slots[:0]
+	heap.Work = heap.Work[:0]
 
-	// marking, setting forward addresses and updating references
-	// local variables
+	for _, root := range gcGlobalRoots(prgrm) {
+		gcMarkValue(prgrm, root.GCRootOffset, root.GCRootType)
+	}
+	var fp types.Pointer
 	for c := types.Pointer(0); c <= prgrm.CallCounter; c++ {
 		op := prgrm.CallStack[c].Operator
-
-		// TODO: Some standard library functions "manually" add a function
-		// call (callbacks) to `PRGRM.CallStack`. These functions do not have an
-		// operator associated to them. This can be considered as a bug or as an
-		// undesirable mechanic.
-		// [2019-06-24 Mon 22:39] Actually, if the GC is triggered in the middle
-		// of a callback, things will certainly break.
+		// A callback a native pushes onto CallStack has no operator.
 		if op == nil {
 			continue
 		}
-
-		for _, ptr := range op.ListOfPointers {
-			offset := ptr.Offset
-			offset += fp
-
-			ptrIsPointer := ptr.IsPointer()
-
-			// Checking if we need to mark `ptr`.
-			if ptrIsPointer {
-				// If `ptr` has fields, we need to navigate the heap and mark its fields too.
-				if ptr.StructType != nil {
-					// Getting the offset to the object in the heap
-					heapOffset := types.Read_ptr(prgrm.Memory, offset)
-					if heapOffset >= prgrm.Heap.StartsAt {
-						for _, typeSignatureIdx := range ptr.StructType.Fields {
-							typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
-
-							var fld *CXArgument = &CXArgument{}
-							if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
-								fldIdx := typeSignature.Meta
-								fld = &prgrm.CXArgs[fldIdx]
-							} else {
-								fld = typeSignature.GetCXArgFormat(prgrm)
-							}
-
-							MarkObjectsTree(prgrm, heapOffset+types.OBJECT_HEADER_SIZE+fld.Offset, fld.Type, fld.DeclarationSpecifiers[1:])
-						}
-					}
-				}
-
-				MarkObjectsTree(prgrm, offset, ptr.Type, ptr.DeclarationSpecifiers[1:])
-			}
-
-			// Checking if the field being accessed needs to be marked.
-			// If the root (`ptr`) is a pointer, this step is unnecessary.
-			if len(ptr.Fields) > 0 && !ptrIsPointer && prgrm.GetCXArgFromArray(ptr.Fields[len(ptr.Fields)-1]).IsPointer() {
-				fld := prgrm.GetCXArgFromArray(ptr.Fields[len(ptr.Fields)-1])
-				MarkObjectsTree(prgrm, offset+fld.Offset, fld.Type, fld.DeclarationSpecifiers[1:])
+		for _, root := range gcFrameRoots(prgrm, op) {
+			if address, found := gcFrameAddress(prgrm, fp, root.GCRootOffset); found {
+				gcMarkValue(prgrm, address+root.GCRootInner, root.GCRootType)
 			}
 		}
-
 		fp += op.Size
 	}
+	if object, found := gcObjectContaining(prgrm, heap.Pinned); found {
+		types.Write_obj_mark(prgrm.Memory, object, 1)
+	}
+	gcMarkDrain(prgrm)
 
-	// Relocation of live objects.
-	for c := prgrm.Heap.StartsAt + constants.NULL_HEAP_ADDRESS_OFFSET; c < prgrm.Heap.StartsAt+prgrm.Heap.Pointer; {
-		objSize := types.Read_obj_size(prgrm.Memory, c)
-
-		if prgrm.Memory[c] == 1 {
-			forwardingAddress := types.Read_obj_forwarding_address(prgrm.Memory, c)
-
-			// We update the pointers that are pointing to the just moved object.
-			updatePointers(prgrm, forwardingAddress, prgrm.Heap.StartsAt+faddr)
-
-			// setting the mark back to 0
-			prgrm.Memory[c] = 0
-			// then it's alive and we'll relocate the object
-			for i := types.Pointer(0); i < objSize; i++ {
-				prgrm.Memory[faddr+prgrm.Heap.StartsAt+i] = prgrm.Memory[c+i]
-			}
-
-			faddr += objSize
+	faddr := constants.NULL_HEAP_ADDRESS_OFFSET
+	for _, object := range heap.ObjectStarts {
+		if prgrm.Memory[object] == 1 {
+			types.Write_obj_forwarding_address(prgrm.Memory, object, heap.StartsAt+faddr)
+			faddr += types.Read_obj_size(prgrm.Memory, object)
 		}
-
-		c += objSize
 	}
 
-	prgrm.Heap.Pointer = faddr
+	if object, found := gcObjectContaining(prgrm, heap.Pinned); found {
+		heap.Pinned = heap.Pinned - object + types.Read_obj_forwarding_address(prgrm.Memory, object)
+	}
+	slices.Sort(heap.Slots)
+	for i, slot := range heap.Slots {
+		if i > 0 && slot == heap.Slots[i-1] {
+			continue
+		}
+		pointer := types.Read_ptr(prgrm.Memory, slot)
+		if object, found := gcObjectContaining(prgrm, pointer); found {
+			types.Write_ptr(prgrm.Memory, slot, pointer-object+types.Read_obj_forwarding_address(prgrm.Memory, object))
+		}
+	}
+
+	for _, object := range heap.ObjectStarts {
+		if prgrm.Memory[object] != 1 {
+			continue
+		}
+		prgrm.Memory[object] = 0
+		size := types.Read_obj_size(prgrm.Memory, object)
+		to := types.Read_obj_forwarding_address(prgrm.Memory, object)
+		copy(prgrm.Memory[to:to+size], prgrm.Memory[object:object+size])
+	}
+	heap.Pointer = faddr
+}
+
+// gcMarkValue marks what the value of GCType t at address refers to.
+func gcMarkValue(prgrm *CXProgram, address types.Pointer, t *GCType) {
+	switch t.GCTypeKind {
+	case GCKindPointer, GCKindSlice, GCKindStr:
+		gcMarkReference(prgrm, address, t)
+	case GCKindArray:
+		for i := types.Pointer(0); i < t.GCTypeLength; i++ {
+			gcMarkValue(prgrm, address+i*t.GCTypeElemSize, t.GCTypeElem)
+		}
+	case GCKindStruct:
+		for _, field := range t.GCTypeFields {
+			gcMarkValue(prgrm, address+field.GCTypeFieldOffset, field.GCTypeFieldType)
+		}
+	}
+}
+
+// gcMarkReference marks the object the pointer, slice or str at slot points
+// into, records slot for the update, and queues what the object holds.
+func gcMarkReference(prgrm *CXProgram, slot types.Pointer, t *GCType) {
+	if uint64(slot)+uint64(types.POINTER_SIZE) > uint64(len(prgrm.Memory)) {
+		return
+	}
+	pointer := types.Read_ptr(prgrm.Memory, slot)
+	if pointer < prgrm.Heap.StartsAt+constants.NULL_HEAP_ADDRESS_OFFSET {
+		return
+	}
+	object, found := gcObjectContaining(prgrm, pointer)
+	if !found {
+		return
+	}
+	prgrm.Heap.Slots = append(prgrm.Heap.Slots, slot)
+	types.Write_obj_mark(prgrm.Memory, object, 1)
+	if t.GCTypeElem == nil {
+		return
+	}
+	visit := HeapVisit{HeapVisitAddress: pointer, HeapVisitType: t}
+	if prgrm.Heap.Visited[visit] {
+		return
+	}
+	prgrm.Heap.Visited[visit] = true
+	prgrm.Heap.Work = append(prgrm.Heap.Work, visit)
+}
+
+// gcMarkDrain marks what the queued pointers and slices refer to. A pointer
+// to the heap is the address of the value less the object header.
+func gcMarkDrain(prgrm *CXProgram) {
+	for len(prgrm.Heap.Work) > 0 {
+		visit := prgrm.Heap.Work[len(prgrm.Heap.Work)-1]
+		prgrm.Heap.Work = prgrm.Heap.Work[:len(prgrm.Heap.Work)-1]
+		pointer, t := visit.HeapVisitAddress, visit.HeapVisitType
+		if t.GCTypeKind == GCKindPointer {
+			gcMarkValue(prgrm, pointer+types.OBJECT_HEADER_SIZE, t.GCTypeElem)
+			continue
+		}
+		object, _ := gcObjectContaining(prgrm, pointer)
+		elements := pointer + types.OBJECT_HEADER_SIZE + constants.SLICE_HEADER_SIZE
+		end := object + types.Read_obj_size(prgrm.Memory, object)
+		length := GetSliceLen(prgrm, pointer)
+		if elements > end || t.GCTypeElemSize == 0 {
+			continue
+		}
+		length = min(length, (end-elements)/t.GCTypeElemSize)
+		for i := types.Pointer(0); i < length; i++ {
+			gcMarkValue(prgrm, elements+i*t.GCTypeElemSize, t.GCTypeElem)
+		}
+	}
 }
 
 // updateDisplaceReference performs the actual addition or subtraction of `plusOff` to the address being pointed by the element at `atOffset`.
@@ -238,6 +225,8 @@ func DisplaceReferences(prgrm *CXProgram, off types.Pointer, numPkgs int) {
 
 	count := 0
 	for _, pkgIdx := range prgrm.Packages {
+		// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+		// Now an arena getter, site S0347.
 		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
 		if err != nil {
 			panic(err)
@@ -251,10 +240,14 @@ func DisplaceReferences(prgrm *CXProgram, off types.Pointer, numPkgs int) {
 		// as any other object should be destroyed, as the program finished its
 		// execution.
 		for _, glblFldIdx := range pkg.Globals.Fields {
+			// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+			// Now an arena getter, site S0348.
 			glblFld := prgrm.GetCXTypeSignatureFromArray(glblFldIdx)
 
-			var glbl *CXArgument = &CXArgument{}
+			var glbl *CXArgument
 			if glblFld.Type == TYPE_CXARGUMENT_DEPRECATE {
+				// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+				// Now an arena getter, site S0350.
 				glbl = prgrm.GetCXArg(CXArgumentIndex(glblFld.Meta))
 			} else {
 				panic("type is not cxargument deprecate.")
@@ -266,19 +259,23 @@ func DisplaceReferences(prgrm *CXProgram, off types.Pointer, numPkgs int) {
 
 			// If it's a struct instance we need to displace each of its fields.
 			if glbl.StructType != nil {
-				for _, typeSignatureIdx := range glbl.StructType.Fields {
+				for fieldIndex, typeSignatureIdx := range glbl.StructType.Fields {
+					// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+					// Now an arena getter, site S0351.
 					typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
 
-					var fld *CXArgument = &CXArgument{}
+					var fld *CXArgument
 					if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
 						fldIdx := typeSignature.Meta
-						fld = &prgrm.CXArgs[fldIdx]
+						// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+						// Now an arena getter, site S0353.
+						fld = prgrm.GetCXArg(CXArgumentIndex(fldIdx))
 					} else {
 						fld = typeSignature.GetCXArgFormat(prgrm)
 					}
 
 					if fld.IsString() || fld.IsStruct() || fld.IsSlice() {
-						doDisplaceReferences(prgrm, &updated, glbl.Offset+fld.Offset, off, fld.Type, fld.DeclarationSpecifiers[1:])
+						doDisplaceReferences(prgrm, &updated, glbl.Offset+StructFieldOffset(prgrm, glbl.StructType, fieldIndex), off, fld.Type, fld.DeclarationSpecifiers[1:])
 					}
 				}
 			}
@@ -288,256 +285,58 @@ func DisplaceReferences(prgrm *CXProgram, off types.Pointer, numPkgs int) {
 	}
 }
 
-// Mark marks the object located at `heapOffset` as alive and sets the object's referencing address to `heapOffset`.
-func Mark(prgrm *CXProgram, heapOffset types.Pointer) {
-	// Marking as alive.
-	types.Write_obj_mark(prgrm.Memory, heapOffset, 1)
-
-	// Setting forwarding address. This address is used to know where the object used to live on the heap. With it we can know what symbols were pointing to that dead object and then update their address.
-	types.Write_obj_forwarding_address(prgrm.Memory, heapOffset, heapOffset)
+// gcFrameAddress returns the address of the frame variable at offset. It
+// returns false for an escaped local whose declaration has not run yet. An
+// offset outside the stack is an address already, as frameAddress has it.
+func gcFrameAddress(prgrm *CXProgram, fp types.Pointer, offset types.Pointer) (types.Pointer, bool) {
+	if !OffsetEscaped(offset) {
+		if offset >= prgrm.Stack.Size {
+			return offset, true
+		}
+		return offset + fp, true
+	}
+	object := types.Read_ptr(prgrm.Memory, fp+OffsetEscapedSlot(offset))
+	if object < prgrm.Heap.StartsAt+constants.NULL_HEAP_ADDRESS_OFFSET || object >= prgrm.Heap.StartsAt+prgrm.Heap.Pointer {
+		return 0, false
+	}
+	return object + types.OBJECT_HEADER_SIZE, true
 }
 
-// MarkObjectsTree traverses and marks a possible tree of heap objects (slices of slices, slices of pointers, etc.).
-func MarkObjectsTree(prgrm *CXProgram, offset types.Pointer, baseType types.Code, declSpecs []int) {
-	lenMem := types.Cast_int_to_ptr(len(prgrm.Memory))
-	// Checking if it's a valid heap address. An invalid address
-	// usually occurs in CX chains, with the split of blockchain
-	// and transaction codes in a CX chain program state.
-	if offset > lenMem || offset+types.POINTER_SIZE > lenMem {
-		return
-	}
-
-	// Getting the offset to the object in the heap
-	heapOffset := types.Read_ptr(prgrm.Memory, offset)
-
-	// Then it's a pointer to an object in the stack and it should not be marked.
-	if heapOffset <= prgrm.Heap.StartsAt {
-		return
-	}
-
-	// marking the root object
-	Mark(prgrm, heapOffset)
-
-	var numDeclSpecs = len(declSpecs)
-	if numDeclSpecs == 0 {
-		return
-	}
-
-	// Then it's a tree of objects.
-	// TODO: We're not considering struct instances with pointer fields.
-	if declSpecs[0] == constants.DECL_SLICE {
-		if (numDeclSpecs > 1 &&
-			(declSpecs[1] == constants.DECL_SLICE ||
-				declSpecs[1] == constants.DECL_POINTER)) ||
-			(numDeclSpecs == 1 && baseType == types.STR) {
-			// Then we need to iterate each of the slice objects and mark them as alive
-			sliceLen := GetSliceLen(prgrm, heapOffset)
-
-			for c := types.Pointer(0); c < sliceLen; c++ {
-				offsetToElements := types.OBJECT_HEADER_SIZE + constants.SLICE_HEADER_SIZE
-				cHeapOffset := types.Read_ptr(prgrm.Memory, heapOffset+offsetToElements+c*types.POINTER_SIZE)
-				if cHeapOffset <= prgrm.Heap.StartsAt {
-					// Then it's pointing to null or data segment
-					continue
-				}
-
-				MarkObjectsTree(prgrm, heapOffset+offsetToElements+c*types.POINTER_SIZE, baseType, declSpecs[1:])
-			}
+// gcObjectStartsBuild lists the address of each heap object in
+// prgrm.Heap.ObjectStarts and clears its mark, which a new object may not.
+func gcObjectStartsBuild(prgrm *CXProgram) {
+	starts := prgrm.Heap.ObjectStarts[:0]
+	for c := prgrm.Heap.StartsAt + constants.NULL_HEAP_ADDRESS_OFFSET; c < prgrm.Heap.StartsAt+prgrm.Heap.Pointer; {
+		starts = append(starts, c)
+		prgrm.Memory[c] = 0
+		objSize := types.Read_obj_size(prgrm.Memory, c)
+		if objSize == 0 {
+			break
 		}
+		c += objSize
 	}
+	prgrm.Heap.ObjectStarts = starts
 }
 
-// updatePointer changes the address of the pointer located at `atOffset` to `newAddress`.
-func updatePointer(prgrm *CXProgram, atOffset types.Pointer, toAddress types.Pointer) {
-	types.Write_ptr(prgrm.Memory, atOffset, toAddress)
-}
-
-// updatePointerTree changes the address of the pointer located at `atOffset` to `newAddress` and checks if it is the
-// root of a tree of objects, such as a slice or the instance of a struct where some of its fields are pointers.
-func updatePointerTree(prgrm *CXProgram, atOffset types.Pointer, oldAddr, newAddr types.Pointer, baseType types.Code, declSpecs []int) {
-	var numDeclSpecs = len(declSpecs)
-
-	// Getting the offset to the object in the heap
-	heapOffset := types.Read_ptr(prgrm.Memory, atOffset)
-
-	if heapOffset == oldAddr {
-		// Updating the root pointer.
-		updatePointer(prgrm, atOffset, newAddr)
-	}
-
-	// It can't be a tree of objects.
-	if numDeclSpecs == 0 || heapOffset <= prgrm.Heap.StartsAt {
-		return
-	}
-
-	// Checking if it's a tree of objects.
-	// TODO: We're not considering struct instances with pointer fields.
-	if declSpecs[0] == constants.DECL_SLICE {
-		if (numDeclSpecs > 1 &&
-			(declSpecs[1] == constants.DECL_SLICE ||
-				declSpecs[1] == constants.DECL_POINTER)) ||
-			(numDeclSpecs == 1 && baseType == types.STR) {
-			// Then we need to iterate each of the slice objects
-			// and check if we need to update their address.
-			sliceLen := GetSliceLen(prgrm, heapOffset)
-			offsetToElements := types.OBJECT_HEADER_SIZE + constants.SLICE_HEADER_SIZE
-
-			for c := types.Pointer(0); c < sliceLen; c++ {
-				cHeapOffset := types.Read_ptr(prgrm.Memory, heapOffset+offsetToElements+c*types.POINTER_SIZE)
-				if cHeapOffset <= prgrm.Heap.StartsAt {
-					// Then it's pointing to null or data segment
-					continue
-				}
-
-				// Then it's not pointing to the object moved by the GC or it's pointing to
-				// an object in the stack segment or nil.
-				if cHeapOffset == oldAddr {
-					updatePointerTree(prgrm, heapOffset+offsetToElements+c*types.POINTER_SIZE, oldAddr, newAddr, baseType, declSpecs[1:]) // TODO:PTR remove hardcode
-				}
-			}
+// gcObjectContaining returns the address of the heap object that pointer
+// points into. A pointer inside an object, as &s[1] is, keeps it alive.
+func gcObjectContaining(prgrm *CXProgram, pointer types.Pointer) (types.Pointer, bool) {
+	starts := prgrm.Heap.ObjectStarts
+	low, high := 0, len(starts)
+	for low < high {
+		middle := int(uint(low+high) >> 1)
+		if starts[middle] <= pointer {
+			low = middle + 1
+		} else {
+			high = middle
 		}
 	}
-}
-
-// updatePointers updates all the references to objects on the heap to their new addresses after calling the garbage collector.
-// For example, if `foo` was pointing to an object located at address 5151 and after calling the garbage collector it was
-// moved to address 4141, every symbol in a `CXProgram`'s `CallStack` and in its global variables need to be updated to point now to
-// 4141 instead of 5151.
-func updatePointers(prgrm *CXProgram, oldAddr, newAddr types.Pointer) {
-	if oldAddr == newAddr {
-		return
+	if low == 0 {
+		return 0, false
 	}
-	// TODO: `oldAddr` could be received as a slice of bytes that represent the old address of the object,
-	// as it needs to be converted to bytes later on anyways. However, I'm sticking to an int32
-	// for a bit more of clarity.
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, glblFldIdx := range pkg.Globals.Fields {
-			glblFld := prgrm.GetCXTypeSignatureFromArray(glblFldIdx)
-
-			var glbl *CXArgument = &CXArgument{}
-			if glblFld.Type == TYPE_CXARGUMENT_DEPRECATE {
-				glbl = prgrm.GetCXArg(CXArgumentIndex(glblFld.Meta))
-			} else {
-				panic("type is not cxargument deprecate.")
-			}
-
-			if (glbl.IsPointer() || glbl.IsSlice() || glbl.Type == types.STR) && glbl.StructType == nil {
-				// Getting the offset to the object in the heap
-				heapOffset := types.Read_ptr(prgrm.Memory, glbl.Offset)
-				if heapOffset < prgrm.Heap.StartsAt {
-					continue
-				}
-
-				glblType := glbl.Type
-				if glbl.Type == types.POINTER {
-					glblType = glbl.PointerTargetType
-				}
-				updatePointerTree(prgrm, glbl.Offset, oldAddr, newAddr, glblType, glbl.DeclarationSpecifiers[1:]) // TODO:PTR remove hardcoded 1 value
-			}
-
-			// If `ptr` has fields, we need to navigate the heap and mark its fields too.
-			if glbl.StructType != nil {
-				for _, typeSignatureIdx := range glbl.StructType.Fields {
-					typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
-
-					var fld *CXArgument = &CXArgument{}
-					if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
-						fldIdx := typeSignature.Meta
-						fld = &prgrm.CXArgs[fldIdx]
-					} else {
-						fld = typeSignature.GetCXArgFormat(prgrm)
-					}
-
-					if !fld.IsPointer() {
-						continue
-					}
-					offset := glbl.Offset + fld.Offset
-
-					// Getting the offset to the object in the heap
-					heapOffset := types.Read_ptr(prgrm.Memory, offset)
-					if heapOffset < prgrm.Heap.StartsAt {
-						continue
-					}
-
-					if fld.IsPointer() || fld.IsSlice() || fld.Type == types.STR {
-						fldType := fld.Type
-						if fld.Type == types.POINTER {
-							fldType = fld.PointerTargetType
-						}
-						updatePointerTree(prgrm, offset, oldAddr, newAddr, fldType, fld.DeclarationSpecifiers[1:])
-					}
-				}
-			}
-		}
+	start := starts[low-1]
+	if pointer >= start+types.Read_obj_size(prgrm.Memory, start) {
+		return 0, false
 	}
-
-	var fp types.Pointer
-	for c := types.Pointer(0); c <= prgrm.CallCounter; c++ {
-		op := prgrm.CallStack[c].Operator
-
-		// TODO: Some standard library functions "manually" add a function
-		// call (callbacks) to `PRGRM.CallStack`. These functions do not have an
-		// operator associated to them. This can be considered as a bug or as an
-		// undesirable mechanic.
-		// [2019-06-24 Mon 22:39] Actually, if the GC is triggered in the middle
-		// of a callback, things will certainly break.
-		if op == nil {
-			continue
-		}
-
-		for _, ptr := range op.ListOfPointers {
-			offset := ptr.Offset
-			offset += fp
-
-			ptrIsPointer := ptr.IsPointer()
-
-			// Checking if we need to mark `ptr`.
-			if ptrIsPointer {
-				// Getting the offset to the object in the heap
-				heapOffset := types.Read_ptr(prgrm.Memory, offset)
-				if heapOffset > prgrm.Heap.StartsAt {
-					updatePointerTree(prgrm, offset, oldAddr, newAddr, ptr.Type, ptr.DeclarationSpecifiers[1:])
-
-					// If `ptr` has fields, we need to navigate the heap and mark its fields too.
-					if ptr.StructType != nil {
-						if heapOffset >= prgrm.Heap.StartsAt {
-							for _, typeSignatureIdx := range ptr.StructType.Fields {
-								typeSignature := prgrm.GetCXTypeSignatureFromArray(typeSignatureIdx)
-
-								var fld *CXArgument = &CXArgument{}
-								if typeSignature.Type == TYPE_CXARGUMENT_DEPRECATE {
-									fldIdx := typeSignature.Meta
-									fld = &prgrm.CXArgs[fldIdx]
-								} else {
-									fld = typeSignature.GetCXArgFormat(prgrm)
-								}
-
-								updatePointerTree(prgrm, heapOffset+types.OBJECT_HEADER_SIZE+fld.Offset, oldAddr, newAddr, fld.Type, fld.DeclarationSpecifiers[1:])
-							}
-						}
-					}
-				}
-			}
-
-			// Checking if the field being accessed needs to be marked.
-			// If the root (`ptr`) is a pointer, this step is unnecessary.
-			if len(ptr.Fields) > 0 && !ptrIsPointer && prgrm.GetCXArgFromArray(ptr.Fields[len(ptr.Fields)-1]).IsPointer() {
-				fld := prgrm.GetCXArgFromArray(ptr.Fields[len(ptr.Fields)-1])
-
-				// Getting the offset to the object in the heap
-				heapOffset := types.Read_ptr(prgrm.Memory, offset+fld.Offset)
-				if heapOffset > prgrm.Heap.StartsAt {
-					updatePointerTree(prgrm, offset+fld.Offset, oldAddr, newAddr, fld.Type, fld.DeclarationSpecifiers[1:])
-				}
-			}
-
-		}
-
-		fp += op.Size
-	}
+	return start, true
 }

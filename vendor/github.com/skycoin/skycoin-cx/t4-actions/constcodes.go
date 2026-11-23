@@ -2,47 +2,35 @@ package actions
 
 import (
 	"github.com/skycoin/skycoin-cx/t0-types"
-	"github.com/skycoin/skycoin-cx/t1-constants"
-)
-
-// constant codes
-// nolint golint
-const (
-	// cx
-	CONST_CX_SUCCESS = iota
-	CONST_CX_COMPILATION_ERROR
-	CONST_CX_PANIC
-	CONST_CX_INTERNAL_ERROR
-	CONST_CX_ASSERT
-	CONST_CX_RUNTIME_ERROR
-	CONST_CX_RUNTIME_STACK_OVERFLOW_ERROR
-	CONST_CX_RUNTIME_HEAP_EXHAUSTED_ERROR
-	CONST_CX_RUNTIME_INVALID_ARGUMENT
-	CONST_CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE
-	CONST_CX_RUNTIME_NOT_IMPLEMENTED
 )
 
 // For the cxgo. These shouldn't be used in the runtime for performance reasons
 var (
-	ConstCodes = map[string]int{}     //Todo: Used only once in actions/postfix.go
-	Constants  = map[int]CXConstant{} //Todo: Only used once in actions/postfix.go
+	// VIOLATION: state outside State. Owner: t4-actions; moves to CXConstantMng in phase 1.
+	ConstCodes = map[string]int{} //Todo: Used only once in actions/postfix.go
+	// VIOLATION: state outside State. Owner: t4-actions; moves to CXConstantMng in phase 1.
+	Constants = map[int]CXConstant{} //Todo: Only used once in actions/postfix.go
 )
 
+// constPointerSize is the code of cx.POINTER_SIZE, after the exit codes.
+const constPointerSize = types.CX_RUNTIME_NOT_IMPLEMENTED + 1
+
 // nolint typecheck
-func init() {
+// InitConstants registers the cx.* constants in ConstCodes and Constants.
+func InitConstants() {
 	// cx
-	AddConstI32(CONST_CX_SUCCESS, "cx.SUCCESS", constants.CX_SUCCESS)
-	AddConstI32(CONST_CX_COMPILATION_ERROR, "cx.COMPILATION_ERROR", constants.CX_COMPILATION_ERROR)
-	AddConstI32(CONST_CX_PANIC, "cx.PANIC", constants.CX_PANIC)
-	AddConstI32(CONST_CX_INTERNAL_ERROR, "cx.INTERNAL_ERROR", constants.CX_INTERNAL_ERROR)
-	AddConstI32(CONST_CX_ASSERT, "cx.ASSERT", constants.CX_ASSERT)
-	AddConstI32(CONST_CX_RUNTIME_ERROR, "cx.RUNTIME_ERROR", constants.CX_RUNTIME_ERROR)
-	AddConstI32(CONST_CX_RUNTIME_STACK_OVERFLOW_ERROR, "cx.RUNTIME_STACK_OVERFLOW_ERROR", constants.CX_RUNTIME_STACK_OVERFLOW_ERROR)
-	AddConstI32(CONST_CX_RUNTIME_HEAP_EXHAUSTED_ERROR, "cx.RUNTIME_HEAP_EXHAUSTED_ERROR", constants.CX_RUNTIME_HEAP_EXHAUSTED_ERROR)
-	AddConstI32(CONST_CX_RUNTIME_INVALID_ARGUMENT, "cx.RUNTIME_INVALID_ARGUMENT", constants.CX_RUNTIME_INVALID_ARGUMENT)
-	AddConstI32(CONST_CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE, "cx.RUNTIME_SLICE_INDEX_OUT_OF_RANGE", constants.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE)
-	AddConstI32(CONST_CX_RUNTIME_NOT_IMPLEMENTED, "cx.RUNTIME_NOT_INPLEMENTED", constants.CX_RUNTIME_NOT_IMPLEMENTED)
-	AddConstI32(types.Cast_ptr_to_int(types.POINTER_SIZE), "cx.POINTER_SIZE", types.Cast_ptr_to_i32(types.POINTER_SIZE))
+	AddConstI32(types.CX_SUCCESS, "cx.SUCCESS", types.CX_SUCCESS)
+	AddConstI32(types.CX_COMPILATION_ERROR, "cx.COMPILATION_ERROR", types.CX_COMPILATION_ERROR)
+	AddConstI32(types.CX_PANIC, "cx.PANIC", types.CX_PANIC)
+	AddConstI32(types.CX_INTERNAL_ERROR, "cx.INTERNAL_ERROR", types.CX_INTERNAL_ERROR)
+	AddConstI32(types.CX_ASSERT, "cx.ASSERT", types.CX_ASSERT)
+	AddConstI32(types.CX_RUNTIME_ERROR, "cx.RUNTIME_ERROR", types.CX_RUNTIME_ERROR)
+	AddConstI32(types.CX_RUNTIME_STACK_OVERFLOW_ERROR, "cx.RUNTIME_STACK_OVERFLOW_ERROR", types.CX_RUNTIME_STACK_OVERFLOW_ERROR)
+	AddConstI32(types.CX_RUNTIME_HEAP_EXHAUSTED_ERROR, "cx.RUNTIME_HEAP_EXHAUSTED_ERROR", types.CX_RUNTIME_HEAP_EXHAUSTED_ERROR)
+	AddConstI32(types.CX_RUNTIME_INVALID_ARGUMENT, "cx.RUNTIME_INVALID_ARGUMENT", types.CX_RUNTIME_INVALID_ARGUMENT)
+	AddConstI32(types.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE, "cx.RUNTIME_SLICE_INDEX_OUT_OF_RANGE", types.CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE)
+	AddConstI32(types.CX_RUNTIME_NOT_IMPLEMENTED, "cx.RUNTIME_NOT_IMPLEMENTED", types.CX_RUNTIME_NOT_IMPLEMENTED)
+	AddConstI32(constPointerSize, "cx.POINTER_SIZE", types.Cast_ptr_to_i32(types.POINTER_SIZE))
 }
 
 // AddConstCode ...

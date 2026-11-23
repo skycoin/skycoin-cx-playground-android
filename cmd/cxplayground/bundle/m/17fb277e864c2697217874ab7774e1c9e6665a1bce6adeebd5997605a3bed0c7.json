@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Touch and key events",
+  "description": "Event log: touch down/move/up, taps, typed keys, screen size, and a finger paint trail",
+  "kind": "gfx",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 2245,
+      "sha256": "f844c451925566364cffa03543bde81965fb533aa3844f3e539f9ab6cd208123",
+      "chunks": [
+        "f844c451925566364cffa03543bde81965fb533aa3844f3e539f9ab6cd208123"
+      ]
+    }
+  ]
+}

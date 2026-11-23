@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/skycoin/skycoin-cx/t0-util"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -27,8 +26,11 @@ const (
 )
 
 type JSONFile struct {
-	file        *os.File
-	reader      *bufio.Reader
+	// VIOLATION: pointer at rest; becomes OsFileGid in phase 3.
+	file *os.File
+	// VIOLATION: pointer at rest; becomes OsFileGid in phase 3.
+	reader *bufio.Reader
+	// VIOLATION: pointer at rest; becomes OsFileGid in phase 3.
 	decoder     *json.Decoder
 	token       interface{}
 	tokenType   int32
@@ -39,15 +41,18 @@ type JSONFile struct {
 	tokenStr    string
 }
 
+// VIOLATION: state outside State. Owner: t5-cxos; moves to JSONFileMng in phase 1.
 var jsons []JSONFile
+
+// VIOLATION: state outside State. Owner: t5-cxos; moves to JSONFileMng in phase 1.
 var freeJsons []int32
 
 // Open the named json file for reading, returns an i32 identifying the json cxgo.
 func opJsonOpen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	handle := int32(-1)
 
-	file, err := util.CXOpenFile(inputs[0].Get_str(prgrm))
-	if err == nil {
+	file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0])
+	if fileError == nil {
 		freeCount := len(freeJsons)
 		if freeCount > 0 {
 			freeCount--
@@ -55,6 +60,7 @@ func opJsonOpen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 			freeJsons = freeJsons[:freeCount]
 		} else {
 			handle = int32(len(jsons))
+			// VIOLATION: created outside manager; phase 1.
 			jsons = append(jsons, JSONFile{})
 		}
 
@@ -83,6 +89,7 @@ func opJsonClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 			panic(err)
 		}
 
+		// VIOLATION: created outside manager; phase 1.
 		jsons[handle] = JSONFile{}
 		freeJsons = append(freeJsons, handle)
 		success = true

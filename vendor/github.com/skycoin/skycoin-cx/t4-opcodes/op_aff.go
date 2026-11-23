@@ -8,6 +8,7 @@ import (
 	"github.com/skycoin/skycoin-cx/t1-constants"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 	// "github.com/skycoin/skycoin/src/cipher/encoder"
+	stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
 )
 
 var onMessages = map[string]string{
@@ -74,6 +75,8 @@ func CallAffPredicate(prgrm *ast.CXProgram, fn *ast.CXFunction, predValue []byte
 		prgrm.Memory[newFP+c] = 0
 	}
 
+	// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+	// Now an arena getter, site S1253.
 	newCallOperatorInputTypeSig := prgrm.GetCXTypeSignatureFromArray(newCallOperatorInputs[0])
 
 	// sending value to predicate function
@@ -96,6 +99,8 @@ func CallAffPredicate(prgrm *ast.CXProgram, fn *ast.CXFunction, predValue []byte
 		}
 	}
 
+	// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+	// Now an arena getter, site S1254.
 	newCallOperatorOutputTypeSig := prgrm.GetCXTypeSignatureFromArray(newCallOperatorOutputs[0])
 
 	prevCall.Line--
@@ -108,11 +113,15 @@ func CallAffPredicate(prgrm *ast.CXProgram, fn *ast.CXFunction, predValue []byte
 // Used by QueryArgument to query inputs and then outputs from expressions.
 func queryParam(prgrm *ast.CXProgram, fn *ast.CXFunction, argsIdx []ast.CXArgumentIndex, exprLbl string, argOffsetB []byte, affOffset *types.Pointer) {
 	for i, argIdx := range argsIdx {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1255.
 		arg := prgrm.GetCXArgFromArray(argIdx)
 
 		var typOffset types.Pointer
 		elt := arg.GetAssignmentElement(prgrm)
 		if elt.StructType != nil {
+			// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+			// Now an arena getter, site S1256.
 			strctTypePkg, err := prgrm.GetPackageFromArray(elt.StructType.Package)
 			if err != nil {
 				panic(err)
@@ -120,17 +129,17 @@ func queryParam(prgrm *ast.CXProgram, fn *ast.CXFunction, argsIdx []ast.CXArgume
 
 			// then it's struct type
 			// typOffset = WriteObjectRetOff(encoder.Serialize(elt.StructType.Package.Name + "." + elt.StructType.Name))
-			typOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, strctTypePkg.Name+"."+elt.StructType.Name)
+			typOffset = ast.AllocateStr(prgrm, prgrm.CXProgramNameText(strctTypePkg.Name)+"."+prgrm.CXProgramNameText(elt.StructType.Name))
 		} else {
 			// then it's native type
 			// typOffset = WriteObjectRetOff(encoder.Serialize(TypeNames[elt.Type]))
-			typOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, elt.Type.Name())
+			typOffset = ast.AllocateStr(prgrm, elt.Type.Name())
 		}
 
 		// Name
 		// argNameB := encoder.Serialize(arg.Name)
 		// argNameOffset := int32(WriteObjectRetOff(argNameB))
-		argNameOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, arg.Name)
+		argNameOffset := ast.AllocateStr(prgrm, prgrm.CXProgramNameText(arg.Name))
 
 		argOffset := ast.AllocateSeq(prgrm, types.OBJECT_HEADER_SIZE+types.STR_SIZE+types.I32_SIZE+types.STR_SIZE)
 		types.Write_ptr(prgrm.Memory, argOffset+types.OBJECT_HEADER_SIZE, argNameOffset)
@@ -148,7 +157,7 @@ func queryParam(prgrm *ast.CXProgram, fn *ast.CXFunction, argsIdx []ast.CXArgume
 
 			// affNameB := encoder.Serialize(fmt.Sprintf("%s.%d", exprLbl, i))
 			// affNameOffset := AllocateSeq(len(affNameB))
-			affNameOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, fmt.Sprintf("%s.%d", exprLbl, i))
+			affNameOffset := ast.AllocateStr(prgrm, fmt.Sprintf("%s.%d", exprLbl, i))
 			// WriteMemory(affNameOffset, affNameB)
 
 			var affNameOffsetBytes [4]byte
@@ -160,26 +169,34 @@ func queryParam(prgrm *ast.CXProgram, fn *ast.CXFunction, argsIdx []ast.CXArgume
 
 // QueryArgument ...
 func QueryArgument(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpression, argOffsetB []byte, affOffset *types.Pointer) {
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1257.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
 	}
 
+	// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
+	// Now an arena getter, site S1258.
 	cxAtomicOpFunction := prgrm.GetFunctionFromArray(cxAtomicOp.Function)
 
 	for _, ex := range cxAtomicOpFunction.Expressions {
+		// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+		// Now an arena getter, site S1259.
 		exCXAtomicOp, err := prgrm.GetCXAtomicOp(ex.Index)
 		if err != nil {
 			panic(err)
 		}
 
-		if exCXAtomicOp.Label == "" {
+		if exCXAtomicOp.Label == stringpool.StringGidNil {
 			// it's a non-labeled expression
 			continue
 		}
 
 		var inputCXArgsIdxs []ast.CXArgumentIndex
 		for _, inputIdx := range exCXAtomicOp.GetInputs(prgrm) {
+			// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+			// Now an arena getter, site S1260.
 			input := prgrm.GetCXTypeSignatureFromArray(inputIdx)
 			if input.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
 				inputCXArgsIdxs = append(inputCXArgsIdxs, ast.CXArgumentIndex(input.Meta))
@@ -187,10 +204,12 @@ func QueryArgument(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpress
 				panic("type is not type cx argument deprecate\n\n")
 			}
 		}
-		queryParam(prgrm, fn, inputCXArgsIdxs, exCXAtomicOp.Label+".Input", argOffsetB, affOffset)
+		queryParam(prgrm, fn, inputCXArgsIdxs, prgrm.CXProgramNameText(exCXAtomicOp.Label)+".Input", argOffsetB, affOffset)
 
 		var outputCXArgsIdxs []ast.CXArgumentIndex
 		for _, outputIdx := range exCXAtomicOp.GetOutputs(prgrm) {
+			// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+			// Now an arena getter, site S1261.
 			output := prgrm.GetCXTypeSignatureFromArray(outputIdx)
 			if output.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
 				outputCXArgsIdxs = append(outputCXArgsIdxs, ast.CXArgumentIndex(output.Meta))
@@ -198,27 +217,35 @@ func QueryArgument(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpress
 				panic("type is not type cx argument deprecate\n\n")
 			}
 		}
-		queryParam(prgrm, fn, outputCXArgsIdxs, exCXAtomicOp.Label+".Output", argOffsetB, affOffset)
+		queryParam(prgrm, fn, outputCXArgsIdxs, prgrm.CXProgramNameText(exCXAtomicOp.Label)+".Output", argOffsetB, affOffset)
 	}
 }
 
 // QueryExpressions ...
 func QueryExpressions(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpression, exprOffsetB []byte, affOffset *types.Pointer) {
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1262.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
 	}
 
+	// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
+	// Now an arena getter, site S1263.
 	cxAtomicOpFunction := prgrm.GetFunctionFromArray(cxAtomicOp.Function)
 
 	for _, ex := range cxAtomicOpFunction.Expressions {
+		// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+		// Now an arena getter, site S1264.
 		exCXAtomicOp, err := prgrm.GetCXAtomicOp(ex.Index)
 		if err != nil {
 			panic(err)
 		}
+		// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
+		// Now an arena getter, site S1265.
 		exCXAtomicOpOperator := prgrm.GetFunctionFromArray(exCXAtomicOp.Operator)
 
-		if exCXAtomicOpOperator == nil || exCXAtomicOp.Label == "" {
+		if exCXAtomicOpOperator == nil || exCXAtomicOp.Label == stringpool.StringGidNil {
 			// then it's a variable declaration
 			// or it's a non-labeled expression
 			continue
@@ -228,10 +255,10 @@ func QueryExpressions(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpr
 		opNameOffset := types.Pointer(0)
 		if exCXAtomicOpOperator.IsBuiltIn() {
 			// opNameB = encoder.Serialize(OpNames[ex.Operator.OpCode])
-			opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, ast.OpNames[exCXAtomicOpOperator.AtomicOPCode])
+			opNameOffset = ast.AllocateStr(prgrm, ast.OpNames[exCXAtomicOpOperator.AtomicOPCode])
 		} else {
 			// opNameB = encoder.Serialize(ex.Operator.Name)
-			opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, exCXAtomicOpOperator.Name)
+			opNameOffset = ast.AllocateStr(prgrm, prgrm.CXProgramNameText(exCXAtomicOpOperator.Name))
 		}
 
 		// opNameOffset := AllocateSeq(len(opNameB))
@@ -245,7 +272,7 @@ func QueryExpressions(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpr
 
 			// lblNameB := encoder.Serialize(ex.Label)
 			// lblNameOffset := AllocateSeq(len(lblNameB))
-			lblNameOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, exCXAtomicOp.Label)
+			lblNameOffset := ast.AllocateStr(prgrm, prgrm.CXProgramNameText(exCXAtomicOp.Label))
 			// WriteMemory(lblNameOffset, lblNameB)
 			var lblNameOffsetB [4]byte
 			types.Write_ptr(lblNameOffsetB[:], 0, lblNameOffset)
@@ -260,12 +287,18 @@ func getSignatureSlice(prgrm *ast.CXProgram, params []ast.CXArgumentIndex, param
 
 	var arrCXArgs []*ast.CXArgument
 	for _, paramIdx := range params {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1266.
 		param := prgrm.GetCXArgFromArray(paramIdx)
 		arrCXArgs = append(arrCXArgs, param)
 	}
 	for _, paramIdx := range paramsTypeSig {
+		// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+		// Now an arena getter, site S1267.
 		param := prgrm.GetCXTypeSignatureFromArray(paramIdx)
 		if param.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1268.
 			arg := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(param.Meta))
 			arrCXArgs = append(arrCXArgs, arg)
 		} else {
@@ -276,6 +309,8 @@ func getSignatureSlice(prgrm *ast.CXProgram, params []ast.CXArgumentIndex, param
 	for _, param := range arrCXArgs {
 		var typOffset types.Pointer
 		if param.StructType != nil {
+			// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+			// Now an arena getter, site S1269.
 			strctTypePkg, err := prgrm.GetPackageFromArray(param.StructType.Package)
 			if err != nil {
 				panic(err)
@@ -283,11 +318,11 @@ func getSignatureSlice(prgrm *ast.CXProgram, params []ast.CXArgumentIndex, param
 
 			// then it's struct type
 			// typOffset = WriteObjectRetOff(encoder.Serialize(param.StructType.Package.Name + "." + param.StructType.Name))
-			typOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, strctTypePkg.Name+"."+param.StructType.Name)
+			typOffset = ast.AllocateStr(prgrm, prgrm.CXProgramNameText(strctTypePkg.Name)+"."+prgrm.CXProgramNameText(param.StructType.Name))
 		} else {
 			// then it's native type
 			// typOffset = WriteObjectRetOff(encoder.Serialize(TypeNames[param.Type]))
-			typOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, param.Type.Name())
+			typOffset = ast.AllocateStr(prgrm, param.Type.Name())
 		}
 
 		var typOffsetB [types.POINTER_SIZE]byte
@@ -305,7 +340,7 @@ func queryStructsInPackage(prgrm *ast.CXProgram, fn *ast.CXFunction, strctOffset
 		// strctNameB := encoder.Serialize(f.Name)
 
 		// strctNameOffset := WriteObjectRetOff(strctNameB)
-		strctNameOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, f.Name)
+		strctNameOffset := ast.AllocateStr(prgrm, prgrm.CXProgramNameText(f.Name))
 		var strctNameOffsetB [types.POINTER_SIZE]byte
 		types.Write_ptr(strctNameOffsetB[:], 0, strctNameOffset)
 
@@ -325,11 +360,15 @@ func queryStructsInPackage(prgrm *ast.CXProgram, fn *ast.CXFunction, strctOffset
 
 // QueryStructure ...
 func QueryStructure(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpression, strctOffsetB []byte, affOffset *types.Pointer) {
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1270.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
 	}
 
+	// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+	// Now an arena getter, site S1271.
 	pkg, err := prgrm.GetPackageFromArray(cxAtomicOp.Package)
 	if err != nil {
 		panic(err)
@@ -337,6 +376,8 @@ func QueryStructure(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpres
 
 	queryStructsInPackage(prgrm, fn, strctOffsetB, affOffset, pkg)
 	for _, impIdx := range pkg.Imports {
+		// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+		// Now an arena getter, site S1272.
 		imp, err := prgrm.GetPackageFromArray(impIdx)
 		if err != nil {
 			panic(err)
@@ -347,19 +388,25 @@ func QueryStructure(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpres
 
 // QueryFunction ...
 func QueryFunction(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpression, fnOffsetB []byte, affOffset *types.Pointer) {
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1273.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
 	}
 
+	// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+	// Now an arena getter, site S1274.
 	pkg, err := prgrm.GetPackageFromArray(cxAtomicOp.Package)
 	if err != nil {
 		panic(err)
 	}
 	for _, fIdx := range pkg.Functions {
+		// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
+		// Now an arena getter, site S1275.
 		f := prgrm.GetFunctionFromArray(fIdx)
 
-		if f.Name == constants.SYS_INIT_FUNC {
+		if f.Name == prgrm.CxIrState.CxIrStateNameSysInit {
 			continue
 		}
 
@@ -367,10 +414,10 @@ func QueryFunction(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpress
 		opNameOffset := types.Pointer(0)
 		if f.IsBuiltIn() {
 			// opNameB = encoder.Serialize(OpNames[f.OpCode])
-			opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, ast.OpNames[f.AtomicOPCode])
+			opNameOffset = ast.AllocateStr(prgrm, ast.OpNames[f.AtomicOPCode])
 		} else {
 			// opNameB = encoder.Serialize(f.Name)
-			opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, f.Name)
+			opNameOffset = ast.AllocateStr(prgrm, prgrm.CXProgramNameText(f.Name))
 		}
 
 		var opNameOffsetB [types.POINTER_SIZE]byte
@@ -411,14 +458,16 @@ func QueryCaller(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpressio
 	opNameOffset := types.Pointer(0)
 	if call.Operator.IsBuiltIn() {
 		// opNameB = encoder.Serialize(OpNames[call.Operator.OpCode])
-		opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, ast.OpNames[call.Operator.AtomicOPCode])
+		opNameOffset = ast.AllocateStr(prgrm, ast.OpNames[call.Operator.AtomicOPCode])
 	} else {
+		// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+		// Now an arena getter, site S1276.
 		opPkg, err := prgrm.GetPackageFromArray(call.Operator.Package)
 		if err != nil {
 			panic(err)
 		}
 		// opNameB = encoder.Serialize(call.Operator.Package.Name + "." + call.Operator.Name)
-		opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, opPkg.Name+"."+call.Operator.Name)
+		opNameOffset = ast.AllocateStr(prgrm, prgrm.CXProgramNameText(opPkg.Name)+"."+prgrm.CXProgramNameText(call.Operator.Name))
 	}
 
 	callOffset := ast.AllocateSeq(prgrm, types.OBJECT_HEADER_SIZE+types.STR_SIZE+types.I32_SIZE)
@@ -456,15 +505,17 @@ func QueryProgram(prgrm *ast.CXProgram, fn *ast.CXFunction, expr *ast.CXExpressi
 		opNameOffset := types.Pointer(0)
 		if call.Operator.IsBuiltIn() {
 			// opNameB = encoder.Serialize(OpNames[call.Operator.OpCode])
-			opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, ast.OpNames[call.Operator.AtomicOPCode])
+			opNameOffset = ast.AllocateStr(prgrm, ast.OpNames[call.Operator.AtomicOPCode])
 		} else {
+			// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+			// Now an arena getter, site S1277.
 			opPkg, err := prgrm.GetPackageFromArray(call.Operator.Package)
 			if err != nil {
 				panic(err)
 			}
 
 			// opNameB = encoder.Serialize(call.Operator.Package.Name + "." + call.Operator.Name)
-			opNameOffset = types.AllocWrite_str_data(prgrm, prgrm.Memory, opPkg.Name+"."+call.Operator.Name)
+			opNameOffset = ast.AllocateStr(prgrm, prgrm.CXProgramNameText(opPkg.Name)+"."+prgrm.CXProgramNameText(call.Operator.Name))
 		}
 
 		// callOffset := AllocateSeq(OBJECT_HEADER_SIZE + STR_SIZE + I32_SIZE)
@@ -508,19 +559,25 @@ func getTarget(prgrm *ast.CXProgram, inp2 *ast.CXTypeSignature, fp types.Pointer
 		default:
 			switch *tgtElt {
 			case "Pkg":
-				if pkg, err := prgrm.GetPackage(aff); err == nil {
+				if pkg, err := affPackage(prgrm, aff); err == nil {
+					// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
+					// Now an object copy, site S1278.
 					*tgtPkg = *pkg
 				} else {
 					panic(err)
 				}
 			case "fn":
-				if fn, err := tgtPkg.GetFunction(prgrm, aff); err == nil {
+				if fn, err := affFunction(prgrm, tgtPkg, aff); err == nil {
+					// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
+					// Now an object copy, site S1279.
 					*tgtFn = *fn
 				} else {
 					panic(err)
 				}
 			case "expr":
 				if expr, err := tgtFn.GetExpressionByLabel(prgrm, aff); err == nil {
+					// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
+					// Now an object copy, site S1280.
 					*tgtExpr = *expr
 				} else {
 					panic(err)
@@ -558,6 +615,8 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 	var fltrElt string
 	elts := GetInferActions(prgrm, inp1, fp)
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1281.
 	tgtExprAtomicOp, err := prgrm.GetCXAtomicOp(tgtExpr.Index)
 	if err != nil {
 		panic(err)
@@ -585,11 +644,11 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 			case "arg":
 				if tgtArgType == "inp" {
 					if msg, ok := affMsgs["prgrm-arg-input"]; ok {
-						*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex))
+						*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex))
 					}
 				} else {
 					if msg, ok := affMsgs["prgrm-arg-output"]; ok {
-						*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex))
+						*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex))
 					}
 				}
 			case "prgrm":
@@ -602,11 +661,11 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 				case "arg":
 					if tgtArgType == "inp" {
 						if msg, ok := affMsgs["arg-arg-input"]; ok {
-							*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex, elt))
+							*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex, elt))
 						}
 					} else {
 						if msg, ok := affMsgs["arg-arg-output"]; ok {
-							*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex, elt))
+							*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex, elt))
 						}
 					}
 				case "prgrm":
@@ -627,7 +686,7 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 					panic(err)
 				}
 			case "fn":
-				if fn, err := tgtPkg.GetFunction(prgrm, elt); err == nil {
+				if fn, err := affFunction(prgrm, tgtPkg, elt); err == nil {
 					_ = fn
 					switch tgtElt {
 					case "arg":
@@ -647,15 +706,15 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 				switch tgtElt {
 				case "arg":
 					if msg, ok := affMsgs["arg-strct"]; ok {
-						*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex, elt))
+						*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex, elt))
 					}
 					if tgtArgType == "inp" {
 						if msg, ok := affMsgs["strct-arg-input"]; ok {
-							*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex, elt))
+							*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex, elt))
 						}
 					} else {
 						if msg, ok := affMsgs["strct-arg-output"]; ok {
-							*affs = append(*affs, fmt.Sprintf(msg, tgtExprAtomicOp.Label, tgtArgIndex, elt))
+							*affs = append(*affs, fmt.Sprintf(msg, prgrm.CXProgramNameText(tgtExprAtomicOp.Label), tgtArgIndex, elt))
 						}
 					}
 				case "fn":
@@ -664,7 +723,7 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 					*affs = append(*affs, "Move FS to TP")
 				}
 			case "Pkg":
-				if pkg, err := prgrm.GetPackage(elt); err == nil {
+				if pkg, err := affPackage(prgrm, elt); err == nil {
 					_ = pkg
 					switch tgtElt {
 					case "Pkg":
@@ -803,7 +862,11 @@ func getAffordances(prgrm *ast.CXProgram, inp1 *ast.CXTypeSignature, fp types.Po
 // }
 
 func readStrctAff(prgrm *ast.CXProgram, aff string, tgtPkg *ast.CXPackage) *ast.CXStruct {
-	strct, err := tgtPkg.GetStruct(prgrm, aff)
+	gid, found := prgrm.CXProgramNameFind(aff)
+	if !found {
+		panic(fmt.Errorf("struct '%s' not found in package '%s'", aff, prgrm.CXProgramNameText(tgtPkg.Name)))
+	}
+	strct, err := tgtPkg.GetStruct(prgrm, gid)
 	if err != nil {
 		panic(err)
 	}
@@ -824,12 +887,14 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 				if expr.Type == ast.CX_LINE {
 					continue
 				}
+				// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+				// Now an arena getter, site S1282.
 				cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 				if err != nil {
 					panic(err)
 				}
 
-				if exprLbl == cxAtomicOp.Label {
+				if exprLbl == prgrm.CXProgramNameText(cxAtomicOp.Label) {
 					affExpr = &expr
 					rIdx++
 					break
@@ -869,6 +934,8 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 		panic(err)
 	}
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1283.
 	affExprAtomicOp, err := prgrm.GetCXAtomicOp(affExpr.Index)
 	if err != nil {
 		panic(err)
@@ -876,9 +943,13 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 
 	if argType == "Input" {
 
+		// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+		// Now an arena getter, site S1284.
 		affExprAtomicOpInputTypeSig := prgrm.GetCXTypeSignatureFromArray(affExprAtomicOp.GetInputs(prgrm)[argIdx])
-		var arg *ast.CXArgument = &ast.CXArgument{}
+		var arg *ast.CXArgument
 		if affExprAtomicOpInputTypeSig.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1286.
 			arg = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(affExprAtomicOpInputTypeSig.Meta))
 		} else {
 			panic("type is not a cx argumetn deprecate\n\n")
@@ -887,9 +958,13 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 		return arg
 	}
 
+	// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+	// Now an arena getter, site S1287.
 	affExprAtomicOpOutputTypeSig := prgrm.GetCXTypeSignatureFromArray(affExprAtomicOp.GetOutputs(prgrm)[argIdx])
-	var arg *ast.CXArgument = &ast.CXArgument{}
+	var arg *ast.CXArgument
 	if affExprAtomicOpOutputTypeSig.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1289.
 		arg = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(affExprAtomicOpOutputTypeSig.Meta))
 	} else {
 		panic("type is not a cx argumetn deprecate\n\n")
@@ -940,7 +1015,7 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 
 // 	getTarget(prgrm, inp3, fp, &tgtElt, &tgtArgType, &tgtArgIndex, &tgtPkg, &tgtFn, &tgtExpr)
 
-// 	tgtExprAtomicOp, _, _, err := prgrm.GetOperation(&tgtExpr)
+// 	tgtExprAtomicOp, _, err := prgrm.GetOperation(&tgtExpr)
 // 	if err != nil {
 // 		panic(err)
 // 	}
@@ -1068,7 +1143,7 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 
 // 	getTarget(prgrm, inp3, fp, &tgtElt, &tgtArgType, &tgtArgIndex, &tgtPkg, &tgtFn, &tgtExpr)
 
-// 	tgtExprAtomicOp, _, _, err := prgrm.GetOperation(&tgtExpr)
+// 	tgtExprAtomicOp, _, err := prgrm.GetOperation(&tgtExpr)
 // 	if err != nil {
 // 		panic(err)
 // 	}
@@ -1193,17 +1268,19 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 		default:
 			switch cmd {
 			case "filter":
+				// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
+				// Now an arena getter, site S1290.
 				inp1Pkg, err := prgrm.GetPackageFromArray(inputs[0].TypeSignature.Package)
 				if err != nil {
 					panic(err)
 				}
-				if fn, err := inp1Pkg.GetFunction(prgrm, rule); err == nil {
+				if fn, err := affFunction(prgrm, inp1Pkg, rule); err == nil {
 
 					// arg keyword
 					// argB := encoder.Serialize("arg")
 					// argOffset := AllocateSeq(len(argB))
 					// WriteMemory(argOffset, argB)
-					argOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, "arg")
+					argOffset := ast.AllocateStr(prgrm, "arg")
 					var argOffsetB [4]byte
 					types.Write_ptr(argOffsetB[:], 0, argOffset)
 
@@ -1211,7 +1288,7 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 					// exprB := encoder.Serialize("expr")
 					// exprOffset := AllocateSeq(len(exprB))
 					// WriteMemory(exprOffset, exprB)
-					exprOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, "expr")
+					exprOffset := ast.AllocateStr(prgrm, "expr")
 					var exprOffsetB [4]byte
 					types.Write_ptr(exprOffsetB[:], 0, exprOffset)
 
@@ -1219,7 +1296,7 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 					// fnB := encoder.Serialize("fn")
 					// fnOffset := AllocateSeq(len(fnB))
 					// WriteMemory(fnOffset, fnB)
-					fnOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, "fn")
+					fnOffset := ast.AllocateStr(prgrm, "fn")
 					var fnOffsetB [4]byte
 					types.Write_ptr(fnOffsetB[:], 0, fnOffset)
 
@@ -1227,7 +1304,7 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 					// strctB := encoder.Serialize("strct")
 					// strctOffset := AllocateSeq(len(strctB))
 					// WriteMemory(strctOffset, strctB)
-					strctOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, "strct")
+					strctOffset := ast.AllocateStr(prgrm, "strct")
 					var strctOffsetB [4]byte
 					types.Write_ptr(strctOffsetB[:], 0, strctOffset)
 
@@ -1235,7 +1312,7 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 					// callerB := encoder.Serialize("caller")
 					// callerOffset := AllocateSeq(len(callerB))
 					// WriteMemory(callerOffset, callerB)
-					callerOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, "caller")
+					callerOffset := ast.AllocateStr(prgrm, "caller")
 					var callerOffsetB [4]byte
 					types.Write_ptr(callerOffsetB[:], 0, callerOffset)
 
@@ -1243,14 +1320,18 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 					// prgrmB := encoder.Serialize("prgrm")
 					// prgrmOffset := AllocateSeq(len(prgrmB))
 					// WriteMemory(prgrmOffset, prgrmB)
-					prgrmOffset := types.AllocWrite_str_data(prgrm, prgrm.Memory, "prgrm")
+					prgrmOffset := ast.AllocateStr(prgrm, "prgrm")
 					var prgrmOffsetB [4]byte
 					types.Write_ptr(prgrmOffsetB[:], 0, prgrmOffset)
 
 					fnInputs := fn.GetInputs(prgrm)
+					// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+					// Now an arena getter, site S1291.
 					fnInputTypeSig := prgrm.GetCXTypeSignatureFromArray(fnInputs[0])
 					var predInp *ast.CXArgument
 					if fnInputTypeSig.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+						// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+						// Now an arena getter, site S1292.
 						predInp = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(fnInputTypeSig.Meta))
 					} else {
 						panic("type is not type cx argument deprecate\n\n")
@@ -1258,7 +1339,7 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 
 					if predInp.Type == types.STRUCT {
 						if predInp.StructType != nil {
-							switch predInp.StructType.Name {
+							switch prgrm.CXProgramNameText(predInp.StructType.Name) {
 							case "Argument":
 								QueryArgument(prgrm, fn, &expr, argOffsetB[:], &affOffset)
 							case "Expression":
@@ -1285,4 +1366,23 @@ func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	}
 
 	types.Write_ptr(prgrm.Memory, out1Offset, affOffset)
+}
+
+// affPackage finds the package named by text. The pool is frozen at run
+// time, so a name that was never interned names nothing.
+func affPackage(prgrm *ast.CXProgram, text string) (*ast.CXPackage, error) {
+	gid, found := prgrm.CXProgramNameFind(text)
+	if !found {
+		return nil, fmt.Errorf("package '%s' not found", text)
+	}
+	return prgrm.GetPackage(gid)
+}
+
+// affFunction finds the function named by text in pkg or its imports.
+func affFunction(prgrm *ast.CXProgram, pkg *ast.CXPackage, text string) (*ast.CXFunction, error) {
+	gid, found := prgrm.CXProgramNameFind(text)
+	if !found {
+		return nil, fmt.Errorf("function '%s' not found in package '%s' or its imports", text, prgrm.CXProgramNameText(pkg.Name))
+	}
+	return pkg.GetFunction(prgrm, gid)
 }

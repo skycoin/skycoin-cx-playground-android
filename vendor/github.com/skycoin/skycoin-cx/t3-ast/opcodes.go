@@ -7,13 +7,16 @@ import (
 
 var (
 	// OpNames ...
+	// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
 	OpNames = map[int]string{}
 
 	// OpCodes ...
+	// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
 	OpCodes = map[string]int{}
 )
 
 var (
+	// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
 	OpcodeHandlers []OpcodeHandler
 )
 
@@ -34,7 +37,11 @@ const (
 // Todo: What is an operator?
 var (
 	// Natives ...
-	Natives   = map[int]*CXNativeFunction{}
+	// OBJMODEL: state.CXNativeFunctionMng, keyed by opcode, phase 4 #356.
+	// Now a pointer at rest, site S0387.
+	Natives = map[int]*CXNativeFunction{}
+	// OBJMODEL: state.CXNativeFunctionMng, keyed by opcode, phase 4 #356.
+	// Now a pointer at rest, site S0388.
 	Operators []*CXNativeFunction
 )
 

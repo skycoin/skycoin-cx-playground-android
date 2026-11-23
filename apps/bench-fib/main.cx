@@ -1,6 +1,6 @@
 package main
 
-import "time"
+import "sys/time"
 
 func fib(n i32) (r i32) {
 	if n < 2 {

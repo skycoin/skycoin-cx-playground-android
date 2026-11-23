@@ -3,7 +3,7 @@
 package cxfx
 
 import (
-	"github.com/skycoin/skycoin-cx/t4-actions"
+	"github.com/skycoin/skycoin-cx/t4-actions" // thin: only AddConstI32; no depth gain
 )
 
 // constant codes
@@ -270,7 +270,8 @@ const (
 )
 
 // nolint typecheck
-func init() {
+// InitConstants registers the gl.*, glfw.* and al.* constants in actions.ConstCodes.
+func InitConstants() {
 	/* gl_1_0 */
 	actions.AddConstI32(CONST_GL_DEPTH_BUFFER_BIT, "gl.DEPTH_BUFFER_BIT", 0x00000100)
 	actions.AddConstI32(CONST_GL_STENCIL_BUFFER_BIT, "gl.STENCIL_BUFFER_BIT", 0x00000400)

@@ -3,7 +3,6 @@ package opcodes
 import (
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
-	"github.com/skycoin/skycoin-cx/t2-globals"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -22,6 +21,8 @@ func Out(params ...*ast.CXArgument) []*ast.CXArgument {
 }
 
 func RegisterOpcodes(prgrm *ast.CXProgram) {
+	// OBJMODEL: state.CXNativeFunctionMng (manager storage) or []CXNativeFunctionGid, phase 4 #356.
+	// Now a slice of objects, site S1351.
 	ast.Operators = make([]*ast.CXNativeFunction, ast.OPERATOR_HANDLER_COUNT)
 
 	RegisterOpCode(prgrm, constants.OP_IDENTITY, "identity", opIdentity, In(ast.ConstCxArg_UND_TYPE), Out(ast.ConstCxArg_UND_TYPE))
@@ -41,9 +42,8 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterOpCode(prgrm, constants.OP_JMP_ZERO, "jmpzero", nil, In(ast.ConstCxArg_UND_TYPE), nil)
 	RegisterOpCode(prgrm, constants.OP_JMP_NOT_ZERO, "jmpnotzero", nil, In(ast.ConstCxArg_UND_TYPE), nil)
 
-	RegisterOpCode(prgrm, constants.OP_DEBUG_PRINT_STACK, "debug", opDebugPrintStack, nil, nil)
-	RegisterOpCode(prgrm, constants.OP_SERIALIZE, "serialize", opSerialize, In(ast.ConstCxArg_Affordance), Out(ast.ConstCxArg_PTR))
-	RegisterOpCode(prgrm, constants.OP_DESERIALIZE, "deserialize", opDeserialize, In(ast.ConstCxArg_I32), nil)
+	RegisterOpCode(prgrm, constants.OP_SERIALIZE, "serialize", opSerialize, In(ast.Slice(types.AFF)), Out(ast.Slice(types.UI8)))
+	RegisterOpCode(prgrm, constants.OP_DESERIALIZE, "deserialize", opDeserialize, In(ast.Slice(types.UI8)), nil)
 
 	RegisterOpCode(prgrm, constants.OP_EQUAL, "eq", nil, In(ast.ConstCxArg_UND_TYPE, ast.ConstCxArg_UND_TYPE), Out(ast.ConstCxArg_BOOL))
 	RegisterOpCode(prgrm, constants.OP_UNEQUAL, "uneq", nil, In(ast.ConstCxArg_UND_TYPE, ast.ConstCxArg_UND_TYPE), Out(ast.ConstCxArg_BOOL))
@@ -73,11 +73,21 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterOpCode(prgrm, constants.OP_BOOL_AND, "bool.and", opBoolAnd, In(ast.ConstCxArg_BOOL, ast.ConstCxArg_BOOL), Out(ast.ConstCxArg_BOOL))
 	RegisterOpCode(prgrm, constants.OP_BOOL_NOT, "bool.not", opBoolNot, In(ast.ConstCxArg_BOOL), Out(ast.ConstCxArg_BOOL))
 
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1352.
 	RegisterOpCode(prgrm, constants.OP_APPEND, "append", opSliceAppend, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_UND_TYPE), Out(ast.Slice(types.UNDEFINED)))
 
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1353.
 	RegisterFunction(prgrm, "resize", opSliceResize, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32), Out(ast.Slice(types.UNDEFINED)))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1354.
 	RegisterFunction(prgrm, "insert", opSliceInsertElement, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32, ast.ConstCxArg_UND_TYPE), Out(ast.Slice(types.UNDEFINED)))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1355.
 	RegisterFunction(prgrm, "remove", opSliceRemoveElement, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32), Out(ast.Slice(types.UNDEFINED)))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1356.
 	RegisterFunction(prgrm, "copy", opSliceCopy, In(ast.Slice(types.UNDEFINED), ast.Slice(types.UNDEFINED)), Out(ast.ConstCxArg_I32))
 
 	RegisterFunction(prgrm, "len", opSliceLen, In(ast.ConstCxArg_UND_TYPE), Out(ast.ConstCxArg_I32))
@@ -96,7 +106,7 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 
 	// TODO: Rename to CASTING_OPS ?
 	// TODO: Remove START_PARSE_OPS/END_PARSE_OPS, somehow we need to now start/end of these operator : used in isParseOp
-	constants.START_PARSE_OPS = globals.OpCodeSystemCounter - 1
+	constants.START_PARSE_OPS = OpcodeNumber("i8.str") - 1
 	RegisterFunction(prgrm, "i8.str", opI8ToStr, In(ast.ConstCXArg_I8), Out(ast.ConstCxArg_STR))
 	RegisterFunction(prgrm, "i8.i16", opI8ToI16, In(ast.ConstCXArg_I8), Out(ast.ConstCxArg_I16))
 	RegisterFunction(prgrm, "i8.i32", opI8ToI32, In(ast.ConstCXArg_I8), Out(ast.ConstCxArg_I32))
@@ -208,7 +218,7 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterFunction(prgrm, "f64.f32", opF64ToF32, In(ast.ConstCxArg_F64), Out(ast.ConstCxArg_F32))
 	// TODO: Rename to CASTING_OPS ?
 	// TODO: Remove START_PARSE_OPS/END_PARSE_OPS, somehow we need to now start/end of these operator : used in isParseOp
-	constants.END_PARSE_OPS = globals.OpCodeSystemCounter
+	constants.END_PARSE_OPS = OpcodeNumber("f64.f32") + 1
 
 	RegisterOperator(prgrm, "i8.eq", opI8Eq, In(ast.ConstCXArg_I8, ast.ConstCXArg_I8), Out(ast.ConstCxArg_BOOL), types.I8, constants.OP_EQUAL)
 	RegisterOperator(prgrm, "i8.uneq", opI8Uneq, In(ast.ConstCXArg_I8, ast.ConstCXArg_I8), Out(ast.ConstCxArg_BOOL), types.I8, constants.OP_UNEQUAL)
@@ -438,7 +448,7 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterOperator(prgrm, "f64.neg", opF64Neg, In(ast.ConstCxArg_F64), Out(ast.ConstCxArg_F64), types.F64, constants.OP_NEG)
 	RegisterOperator(prgrm, "f64.mul", opF64Mul, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_F64), types.F64, constants.OP_MUL)
 	RegisterOperator(prgrm, "f64.div", opF64Div, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_F64), types.F64, constants.OP_DIV)
-	RegisterOperator(prgrm, "f32.mod", opF64Mod, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_F64), types.F64, constants.OP_MOD)
+	RegisterOperator(prgrm, "f64.mod", opF64Mod, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_F64), types.F64, constants.OP_MOD)
 	RegisterOperator(prgrm, "f64.gt", opF64Gt, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_BOOL), types.F64, constants.OP_GT)
 	RegisterOperator(prgrm, "f64.gteq", opF64Gteq, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_BOOL), types.F64, constants.OP_GTEQ)
 	RegisterOperator(prgrm, "f64.lt", opF64Lt, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_BOOL), types.F64, constants.OP_LT)
@@ -459,30 +469,39 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterFunction(prgrm, "f64.min", opF64Min, In(ast.ConstCxArg_F64, ast.ConstCxArg_F64), Out(ast.ConstCxArg_F64))
 	RegisterFunction(prgrm, "f64.rand", opF64Rand, nil, Out(ast.ConstCxArg_F64))
 
-	RegisterOperator(prgrm, "str.eq", opStrEq, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_BOOL), types.STR, constants.OP_EQUAL)
-	RegisterOperator(prgrm, "str.uneq", opStrUneq, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_BOOL), types.STR, constants.OP_UNEQUAL)
-	RegisterOperator(prgrm, "str.concat", opStrConcat, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_STR), types.STR, constants.OP_ADD)
-	RegisterFunction(prgrm, "str.i8", opStrToI8, In(ast.ConstCxArg_STR), Out(ast.ConstCXArg_I8))
-	RegisterFunction(prgrm, "str.i16", opStrToI16, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I16))
-	RegisterFunction(prgrm, "str.i32", opStrToI32, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
-	RegisterFunction(prgrm, "str.i64", opStrToI64, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I64))
-	RegisterFunction(prgrm, "str.ui8", opStrToUI8, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI8))
-	RegisterFunction(prgrm, "str.ui16", opStrToUI16, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI16))
-	RegisterFunction(prgrm, "str.ui32", opStrToUI32, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI32))
-	RegisterFunction(prgrm, "str.ui64", opStrToUI64, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI64))
-	RegisterFunction(prgrm, "str.f32", opStrToF32, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_F32))
-	RegisterFunction(prgrm, "str.f64", opStrToF64, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_F64))
-	RegisterFunction(prgrm, "str.print", opStrPrint, In(ast.ConstCxArg_STR), nil)
-	RegisterFunction(prgrm, "str.substr", opStrSubstr, In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), Out(ast.ConstCxArg_STR))
-	RegisterFunction(prgrm, "str.index", opStrIndex, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
-	RegisterFunction(prgrm, "str.lastindex", opStrLastIndex, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
-	RegisterFunction(prgrm, "str.trimspace", opStrTrimSpace, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_STR))
+	RegisterFunction(prgrm, "string.Concatenation", opStrConcat, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_STR))
+	RegisterFunction(prgrm, "string.EqualityByByteValue", opStrEqualByValue, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_BOOL))
+	RegisterFunction(prgrm, "string.EqualityByHeapPointer", opStrEqualByPointer, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_BOOL))
+	RegisterFunction(prgrm, "string.OrderingByByteValue", opStrCompareByValue, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
+	RegisterFunction(prgrm, "string.ParseDecimalI8", opStrToI8, In(ast.ConstCxArg_STR), Out(ast.ConstCXArg_I8))
+	RegisterFunction(prgrm, "string.ParseDecimalI16", opStrToI16, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I16))
+	RegisterFunction(prgrm, "string.ParseDecimalI32", opStrToI32, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
+	RegisterFunction(prgrm, "string.ParseDecimalI64", opStrToI64, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I64))
+	RegisterFunction(prgrm, "string.ParseDecimalUI8", opStrToUI8, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI8))
+	RegisterFunction(prgrm, "string.ParseDecimalUI16", opStrToUI16, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI16))
+	RegisterFunction(prgrm, "string.ParseDecimalUI32", opStrToUI32, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI32))
+	RegisterFunction(prgrm, "string.ParseDecimalUI64", opStrToUI64, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_UI64))
+	RegisterFunction(prgrm, "string.ParseFloatF32", opStrToF32, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_F32))
+	RegisterFunction(prgrm, "string.ParseFloatF64", opStrToF64, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_F64))
+	RegisterFunction(prgrm, "string.PrintLine", opStrPrint, In(ast.ConstCxArg_STR), nil)
+	RegisterFunction(prgrm, "string.SubstringByByteRange", opStrSubstr, In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), Out(ast.ConstCxArg_STR))
+	RegisterFunction(prgrm, "string.ByteIndexOfFirstSubstring", opStrIndex, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
+	RegisterFunction(prgrm, "string.ByteIndexOfLastSubstring", opStrLastIndex, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
+	RegisterFunction(prgrm, "string.TrimSurroundingWhitespace", opStrTrimSpace, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_STR))
+	RegisterFunction(prgrm, "string.ByteLength", opStrByteLength, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
+
+	RegisterOperator(prgrm, "ptr.eq", opPtrEq, In(ast.ConstCxArg_PTR, ast.ConstCxArg_PTR), Out(ast.ConstCxArg_BOOL), types.POINTER, constants.OP_EQUAL)
+	RegisterOperator(prgrm, "ptr.uneq", opPtrUneq, In(ast.ConstCxArg_PTR, ast.ConstCxArg_PTR), Out(ast.ConstCxArg_BOOL), types.POINTER, constants.OP_UNEQUAL)
 
 	RegisterFunction(prgrm, "panicIf", opPanicIf, In(ast.ConstCxArg_BOOL, ast.ConstCxArg_STR), nil)
 	RegisterFunction(prgrm, "panicIfNot", opPanicIfNot, In(ast.ConstCxArg_BOOL, ast.ConstCxArg_STR), nil)
 	RegisterFunction(prgrm, "strerror", opStrError, In(ast.ConstCxArg_I32), Out(ast.ConstCxArg_STR))
 
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1357.
 	RegisterFunction(prgrm, "aff.print", opAffPrint, In(ast.Slice(types.AFF)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1358.
 	RegisterFunction(prgrm, "aff.query", opAffQuery, In(ast.Slice(types.AFF)), Out(ast.Slice(types.AFF)))
 	// RegisterFunction(prgrm,"aff.on", opAffOn, In(ast.Slice(types.AFF), ast.Slice(types.AFF)), nil)
 	// RegisterFunction(prgrm,"aff.of", opAffOf, In(ast.Slice(types.AFF), ast.Slice(types.AFF)), nil)
@@ -491,5 +510,4 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 
 	//RegisterOpCode(prgrm,OP_EVOLVE_EVOLVE, "evolve.evolve", opEvolve, In(Slice(TYPE_AFF), Slice(TYPE_AFF), Slice(TYPE_F64), Slice(TYPE_F64), ConstCxArg_I32, ConstCxArg_I32, ConstCxArg_I32, ConstCxArg_F64), nil)
 	//RegisterOpCode(prgrm,OP_EVOLVE_EVOLVE, "evolve.evolve", opEvolve, In(Slice(TYPE_AFF), Slice(TYPE_AFF), Slice(TYPE_AFF), Slice(TYPE_AFF), Slice(TYPE_AFF), ConstCxArg_I32, ConstCxArg_I32, ConstCxArg_I32, ConstCxArg_F64), nil)
-
 }

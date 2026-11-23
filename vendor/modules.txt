@@ -87,19 +87,20 @@ github.com/golang/freetype/truetype
 # github.com/jinzhu/copier v0.4.0
 ## explicit; go 1.13
 github.com/jinzhu/copier
-# github.com/kr/pretty v0.3.1
-## explicit; go 1.12
 # github.com/madelynnblue/go-dsp v1.0.0
 ## explicit; go 1.25.5
 github.com/madelynnblue/go-dsp/wav
-# github.com/pierrec/lz4 v2.6.1+incompatible
-## explicit
-github.com/pierrec/lz4
-github.com/pierrec/lz4/internal/xxh32
+# github.com/pierrec/lz4/v4 v4.1.34
+## explicit; go 1.22
+github.com/pierrec/lz4/v4
+github.com/pierrec/lz4/v4/internal/lz4block
+github.com/pierrec/lz4/v4/internal/lz4errors
+github.com/pierrec/lz4/v4/internal/lz4stream
+github.com/pierrec/lz4/v4/internal/xxh32
 # github.com/skycoin/gltext v0.0.0-20200425002731-afdd8ff94e14
 ## explicit
 github.com/skycoin/gltext
-# github.com/skycoin/skycoin v0.28.8-0.20261117145039-38b3036d50d8
+# github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5
 ## explicit; go 1.27.3
 github.com/skycoin/skycoin/src/cipher
 github.com/skycoin/skycoin/src/cipher/base58
@@ -108,19 +109,26 @@ github.com/skycoin/skycoin/src/cipher/encoder
 github.com/skycoin/skycoin/src/cipher/ripemd160
 github.com/skycoin/skycoin/src/cipher/secp256k1-go
 github.com/skycoin/skycoin/src/cipher/secp256k1-go/secp256k1-go2
-# github.com/skycoin/skycoin-cx v0.0.0-20261118154316-ee4592edeb24
+# github.com/skycoin/skycoin-cx v0.0.0-20261123002813-df4c987910ae
 ## explicit; go 1.27.3
+github.com/skycoin/skycoin-cx/t0-cx-core-assert
+github.com/skycoin/skycoin-cx/t0-lz4codec
 github.com/skycoin/skycoin-cx/t0-packages
 github.com/skycoin/skycoin-cx/t0-types
 github.com/skycoin/skycoin-cx/t0-util
 github.com/skycoin/skycoin-cx/t1-constants
+github.com/skycoin/skycoin-cx/t1-cx-core-objmodel
 github.com/skycoin/skycoin-cx/t1-profiling
+github.com/skycoin/skycoin-cx/t2-cx-core-stringpool
+github.com/skycoin/skycoin-cx/t2-cx-runtime-ir
 github.com/skycoin/skycoin-cx/t2-globals
 github.com/skycoin/skycoin-cx/t3-ast
+github.com/skycoin/skycoin-cx/t3-cx-runtime-vm
 github.com/skycoin/skycoin-cx/t4-actions
 github.com/skycoin/skycoin-cx/t4-execute
 github.com/skycoin/skycoin-cx/t4-opcodes
 github.com/skycoin/skycoin-cx/t5-cipher
+github.com/skycoin/skycoin-cx/t5-cx-runtime-printer
 github.com/skycoin/skycoin-cx/t5-cxos
 github.com/skycoin/skycoin-cx/t5-cxpartialparsing
 github.com/skycoin/skycoin-cx/t5-regexp
@@ -129,7 +137,7 @@ github.com/skycoin/skycoin-cx/t6-cxfx
 github.com/skycoin/skycoin-cx/t7-init
 github.com/skycoin/skycoin-cx/t8-cxparsingcompletor
 github.com/skycoin/skycoin-cx/t9-cxparsing
-# golang.org/x/exp/shiny v0.0.0-20261113113407-e3970619a1a4
+# golang.org/x/exp/shiny v0.0.0-20261121134650-e1094eeca1b5
 ## explicit; go 1.26.0
 golang.org/x/exp/shiny/driver/gldriver
 golang.org/x/exp/shiny/driver/internal/drawer
@@ -165,7 +173,7 @@ golang.org/x/image/math/fixed
 golang.org/x/image/tiff
 golang.org/x/image/tiff/lzw
 golang.org/x/image/vector
-# golang.org/x/mobile v0.0.0-20261011034528-197770444867
+# golang.org/x/mobile v0.0.0-20261117202452-47699113848a
 ## explicit; go 1.26.0
 golang.org/x/mobile/app
 golang.org/x/mobile/app/internal/callfn

@@ -1,6 +1,7 @@
 package main
 
-import "app"
+import "sys/app"
+import "sys/string"
 
 func kindName(k i32) (s str) {
 	s = "?"
@@ -52,10 +53,10 @@ func main() {
 					line = sprintf("key code %d", code)
 					if code == app.KEY_BACKSPACE {
 						if len(typed) > 0 {
-							typed = str.substr(typed, 0, len(typed)-1)
+							typed = string.SubstringByByteRange(typed, 0, len(typed)-1)
 						}
 					} else {
-						typed = str.concat(typed, app.Rune(code))
+						typed = string.Concatenation(typed, app.Rune(code))
 					}
 				} else {
 					line = sprintf("%s at %d,%d", kindName(kind), f32.i32(ex), f32.i32(ey))

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Benchmark: allocation",
+  "description": "Slice appends, string building and struct slices on the CX heap",
+  "kind": "console",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 1000,
+      "sha256": "817861346841bdd8349f6022db17e3a2e91c6dd536b3ba1c0db21454f5af97be",
+      "chunks": [
+        "817861346841bdd8349f6022db17e3a2e91c6dd536b3ba1c0db21454f5af97be"
+      ]
+    }
+  ]
+}

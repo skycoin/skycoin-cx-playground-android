@@ -12,9 +12,15 @@ const (
 
 // used for selection_statement to layout its outputs
 type SelectStatement struct {
+	// OBJMODEL: []CXExpressionGid or CXExpressionGid, phase 5 #347.
+	// Now objects held by value, site S1205.
 	Condition []ast.CXExpression
-	Then      []ast.CXExpression
-	Else      []ast.CXExpression
+	// OBJMODEL: []CXExpressionGid or CXExpressionGid, phase 5 #347.
+	// Now objects held by value, site S1206.
+	Then []ast.CXExpression
+	// OBJMODEL: []CXExpressionGid or CXExpressionGid, phase 5 #347.
+	// Now objects held by value, site S1207.
+	Else []ast.CXExpression
 }
 
 // CreateSelectionStatement creates series of expressions that will create

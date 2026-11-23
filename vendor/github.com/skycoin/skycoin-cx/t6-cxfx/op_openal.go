@@ -6,18 +6,17 @@ import (
 	"bufio"
 	"github.com/madelynnblue/go-dsp/wav"
 	"github.com/skycoin/skycoin-cx/t0-types"
-	"github.com/skycoin/skycoin-cx/t0-util"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 	"github.com/skycoin/skycoin/src/cipher/encoder"
 	//"golang.org/x/mobile/exp/audio/al"
 )
 
 func opAlLoadWav(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	file, err := util.CXOpenFile(inputs[0].Get_str(prgrm))
-	defer file.Close()
-	if err != nil {
-		panic(err)
+	file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0])
+	if fileError != nil {
+		panic(fileError.FileErrorMessage)
 	}
+	defer file.Close()
 	reader := bufio.NewReader(file)
 
 	wav, err := wav.New(reader)

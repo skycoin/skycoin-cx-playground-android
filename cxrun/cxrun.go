@@ -19,7 +19,10 @@ import (
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
 	execute "github.com/skycoin/skycoin-cx/t4-execute"
-	parsingcompletor "github.com/skycoin/skycoin-cx/t8-cxparsingcompletor"
+	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
+	printer "github.com/skycoin/skycoin-cx/t5-cx-runtime-printer"
+	cxos "github.com/skycoin/skycoin-cx/t5-cxos"
+	cxinit "github.com/skycoin/skycoin-cx/t7-init"
 	cxparsing "github.com/skycoin/skycoin-cx/t9-cxparsing"
 )
 
@@ -83,63 +86,23 @@ var (
 	runMu sync.Mutex
 	host  Host
 	cmds  []Cmd
-	saved map[*cxast.CXArgument]cxast.CXArgument
 )
 
 func init() {
 	types.Allocator = cxast.AllocateSeq
 	packages.DefaultPackages = append(packages.DefaultPackages, "app")
-	parsingcompletor.InitCXCore()
-	register(actions.AST)
-	saved = map[*cxast.CXArgument]cxast.CXArgument{}
-	walkNatives(func(a *cxast.CXArgument) { saved[a] = copyArg(*a) })
+	actions.InitConstants()
+	cxos.InitConstants()
+	resetCompiler()
 }
 
-// The parser writes into the argument structs shared by every native
-// function, so a second program sees types left over from the first.
-// Restoring them and starting from an empty program lets one process run
-// any number of programs.
-func copyArg(a cxast.CXArgument) cxast.CXArgument {
-	a.Lengths = append(a.Lengths[:0:0], a.Lengths...)
-	a.DereferenceOperations = append(a.DereferenceOperations[:0:0], a.DereferenceOperations...)
-	a.DeclarationSpecifiers = append(a.DeclarationSpecifiers[:0:0], a.DeclarationSpecifiers...)
-	return a
-}
-
-func walkNatives(f func(*cxast.CXArgument)) {
-	visit := func(n *cxast.CXNativeFunction) {
-		if n == nil {
-			return
-		}
-		for _, a := range n.Inputs {
-			f(a)
-		}
-		for _, a := range n.Outputs {
-			f(a)
-		}
-	}
-	for _, n := range cxast.Natives {
-		visit(n)
-	}
-	for _, n := range cxast.Operators {
-		visit(n)
-	}
-}
-
+// resetCompiler starts from a new program with every native registered again,
+// the way skycoin-cx's own tests run many programs in one process.
 func resetCompiler() {
-	walkNatives(func(a *cxast.CXArgument) { *a = copyArg(saved[a]) })
-	heap := cxast.MinHeapSize()
-	actions.AST = &cxast.CXProgram{
-		Packages:       make(map[string]cxast.CXPackageIndex),
-		CXFunctions:    make([]cxast.CXFunction, 0),
-		CurrentPackage: -1,
-		CallStack:      make([]cxast.CXCall, constants.CALLSTACK_SIZE),
-		Memory:         make([]byte, constants.STACK_SIZE+heap),
-		Stack:          cxast.StackSegmentStruct{Size: constants.STACK_SIZE},
-		Data:           cxast.DataSegmentStruct{StartsAt: constants.STACK_SIZE},
-		Heap:           cxast.HeapSegmentStruct{Size: heap, Pointer: constants.NULL_HEAP_ADDRESS_OFFSET},
-		CXArgs:         make([]cxast.CXArgument, 0),
-	}
+	actions.AST = cxinit.MakeProgram()
+	cxinit.RegisterPackages(actions.AST)
+	opcodes.RegisterOpcodes(actions.AST)
+	register(actions.AST)
 	globals.FoundCompileErrors = false
 	actions.LineNo = 0
 }
@@ -147,6 +110,10 @@ func resetCompiler() {
 // ErrCompile is returned when the sources do not compile. The compiler's
 // messages are in the output.
 var ErrCompile = errors.New("compilation failed")
+
+// ErrRuntime is returned when the program stops on a runtime error, which is
+// in the output.
+var ErrRuntime = errors.New("runtime error")
 
 // Run compiles the .cx files in files, entry first, and runs main. Program
 // output, including compiler errors, is written to out. Only one program
@@ -173,7 +140,7 @@ func Run(files map[string][]byte, entry string, h Host, out io.Writer) (err erro
 		srcs[i] = string(files[n])
 	}
 
-	restore, err := captureStdout(out)
+	restore, err := captureOutput(out)
 	if err != nil {
 		return err
 	}
@@ -191,31 +158,39 @@ func Run(files map[string][]byte, entry string, h Host, out io.Writer) (err erro
 	if err := cxparsing.ParseSourceStrings(srcs, names); err != nil {
 		return ErrCompile
 	}
-	if _, err := actions.AST.GetFunction(constants.MAIN_FUNC, constants.MAIN_PKG); err != nil {
+	if _, err := actions.AST.GetFunction(actions.AST.CXProgramNameIntern(constants.MAIN_FUNC), actions.AST.CxIrState.CxIrStateNameMain); err != nil {
 		return errors.New("no main function in package main")
 	}
 	if err := cxparsing.AddInitFunction(actions.AST); err != nil {
 		return err
 	}
-	return execute.RunCompiled(actions.AST, 0, nil)
+	if err := execute.RunCompiled(actions.AST, 0, nil); err != nil {
+		return err
+	}
+	if actions.AST.RuntimeError.RuntimeErrorRecordRaised {
+		printer.PrinterRuntimeErrorPrint(actions.AST)
+		fmt.Println()
+		return ErrRuntime
+	}
+	return nil
 }
 
-// captureStdout sends os.Stdout to out until restore is called. CX prints
-// with fmt.Println.
-func captureStdout(out io.Writer) (restore func(), err error) {
+// captureOutput sends os.Stdout and os.Stderr to out until restore is called.
+// CX prints with fmt.Println and compile errors go to os.Stderr.
+func captureOutput(out io.Writer) (restore func(), err error) {
 	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
-	old := os.Stdout
-	os.Stdout = w
+	oldOut, oldErr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = w, w
 	done := make(chan struct{})
 	go func() {
 		io.Copy(out, r)
 		close(done)
 	}()
 	return func() {
-		os.Stdout = old
+		os.Stdout, os.Stderr = oldOut, oldErr
 		w.Close()
 		<-done
 		r.Close()

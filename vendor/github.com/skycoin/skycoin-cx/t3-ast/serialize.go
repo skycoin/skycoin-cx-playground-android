@@ -1,1284 +1,1172 @@
 package ast
 
 import (
+	"encoding/binary"
+	"fmt"
+	"sort"
+
+	"github.com/skycoin/skycoin-cx/t0-lz4codec"
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
-	"github.com/skycoin/skycoin/src/cipher/encoder"
+	objmodel "github.com/skycoin/skycoin-cx/t1-cx-core-objmodel"
+	stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
 )
 
-func deserializeRaw(byts []byte, offset types.Pointer, size types.Pointer, item interface{}) {
-	_, err := encoder.DeserializeRaw(byts[offset:offset+size], item)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func serializeString(name string, s *SerializedCXProgram) (int64, int64) {
-	if name == "" {
-		return int64(-1), int64(-1)
-	}
-
-	size := encoder.Size(name)
-
-	off, found := s.StringsMap[name]
-	if found {
-		return int64(off), int64(size)
-	}
-	off = int64(len(s.Strings))
-	s.Strings = append(s.Strings, encoder.Serialize(name)...)
-	s.StringsMap[name] = off
-
-	return int64(off), int64(size)
-}
-
-func indexPackage(pkg *CXPackage, s *SerializedCXProgram) {
-	if _, found := s.PackagesMap[pkg.Name]; !found {
-		s.PackagesMap[pkg.Name] = int64(len(s.PackagesMap))
-	} else {
-		panic("duplicated package in serialization process")
-	}
-}
-
-func indexStruct(prgrm *CXProgram, strct *CXStruct, s *SerializedCXProgram) {
-	strctPkg, err := prgrm.GetPackageFromArray(strct.Package)
-	if err != nil {
-		panic(err)
-	}
-
-	strctName := strctPkg.Name + "." + strct.Name
-	if _, found := s.StructsMap[strctName]; !found {
-		s.StructsMap[strctName] = int64(len(s.StructsMap))
-	} else {
-		panic("duplicated struct in serialization process")
-	}
-}
-
-func indexFunction(prgrm *CXProgram, fn *CXFunction, s *SerializedCXProgram) {
-	fnPkg, err := prgrm.GetPackageFromArray(fn.Package)
-	if err != nil {
-		panic(err)
-	}
-	fnName := fnPkg.Name + "." + fn.Name
-	if _, found := s.FunctionsMap[fnName]; !found {
-		s.FunctionsMap[fnName] = int64(len(s.FunctionsMap))
-	} else {
-		panic("duplicated function in serialization process")
-	}
-}
-
-func serializeBoolean(val bool) int64 {
-	if val {
-		return 1
-	}
-	return 0
-}
-
-func serializePointers(pointers []types.Pointer, s *SerializedCXProgram) (int64, int64) {
-	if len(pointers) == 0 {
-		return int64(-1), int64(-1)
-	}
-	off := len(s.Integers)
-	l := len(pointers)
-
-	ints := make([]int64, l)
-	for i, pointer := range pointers {
-		ints[i] = int64(pointer)
-	}
-
-	s.Integers = append(s.Integers, ints...)
-
-	return int64(off), int64(l)
-}
-
-func serializeIntegers(ints []int, s *SerializedCXProgram) (int64, int64) {
-	if len(ints) == 0 {
-		return int64(-1), int64(-1)
-	}
-	off := len(s.Integers)
-	l := len(ints)
-
-	ints32 := make([]int64, l)
-	for i, int := range ints {
-		ints32[i] = int64(int)
-	}
-
-	s.Integers = append(s.Integers, ints32...)
-
-	return int64(off), int64(l)
-}
-
-func serializeArgument(prgrm *CXProgram, arg *CXArgument, s *SerializedCXProgram) int {
-	s.Arguments = append(s.Arguments, serializedArgument{})
-	argOff := len(s.Arguments) - 1
-
-	sNil := int64(-1)
-
-	s.Arguments[argOff].NameOffset, s.Arguments[argOff].NameSize = serializeString(arg.Name, s)
-
-	s.Arguments[argOff].Type = int64(arg.Type)
-
-	if arg.StructType == nil {
-		s.Arguments[argOff].StructTypeOffset = sNil
-	} else {
-		strctPkg, err := prgrm.GetPackageFromArray(arg.StructType.Package)
-		if err != nil {
-			panic(err)
-		}
-
-		strctName := strctPkg.Name + "." + arg.StructType.Name
-		if strctOff, found := s.StructsMap[strctName]; found {
-			s.Arguments[argOff].StructTypeOffset = int64(strctOff)
-		} else {
-			panic("struct reference not found")
-		}
-	}
-
-	s.Arguments[argOff].Size = int64(arg.Size)
-	s.Arguments[argOff].Offset = int64(arg.Offset)
-
-	s.Arguments[argOff].DeclarationSpecifiersOffset,
-		s.Arguments[argOff].DeclarationSpecifiersSize = serializeIntegers(arg.DeclarationSpecifiers, s)
-
-	s.Arguments[argOff].PreviouslyDeclared = serializeBoolean(arg.PreviouslyDeclared)
-
-	s.Arguments[argOff].PassBy = int64(arg.PassBy)
-
-	s.Arguments[argOff].LengthsOffset, s.Arguments[argOff].LengthsSize = serializePointers(arg.Lengths, s)
-	// TODO: include Indexes of type CTypeSignature
-	// s.Arguments[argOff].IndexesOffset, s.Arguments[argOff].IndexesSize = serializeSliceOfArguments(prgrm, prgrm.ConvertIndexArgsToPointerArgs(arg.Indexes), s)
-	s.Arguments[argOff].FieldsOffset, s.Arguments[argOff].FieldsSize = serializeSliceOfArguments(prgrm, prgrm.ConvertIndexArgsToPointerArgs(arg.Fields), s)
-	s.Arguments[argOff].InputsOffset, s.Arguments[argOff].InputsSize = serializeSliceOfArguments(prgrm, prgrm.ConvertIndexArgsToPointerArgs(arg.Inputs), s)
-	s.Arguments[argOff].OutputsOffset, s.Arguments[argOff].OutputsSize = serializeSliceOfArguments(prgrm, prgrm.ConvertIndexArgsToPointerArgs(arg.Outputs), s)
-
-	argPkg, err := prgrm.GetPackageFromArray(arg.Package)
-	if err != nil {
-		panic(err)
-	}
-
-	if _, found := s.PackagesMap[argPkg.Name]; found {
-		s.Arguments[argOff].PackageName = argPkg.Name
-	} else {
-		panic("package reference not found")
-	}
-
-	return argOff
-}
-
-func serializeSliceOfArguments(prgrm *CXProgram, args []*CXArgument, s *SerializedCXProgram) (int64, int64) {
-	if len(args) == 0 {
-		return int64(-1), int64(-1)
-	}
-	idxs := make([]int, len(args))
-	for i, arg := range args {
-		idxs[i] = serializeArgument(prgrm, arg, s)
-	}
-	return serializeIntegers(idxs, s)
-}
-
-func serializeCalls(prgrm *CXProgram, calls []CXCall, s *SerializedCXProgram) (int64, int64) {
-	if len(calls) == 0 {
-		return int64(-1), int64(-1)
-	}
-	idxs := make([]int, len(calls))
-	for i, call := range calls {
-		idxs[i] = serializeCall(prgrm, &call, s)
-	}
-	return serializeIntegers(idxs, s)
-
-}
-
-func serializeExpression(prgrm *CXProgram, expr *CXExpression, s *SerializedCXProgram) int {
-	s.Expressions = append(s.Expressions, serializedExpression{})
-	exprOff := len(s.Expressions) - 1
-	sExpr := &s.Expressions[exprOff]
-
-	sNil := int64(-1)
-
-	sExpr.Type = int64(expr.Type)
-	switch expr.Type {
-	case CX_LINE:
-		_, _, cxLine, err := prgrm.GetOperation(expr)
-		if err != nil {
-			panic(err)
-		}
-
-		sExpr.ExpressionType = int64(expr.ExpressionType)
-		sExpr.FileName = cxLine.FileName
-		sExpr.LineNumber = int64(cxLine.LineNumber)
-		sExpr.LineStr = cxLine.LineStr
-
-	case CX_ATOMIC_OPERATOR:
-		cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
-		if err != nil {
-			panic(err)
-		}
-
-		cxAtomicOpOperator := prgrm.GetFunctionFromArray(cxAtomicOp.Operator)
-
-		if cxAtomicOpOperator == nil {
-			// then it's a declaration
-			sExpr.OperatorOffset = sNil
-			sExpr.IsNative = serializeBoolean(false)
-			sExpr.OpCode = int64(-1)
-		} else if cxAtomicOpOperator.IsBuiltIn() {
-			sExpr.OperatorOffset = sNil
-			sExpr.IsNative = serializeBoolean(true)
-			sExpr.OpCode = int64(cxAtomicOpOperator.AtomicOPCode)
-		} else {
-			sExpr.IsNative = serializeBoolean(false)
-			sExpr.OpCode = sNil
-
-			opPkg, err := prgrm.GetPackageFromArray(cxAtomicOpOperator.Package)
-			if err != nil {
-				panic(err)
-			}
-			opName := opPkg.Name + "." + cxAtomicOpOperator.Name
-			if opOff, found := s.FunctionsMap[opName]; found {
-				sExpr.OperatorOffset = int64(opOff)
-			}
-		}
-
-		inputCXArgs := prgrm.ConvertIndexTypeSignaturesToPointerArgs(cxAtomicOp.GetInputs(prgrm))
-		sExpr.InputsOffset, sExpr.InputsSize = serializeSliceOfArguments(prgrm, inputCXArgs, s)
-		outputCXArgs := prgrm.ConvertIndexTypeSignaturesToPointerArgs(cxAtomicOp.GetOutputs(prgrm))
-		sExpr.OutputsOffset, sExpr.OutputsSize = serializeSliceOfArguments(prgrm, outputCXArgs, s)
-
-		sExpr.LabelOffset, sExpr.LabelSize = serializeString(cxAtomicOp.Label, s)
-		sExpr.ThenLines = int64(cxAtomicOp.ThenLines)
-		sExpr.ElseLines = int64(cxAtomicOp.ElseLines)
-
-		sExpr.ExpressionType = int64(expr.ExpressionType)
-
-		cxAtomicOpFunction := prgrm.GetFunctionFromArray(cxAtomicOp.Function)
-
-		fnPkg, err := prgrm.GetPackageFromArray(cxAtomicOpFunction.Package)
-		if err != nil {
-			panic(err)
-		}
-		fnName := fnPkg.Name + "." + cxAtomicOpFunction.Name
-		if fnOff, found := s.FunctionsMap[fnName]; found {
-			sExpr.FunctionOffset = int64(fnOff)
-		} else {
-			panic("function reference not found")
-		}
-
-		cxAtomicOpPkg, err := prgrm.GetPackageFromArray(cxAtomicOp.Package)
-		if err != nil {
-			panic(err)
-		}
-
-		if _, found := s.PackagesMap[cxAtomicOpPkg.Name]; found {
-			sExpr.PackageName = cxAtomicOpPkg.Name
-		} else {
-			panic("package reference not found")
-		}
-
-	}
-	return exprOff
-}
-
-func serializeCall(prgrm *CXProgram, call *CXCall, s *SerializedCXProgram) int {
-	s.Calls = append(s.Calls, serializedCall{})
-	callOff := len(s.Calls) - 1
-	serializedCall := &s.Calls[callOff]
-
-	opPkg, err := prgrm.GetPackageFromArray(call.Operator.Package)
-	if err != nil {
-		panic(err)
-	}
-
-	opName := opPkg.Name + "." + call.Operator.Name
-	if opOff, found := s.FunctionsMap[opName]; found {
-		serializedCall.OperatorOffset = int64(opOff)
-		serializedCall.Line = int64(call.Line)
-		serializedCall.FramePointer = int64(call.FramePointer)
-	} else {
-		panic("function reference not found")
-	}
-
-	return callOff
-}
-
-func serializeStructArguments(prgrm *CXProgram, strct *CXStruct, s *SerializedCXProgram) {
-	strctPkg, err := prgrm.GetPackageFromArray(strct.Package)
-	if err != nil {
-		panic(err)
-	}
-
-	strctName := strctPkg.Name + "." + strct.Name
-	if strctOff, found := s.StructsMap[strctName]; found {
-		sStrct := &s.Structs[strctOff]
-		sStrct.FieldsOffset, sStrct.FieldsSize = serializeSliceOfArguments(prgrm, prgrm.ConvertIndexTypeSignaturesToPointerArgs(strct.Fields), s)
-	} else {
-		panic("struct reference not found")
-	}
-}
-
-func serializeFunctionArguments(prgrm *CXProgram, fn *CXFunction, s *SerializedCXProgram) {
-	fnPkg, err := prgrm.GetPackageFromArray(fn.Package)
-	if err != nil {
-		panic(err)
-	}
-	fnName := fnPkg.Name + "." + fn.Name
-	if fnOff, found := s.FunctionsMap[fnName]; found {
-		sFn := &s.Functions[fnOff]
-
-		arrCXArgs := prgrm.ConvertIndexTypeSignaturesToPointerArgs(fn.GetInputs(prgrm))
-		sFn.InputsOffset, sFn.InputsSize = serializeSliceOfArguments(prgrm, arrCXArgs, s)
-		outputCXArgs := prgrm.ConvertIndexTypeSignaturesToPointerArgs(fn.GetOutputs(prgrm))
-		sFn.OutputsOffset, sFn.OutputsSize = serializeSliceOfArguments(prgrm, outputCXArgs, s)
-		sFn.ListOfPointersOffset, sFn.ListOfPointersSize = serializeSliceOfArguments(prgrm, fn.ListOfPointers, s)
-	} else {
-		panic("function reference not found")
-	}
-}
-
-func serializePackageName(pkg *CXPackage, s *SerializedCXProgram) {
-	sPkg := &s.Packages[s.PackagesMap[pkg.Name]]
-	sPkg.NameOffset, sPkg.NameSize = serializeString(pkg.Name, s) //Change Name to String
-}
-
-func serializeStructName(prgrm *CXProgram, strct *CXStruct, s *SerializedCXProgram) {
-	strctPkg, err := prgrm.GetPackageFromArray(strct.Package)
-	if err != nil {
-		panic(err)
-	}
-
-	strctName := strctPkg.Name + "." + strct.Name
-	sStrct := &s.Structs[s.StructsMap[strctName]]
-	sStrct.NameOffset, sStrct.NameSize = serializeString(strct.Name, s) //Change Name to String
-}
-
-func serializeFunctionName(prgrm *CXProgram, fn *CXFunction, s *SerializedCXProgram) {
-	fnPkg, err := prgrm.GetPackageFromArray(fn.Package)
-	if err != nil {
-		panic(err)
-	}
-	fnName := fnPkg.Name + "." + fn.Name
-	if off, found := s.FunctionsMap[fnName]; found {
-		sFn := &s.Functions[off]
-		sFn.NameOffset, sFn.NameSize = serializeString(fn.Name, s) //Change Name to String
-	} else {
-		panic("function reference not found")
-	}
-}
-
-func serializePackageGlobals(prgrm *CXProgram, pkg *CXPackage, s *SerializedCXProgram) {
-	if pkgOff, found := s.PackagesMap[pkg.Name]; found {
-		sPkg := &s.Packages[pkgOff]
-
-		var glblArgs []*CXArgument
-		for _, glblFldIdx := range pkg.Globals.Fields {
-			glblFld := prgrm.GetCXTypeSignatureFromArray(glblFldIdx)
-			// Assuming only all are TYPE_CXARGUMENT_DEPRECATE
-			// TODO: To be replaced
-			glbl := prgrm.GetCXArg(CXArgumentIndex(glblFld.Meta))
-			glblArgs = append(glblArgs, glbl)
-		}
-		sPkg.GlobalsOffset, sPkg.GlobalsSize = serializeSliceOfArguments(prgrm, glblArgs, s)
-	} else {
-		panic("package reference not found")
-	}
-}
-
-func serializePackageImports(prgrm *CXProgram, pkg *CXPackage, s *SerializedCXProgram) {
-	l := len(pkg.Imports)
-	if l == 0 {
-		s.Packages[s.PackagesMap[pkg.Name]].ImportsOffset = int64(-1)
-		s.Packages[s.PackagesMap[pkg.Name]].ImportsSize = int64(-1)
-		return
-	}
-	imps := make([]int64, l)
-	count := 0
-	for _, impIdx := range pkg.Imports {
-		impPkg, err := prgrm.GetPackageFromArray(impIdx)
-		if err != nil {
-			panic(err)
-		}
-		if idx, found := s.PackagesMap[impPkg.Name]; found {
-			imps[count] = int64(idx)
-		} else {
-			panic("import package reference not found")
-		}
-
-		count++
-	}
-
-	s.Packages[s.PackagesMap[pkg.Name]].ImportsOffset = int64(len(s.Integers))
-	s.Packages[s.PackagesMap[pkg.Name]].ImportsSize = int64(l)
-	s.Integers = append(s.Integers, imps...)
-}
-
-func serializeStructPackage(prgrm *CXProgram, strct *CXStruct, s *SerializedCXProgram) {
-	strctPkg, err := prgrm.GetPackageFromArray(strct.Package)
-	if err != nil {
-		panic(err)
-	}
-
-	strctName := strctPkg.Name + "." + strct.Name
-	if _, found := s.PackagesMap[strctPkg.Name]; found {
-		if off, found := s.StructsMap[strctName]; found {
-			sStrct := &s.Structs[off]
-			sStrct.PackageName = strctPkg.Name
-		} else {
-			panic("struct reference not found")
-		}
-	} else {
-		panic("struct's package reference not found")
-	}
-}
-
-func serializeFunctionPackage(prgrm *CXProgram, fn *CXFunction, s *SerializedCXProgram) {
-	fnPkg, err := prgrm.GetPackageFromArray(fn.Package)
-	if err != nil {
-		panic(err)
-	}
-	fnName := fnPkg.Name + "." + fn.Name
-	if _, found := s.PackagesMap[fnPkg.Name]; found {
-		if off, found := s.FunctionsMap[fnName]; found {
-			sFn := &s.Functions[off]
-			sFn.PackageName = fnPkg.Name
-		} else {
-			panic("function reference not found")
-		}
-	} else {
-		panic("function's package reference not found")
-	}
-}
-
-func serializePackageIntegers(prgrm *CXProgram, pkg *CXPackage, s *SerializedCXProgram) {
-	if pkgOff, found := s.PackagesMap[pkg.Name]; found {
-		sPkg := &s.Packages[pkgOff]
-
-		if pkg.CurrentFunction == -1 {
-			// package has no functions
-			sPkg.CurrentFunctionName = ""
-		} else {
-			currFn := prgrm.GetFunctionFromArray(pkg.CurrentFunction)
-
-			currFnPkg, err := prgrm.GetPackageFromArray(currFn.Package)
-			if err != nil {
-				panic(err)
-			}
-			currFnName := currFnPkg.Name + "." + currFn.Name
-
-			if _, found := s.FunctionsMap[currFnName]; found {
-				sPkg.CurrentFunctionName = currFnName
-			} else {
-				panic("function reference not found")
-			}
-		}
-
-	} else {
-		panic("package reference not found")
-	}
-}
-
-// func serializeStructIntegers(prgrm *CXProgram, strct *CXStruct, s *SerializedCXProgram) {
-// 	strctPkg, err := prgrm.GetPackageFromArray(strct.Package)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	strctName := strctPkg.Name + "." + strct.Name
-// 	if off, found := s.StructsMap[strctName]; found {
-// 		sStrct := &s.Structs[off]
-// 		sStrct.Size = int64(strct.Size)
-// 	} else {
-// 		panic("struct reference not found")
-// 	}
-// }
-
-func serializeFunctionIntegers(prgrm *CXProgram, fn *CXFunction, s *SerializedCXProgram) {
-	fnPkg, err := prgrm.GetPackageFromArray(fn.Package)
-	if err != nil {
-		panic(err)
-	}
-	fnName := fnPkg.Name + "." + fn.Name
-	if off, found := s.FunctionsMap[fnName]; found {
-		sFn := &s.Functions[off]
-		sFn.Size = int64(fn.Size)
-		sFn.Length = int64(fn.LineCount)
-	} else {
-		panic("function reference not found")
-	}
-}
-
-// initSerialization initializes the
-// container for our serialized cx program.
-// Program memory is also added here to our container
-// if memory is to be included.
-func initSerialization(prgrm *CXProgram, s *SerializedCXProgram, includeDataMemory, useCompression bool) {
-	s.PackagesMap = make(map[string]int64)
-	s.StructsMap = make(map[string]int64)
-	s.FunctionsMap = make(map[string]int64)
-	s.StringsMap = make(map[string]int64)
-
-	s.Calls = make([]serializedCall, prgrm.CallCounter)
-	s.Packages = make([]serializedPackage, len(prgrm.Packages))
-
-	// If use compression, whole memory will be included
-	// If not and if includeDataMemory, only data segment memory will be included
-	if useCompression {
-		s.Memory = prgrm.Memory
-	} else if includeDataMemory && len(prgrm.Memory) != 0 {
-		s.DataSegmentMemory = prgrm.Memory[prgrm.Data.StartsAt : prgrm.Data.StartsAt+prgrm.Data.Size]
-	}
-
-	var numStrcts int
-	var numFns int
-
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		numStrcts += len(pkg.Structs)
-		numFns += len(pkg.Functions)
-	}
-
-	s.Structs = make([]serializedStruct, numStrcts)
-	s.Functions = make([]serializedFunction, numFns)
-	// args and exprs need to be appended as they are found
-}
-
-// serializeProgram serializes
-// program of cx program.
-func serializeProgram(prgrm *CXProgram, s *SerializedCXProgram) {
-	s.Program = serializedProgram{}
-	sPrgrm := &s.Program
-	sPrgrm.PackagesOffset = int64(0)
-	sPrgrm.PackagesSize = int64(len(prgrm.Packages))
-
-	currPkg, err := prgrm.GetPackageFromArray(prgrm.CurrentPackage)
-	if err != nil {
-		panic(err)
-	}
-	if _, found := s.PackagesMap[currPkg.Name]; found {
-		sPrgrm.CurrentPackageName = currPkg.Name
-	} else {
-		panic("package reference not found")
-	}
-
-	args := []*CXArgument{}
-	for _, argIdx := range prgrm.ProgramInput {
-		arg := prgrm.GetCXArg(argIdx)
-		args = append(args, arg)
-	}
-	sPrgrm.InputsOffset, sPrgrm.InputsSize = serializeSliceOfArguments(prgrm, args, s)
-	//sPrgrm.OutputsOffset, sPrgrm.OutputsSize = serializeSliceOfArguments(prgrm.ProgramOutput, s)
-
-	sPrgrm.CallStackOffset, sPrgrm.CallStackSize = serializeCalls(prgrm, prgrm.CallStack[:prgrm.CallCounter], s)
-
-	sPrgrm.CallCounter = int64(prgrm.CallCounter)
-
-	sPrgrm.MemoryOffset = int64(0)
-	sPrgrm.MemorySize = int64(len(prgrm.Memory))
-
-	sPrgrm.HeapPointer = int64(prgrm.Heap.Pointer)
-	sPrgrm.StackPointer = int64(prgrm.Stack.Pointer)
-	sPrgrm.StackSize = int64(prgrm.Stack.Size)
-	sPrgrm.DataSegmentSize = int64(prgrm.Data.Size)
-	sPrgrm.DataSegmentStartsAt = int64(prgrm.Data.StartsAt)
-	sPrgrm.HeapSize = int64(prgrm.Heap.Size)
-	sPrgrm.HeapStartsAt = int64(prgrm.Heap.StartsAt)
-
-	sPrgrm.Terminated = serializeBoolean(prgrm.Terminated)
-	sPrgrm.VersionOffset, sPrgrm.VersionSize = serializeString(prgrm.Version, s)
-}
-
-// serializeCXProgramElements is used serializing CX program's
-// elements (packages, structs, functions, etc.).
-func serializeCXProgramElements(prgrm *CXProgram, s *SerializedCXProgram) {
-	var fnCounter int64
-	var strctCounter int64
-
-	// indexing packages and serializing their names
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		indexPackage(pkg, s)
-		serializePackageName(pkg, s)
-	}
-	// we first needed to populate references to all packages
-	// now we add the imports' references
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		serializePackageImports(prgrm, pkg, s)
-	}
-
-	// structs
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, strctIdx := range pkg.Structs {
-			strct := &prgrm.CXStructs[strctIdx]
-			indexStruct(prgrm, strct, s)
-			serializeStructName(prgrm, strct, s)
-			serializeStructPackage(prgrm, strct, s)
-			// serializeStructIntegers(prgrm, strct, s)
-		}
-	}
-	// we first needed to populate references to all structs
-	// now we add fields
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, strctIdx := range pkg.Structs {
-			strct := &prgrm.CXStructs[strctIdx]
-			serializeStructArguments(prgrm, strct, s)
-		}
-	}
-
-	// globals
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		serializePackageGlobals(prgrm, pkg, s)
-	}
-
-	// functions
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, fnIdx := range pkg.Functions {
-			fn := prgrm.GetFunctionFromArray(fnIdx)
-
-			indexFunction(prgrm, fn, s)
-			serializeFunctionName(prgrm, fn, s)
-			serializeFunctionPackage(prgrm, fn, s)
-			serializeFunctionIntegers(prgrm, fn, s)
-			serializeFunctionArguments(prgrm, fn, s)
-		}
-	}
-
-	// package elements' offsets and sizes
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		if pkgOff, found := s.PackagesMap[pkg.Name]; found {
-			sPkg := &s.Packages[pkgOff]
-
-			if len(pkg.Structs) == 0 {
-				sPkg.StructsOffset = int64(-1)
-				sPkg.StructsSize = int64(-1)
-			} else {
-				sPkg.StructsOffset = strctCounter
-				lenStrcts := int64(len(pkg.Structs))
-				sPkg.StructsSize = lenStrcts
-				strctCounter += lenStrcts
-			}
-
-			if len(pkg.Functions) == 0 {
-				sPkg.FunctionsOffset = int64(-1)
-				sPkg.FunctionsSize = int64(-1)
-			} else {
-				sPkg.FunctionsOffset = fnCounter
-				lenFns := int64(len(pkg.Functions))
-				sPkg.FunctionsSize = lenFns
-				fnCounter += lenFns
-			}
-		} else {
-			panic("package reference not found")
-		}
-	}
-
-	// package integers
-	// we needed the references to all functions and structs first
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		serializePackageIntegers(prgrm, pkg, s)
-	}
-
-	// expressions
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		for _, fnIdx := range pkg.Functions {
-			fn := prgrm.GetFunctionFromArray(fnIdx)
-
-			fnPkg, err := prgrm.GetPackageFromArray(fn.Package)
-			if err != nil {
-				panic(err)
-			}
-			fnName := fnPkg.Name + "." + fn.Name
-			if fnOff, found := s.FunctionsMap[fnName]; found {
-				sFn := &s.Functions[fnOff]
-
-				if len(fn.Expressions) == 0 {
-					sFn.ExpressionsOffset = int64(-1)
-					sFn.ExpressionsSize = int64(-1)
-					sFn.CurrentExpressionOffset = int64(-1)
-				} else {
-					exprs := make([]int, len(fn.Expressions))
-					for i, expr := range fn.Expressions {
-						exprIdx := serializeExpression(prgrm, &expr, s)
-						exprs[i] = exprIdx
-					}
-
-					sFn.ExpressionsOffset, sFn.ExpressionsSize = serializeIntegers(exprs, s)
-				}
-			} else {
-				panic("function reference not found")
-			}
-		}
-	}
-}
+// A serialized program is a snapshot of the arenas and managers of a
+// compiled program, so that a deserialized program lowers and runs as the
+// original does. The layout is in "Serialized form" in docs/IR.md.
 
 // SerializeCXProgram translates cx program to slice of bytes that we can save.
 // These slice of bytes can then be deserialize in the future and
 // be translated back to cx program.
-func SerializeCXProgram(prgrm *CXProgram, includeDataMemory, useCompression bool) (b []byte) {
-	s := SerializedCXProgram{}
-	initSerialization(prgrm, &s, includeDataMemory, useCompression)
-
-	// serialize cx program's packages,
-	// structs, functions, etc.
-	serializeCXProgramElements(prgrm, &s)
-
-	// serialize cx program's program
-	serializeProgram(prgrm, &s)
-
-	// serializing everything
-	b = encoder.Serialize(s)
-
-	if useCompression {
-		// Compress using LZ4
-		CompressBytesLZ4(&b)
+// includeMemory stores the program memory, without which a deserialized
+// program gets zeroed memory of the same size. A nil codec leaves the bytes
+// uncompressed. A non-nil codec must be initialized, and the bytes then
+// include the memory and are compressed.
+func SerializeCXProgram(prgrm *CXProgram, includeMemory bool, codec *lz4codec.Codec) ([]byte, error) {
+	b, _, err := encodeCXProgram(prgrm, includeMemory || codec != nil)
+	if err != nil || codec == nil {
+		return b, err
 	}
-	return b
+	return compressCopy(codec, b)
 }
 
-// SerializeDebugInfo prints the name of the serialized segment and byte size.
-func SerializeDebugInfo(prgrm *CXProgram, includeMemory, useCompression bool) SerializedDataSize {
-	idxSize := encoder.Size(serializedCXProgramIndex{})
-	var s SerializedCXProgram
-
-	bytes := SerializeCXProgram(prgrm, includeMemory, useCompression)
-	deserializeRaw(bytes, 0, types.Cast_ui64_to_ptr(idxSize), &s.Index)
-
-	data := &SerializedDataSize{
-		Program:     len(bytes[s.Index.ProgramOffset:s.Index.CallsOffset]),
-		Calls:       len(bytes[s.Index.CallsOffset:s.Index.PackagesOffset]),
-		Packages:    len(bytes[s.Index.PackagesOffset:s.Index.StructsOffset]),
-		Structs:     len(bytes[s.Index.StructsOffset:s.Index.FunctionsOffset]),
-		Functions:   len(bytes[s.Index.FunctionsOffset:s.Index.ExpressionsOffset]),
-		Expressions: len(bytes[s.Index.ExpressionsOffset:s.Index.ArgumentsOffset]),
-		Arguments:   len(bytes[s.Index.ArgumentsOffset:s.Index.IntegersOffset]),
-		Integers:    len(bytes[s.Index.IntegersOffset:s.Index.StringsOffset]),
-		Strings:     len(bytes[s.Index.StringsOffset:s.Index.MemoryOffset]),
-		Memory:      len(bytes[s.Index.MemoryOffset:]),
-	}
-
-	return *data
-}
-
-func deserializeString(off int64, size int64, s *SerializedCXProgram) string {
-	if size < 1 {
-		return ""
-	}
-
-	var name string
-	deserializeRaw(s.Strings, types.Cast_i64_to_ptr(off), types.Cast_i64_to_ptr(size), &name)
-
-	return name
-}
-
-func deserializePackages(s *SerializedCXProgram, prgrm *CXProgram) {
-	var fnCounter int64
-	var strctCounter int64
-
-	for _, sPkg := range s.Packages {
-		// initializing packages with their names,
-		// empty functions, structs, imports and globals
-		// and current function and struct
-		pkg := &CXPackage{}
-		pkg.Name = deserializeString(sPkg.NameOffset, sPkg.NameSize, s)
-		pkgIdx := prgrm.AddPackage(pkg)
-		pkg, _ = prgrm.GetPackageFromArray(pkgIdx)
-
-		if sPkg.ImportsSize > 0 {
-			pkg.Imports = make(map[string]CXPackageIndex, sPkg.ImportsSize)
-		}
-
-		if sPkg.FunctionsSize > 0 {
-			pkg.Functions = make(map[string]CXFunctionIndex, sPkg.FunctionsSize)
-
-			for _, sFn := range s.Functions[sPkg.FunctionsOffset : sPkg.FunctionsOffset+sPkg.FunctionsSize] {
-				var fn CXFunction
-				fn.Name = deserializeString(sFn.NameOffset, sFn.NameSize, s)
-
-				fnIdx := prgrm.AddFunctionInArray(&fn)
-				pkg.Functions[fn.Name] = fnIdx
-			}
-		}
-
-		if sPkg.StructsSize > 0 {
-			pkg.Structs = make(map[string]CXStructIndex, sPkg.StructsSize)
-
-			for _, sStrct := range s.Structs[sPkg.StructsOffset : sPkg.StructsOffset+sPkg.StructsSize] {
-				var strct CXStruct
-				strct.Name = deserializeString(sStrct.NameOffset, sStrct.NameSize, s)
-				strctIdx := prgrm.AddStructInArray(&strct)
-				pkg.Structs[strct.Name] = strctIdx
-			}
-		}
-
-		// if sPkg.GlobalsSize > 0 {
-		// 	pkg.Globals = make([]CXArgumentIndex, sPkg.GlobalsSize)
-		// }
-
-		// CurrentFunction
-		if sPkg.FunctionsSize > 0 {
-			pkg.CurrentFunction = pkg.Functions[sPkg.CurrentFunctionName]
-		}
-
-		fnCounter += sPkg.FunctionsSize
-		strctCounter += sPkg.StructsSize
-
-		// imports
-		if sPkg.ImportsSize > 0 {
-			// getting indexes of imports
-			idxs := deserializeIntegers(sPkg.ImportsOffset, sPkg.ImportsSize, s)
-
-			for _, idx := range idxs {
-				impPkg := deserializePackageImport(&s.Packages[idx], s, prgrm)
-				pkg.Imports[impPkg.Name] = CXPackageIndex(impPkg.Index)
-			}
-		}
-
-		// globals
-		if sPkg.GlobalsSize > 0 {
-			glblArgs := deserializeArguments(sPkg.GlobalsOffset, sPkg.GlobalsSize, s, prgrm)
-			var glblArgsIdxs []CXArgumentIndex
-			for _, glbl := range glblArgs {
-				glblIdx := prgrm.AddCXArgInArray(glbl)
-				glblArgsIdxs = append(glblArgsIdxs, CXArgumentIndex(glblIdx))
-			}
-			// pkg.Globals = glblArgsIdxs
-			for _, glblIdx := range glblArgsIdxs {
-				pkg.Globals.AddField_Globals_CXAtomicOps(prgrm, glblIdx)
-			}
-		}
-
-		// structs
-		if sPkg.StructsSize > 0 {
-			for _, sStrct := range s.Structs[sPkg.StructsOffset : sPkg.StructsOffset+sPkg.StructsSize] {
-				strctName := deserializeString(sStrct.NameOffset, sStrct.NameSize, s)
-				strct := &prgrm.CXStructs[pkg.Structs[strctName]]
-				deserializeStruct(&sStrct, strct, s, prgrm)
-			}
-		}
-
-		// functions
-		if sPkg.FunctionsSize > 0 {
-			for _, sFn := range s.Functions[sPkg.FunctionsOffset : sPkg.FunctionsOffset+sPkg.FunctionsSize] {
-				fnName := deserializeString(sFn.NameOffset, sFn.NameSize, s)
-				pkgFn := prgrm.GetFunctionFromArray(pkg.Functions[fnName])
-
-				deserializeFunction(&sFn, pkgFn, s, prgrm)
-			}
-		}
-		prgrm.CXPackages[pkgIdx] = *pkg
-	}
-
-	// current package
-	prgrm.CurrentPackage = prgrm.Packages[s.Program.CurrentPackageName]
-}
-
-func deserializeStruct(sStrct *serializedStruct, strct *CXStruct, s *SerializedCXProgram, prgrm *CXProgram) {
-	strct.Name = deserializeString(sStrct.NameOffset, sStrct.NameSize, s)
-	strct.Fields = prgrm.AddPointerArgsToTypeSignaturesArray(deserializeArguments(sStrct.FieldsOffset, sStrct.FieldsSize, s, prgrm))
-
-	strct.Package = prgrm.Packages[sStrct.PackageName]
-}
-
-func deserializeArguments(off int64, size int64, s *SerializedCXProgram, prgrm *CXProgram) []*CXArgument {
-	if size < 1 {
-		return nil
-	}
-
-	// getting indexes of arguments
-	idxs := deserializeIntegers(off, size, s)
-
-	// sArgs := s.Arguments[off : off + size]
-	args := make([]*CXArgument, size)
-	for i, idx := range idxs {
-		args[i] = deserializeArgument(&s.Arguments[idx], s, prgrm)
-	}
-	return args
-}
-
-// func getStructType(sArg *serializedArgument, s *SerializedCXProgram, prgrm *CXProgram) *CXStruct {
-// 	if sArg.StructTypeOffset < 0 {
-// 		return nil
-// 	}
-
-// 	//structTypePkg := prgrm.Packages[s.Structs[sArg.StructTypeOffset].PackageOffset]
-// 	sStrct := s.Structs[sArg.StructTypeOffset]
-// 	structTypeName := deserializeString(sStrct.NameOffset, sStrct.NameSize, s)
-
-// 	for _, strct := range structTypePkg.Structs {
-// 		if strct.Name == structTypeName {
-// 			return strct
-// 		}
-// 	}
-
-// 	return nil
-// }
-
-func deserializeArgument(sArg *serializedArgument, s *SerializedCXProgram, prgrm *CXProgram) *CXArgument {
-	var arg CXArgument
-	arg.ArgDetails = &CXArgumentDebug{}
-	arg.Name = deserializeString(sArg.NameOffset, sArg.NameSize, s)
-	arg.Type = types.Code(sArg.Type)
-
-	//arg.StructType = getStructType(sArg, s, prgrm)
-
-	arg.Size = types.Cast_i64_to_ptr(sArg.Size)
-	arg.Offset = types.Cast_i64_to_ptr(sArg.Offset)
-	arg.PassBy = int(sArg.PassBy)
-
-	arg.DeclarationSpecifiers = deserializeIntegers(sArg.DeclarationSpecifiersOffset, sArg.DeclarationSpecifiersSize, s)
-
-	// arg.IsPointer = deserializeBool(sArg.IsPointer)
-	// arg.IsReference = deserializeBool(sArg.IsReference)
-
-	arg.PreviouslyDeclared = deserializeBool(sArg.PreviouslyDeclared)
-
-	arg.Lengths = deserializePointers(sArg.LengthsOffset, sArg.LengthsSize, s)
-	// TODO: include serializing of CXTypeSignature for indexes
-	// arg.Indexes = prgrm.AddPointerArgsToCXArgsArray(deserializeArguments(sArg.IndexesOffset, sArg.IndexesSize, s, prgrm))
-	arg.Fields = prgrm.AddPointerArgsToCXArgsArray(deserializeArguments(sArg.FieldsOffset, sArg.FieldsSize, s, prgrm))
-	arg.Inputs = prgrm.AddPointerArgsToCXArgsArray(deserializeArguments(sArg.InputsOffset, sArg.InputsSize, s, prgrm))
-	arg.Outputs = prgrm.AddPointerArgsToCXArgsArray(deserializeArguments(sArg.OutputsOffset, sArg.OutputsSize, s, prgrm))
-	arg.Package = -1
-	if _, ok := prgrm.Packages[sArg.PackageName]; ok {
-		arg.Package = prgrm.Packages[sArg.PackageName]
-	}
-
-	return &arg
-}
-
-func deserializeOperator(sExpr *serializedExpression, s *SerializedCXProgram, prgrm *CXProgram) *CXFunction {
-	if sExpr.OperatorOffset < 0 {
-		return nil
-	}
-
-	opPkgIdx := prgrm.Packages[s.Functions[sExpr.OperatorOffset].PackageName]
-	sOp := s.Functions[sExpr.OperatorOffset]
-	opName := deserializeString(sOp.NameOffset, sOp.NameSize, s)
-
-	opPkg, err := prgrm.GetPackageFromArray(opPkgIdx)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, fnIdx := range opPkg.Functions {
-		fn := prgrm.GetFunctionFromArray(fnIdx)
-
-		if fn.Name == opName {
-			return fn
-		}
-	}
-
-	return nil
-}
-
-func deserializePackageImport(sImp *serializedPackage, s *SerializedCXProgram, prgrm *CXProgram) *CXPackage {
-	impName := deserializeString(sImp.NameOffset, sImp.NameSize, s)
-
-	for _, pkgIdx := range prgrm.Packages {
-		pkg, err := prgrm.GetPackageFromArray(pkgIdx)
-		if err != nil {
-			panic(err)
-		}
-
-		if pkg.Name == impName {
-			return pkg
-		}
-	}
-
-	return nil
-}
-
-func deserializeExpressionFunction(sExpr *serializedExpression, s *SerializedCXProgram, prgrm *CXProgram) CXFunctionIndex {
-	if sExpr.FunctionOffset < 0 {
-		return -1
-	}
-
-	fnPkgIdx := prgrm.Packages[s.Functions[sExpr.FunctionOffset].PackageName]
-	sFn := s.Functions[sExpr.FunctionOffset]
-	fnName := deserializeString(sFn.NameOffset, sFn.NameSize, s)
-
-	fnPkg, err := prgrm.GetPackageFromArray(fnPkgIdx)
-	if err != nil {
-		panic(err)
-	}
-	for _, fnIdx := range fnPkg.Functions {
-		fn := prgrm.GetFunctionFromArray(fnIdx)
-
-		if fn.Name == fnName {
-			return fnIdx
-		}
-	}
-
-	return -1
-}
-
-func deserializeExpressions(off int64, size int64, s *SerializedCXProgram, prgrm *CXProgram) []CXExpression {
-	if size < 1 {
-		return nil
-	}
-
-	// getting indexes of expressions
-	idxs := deserializeIntegers(off, size, s)
-
-	// sExprs := s.Expressions[off : off + size]
-	exprs := make([]CXExpression, size)
-	for i, idx := range idxs {
-		exprs[i] = deserializeExpression(&s.Expressions[idx], s, prgrm)
-	}
-	return exprs
-}
-
-func deserializeExpression(sExpr *serializedExpression, s *SerializedCXProgram, prgrm *CXProgram) CXExpression {
-	var expr CXExpression
-
-	expr.ExpressionType = CXEXPR_TYPE(sExpr.ExpressionType)
-	switch sExpr.Type {
-	case int64(CX_LINE):
-		cxLine := &CXLine{}
-
-		cxLine.FileName = sExpr.FileName
-		cxLine.LineNumber = int(sExpr.LineNumber)
-		cxLine.LineStr = sExpr.LineStr
-		index := prgrm.AddCXLine(cxLine)
-		expr.Index = index
-		expr.Type = CX_LINE
-	case int64(CX_ATOMIC_OPERATOR):
-		cxAtomicOpOperatorIdx := prgrm.AddFunctionInArray(&CXFunction{})
-		cxAtomicOp := &CXAtomicOperator{Operator: cxAtomicOpOperatorIdx}
-
-		if deserializeBool(sExpr.IsNative) {
-			opIdx := prgrm.AddNativeFunctionInArray(Natives[int(sExpr.OpCode)])
-			cxAtomicOp.Operator = opIdx
-		} else {
-			opIdx := prgrm.AddFunctionInArray(deserializeOperator(sExpr, s, prgrm))
-			cxAtomicOp.Operator = opIdx
-		}
-
-		inputCXArgsArray := deserializeArguments(sExpr.InputsOffset, sExpr.InputsSize, s, prgrm)
-		for _, inputCXArg := range inputCXArgsArray {
-			typeSignature := GetCXTypeSignatureRepresentationOfCXArg(prgrm, inputCXArg)
-			typeSignatureIdx := prgrm.AddCXTypeSignatureInArray(typeSignature)
-			cxAtomicOp.AddInput(prgrm, typeSignatureIdx)
-		}
-
-		outputCXArgsArray := deserializeArguments(sExpr.OutputsOffset, sExpr.OutputsSize, s, prgrm)
-		for _, outputCXArg := range outputCXArgsArray {
-			typeSignature := GetCXTypeSignatureRepresentationOfCXArg(prgrm, outputCXArg)
-			typeSignatureIdx := prgrm.AddCXTypeSignatureInArray(typeSignature)
-			cxAtomicOp.AddOutput(prgrm, typeSignatureIdx)
-		}
-
-		cxAtomicOp.Label = deserializeString(sExpr.LabelOffset, sExpr.LabelSize, s)
-
-		cxAtomicOp.ThenLines = int(sExpr.ThenLines)
-		cxAtomicOp.ElseLines = int(sExpr.ElseLines)
-		cxAtomicOp.Package = prgrm.Packages[sExpr.PackageName]
-		cxAtomicOp.Function = deserializeExpressionFunction(sExpr, s, prgrm)
-
-		index := prgrm.AddCXAtomicOp(cxAtomicOp)
-		expr.Index = index
-		expr.Type = CX_ATOMIC_OPERATOR
-	}
-
-	return expr
-}
-
-func deserializeFunction(sFn *serializedFunction, fn *CXFunction, s *SerializedCXProgram, prgrm *CXProgram) {
-	fn.Name = deserializeString(sFn.NameOffset, sFn.NameSize, s)
-
-	inputCXArgsArray := deserializeArguments(sFn.InputsOffset, sFn.InputsSize, s, prgrm)
-	for _, inputCXArg := range inputCXArgsArray {
-		fn.AddInput(prgrm, inputCXArg)
-	}
-
-	outputCXArgsArray := deserializeArguments(sFn.OutputsOffset, sFn.OutputsSize, s, prgrm)
-	for _, outputCXArg := range outputCXArgsArray {
-		fn.AddOutput(prgrm, outputCXArg)
-	}
-
-	fn.ListOfPointers = deserializeArguments(sFn.ListOfPointersOffset, sFn.ListOfPointersSize, s, prgrm)
-	fn.Package = prgrm.Packages[sFn.PackageName]
-	fn.Expressions = deserializeExpressions(sFn.ExpressionsOffset, sFn.ExpressionsSize, s, prgrm)
-	fn.Size = types.Cast_i64_to_ptr(sFn.Size)
-	fn.LineCount = int(sFn.Length)
-	prgrm.CXFunctions[fn.Index] = *fn
-}
-
-func deserializeBool(val int64) bool {
-	return val == 1
-}
-
-func deserializePointers(off int64, size int64, s *SerializedCXProgram) []types.Pointer {
-	if size < 1 {
-		return nil
-	}
-	ints := s.Integers[off : off+size]
-	res := make([]types.Pointer, len(ints))
-	for i, in := range ints {
-		res[i] = types.Cast_i64_to_ptr(in)
-	}
-
-	return res
-}
-
-func deserializeIntegers(off int64, size int64, s *SerializedCXProgram) []int {
-	if size < 1 {
-		return nil
-	}
-	ints := s.Integers[off : off+size]
-	res := make([]int, len(ints))
-	for i, in := range ints {
-		res[i] = int(in)
-	}
-
-	return res
-}
-
-// initDeserialization initializes the CXProgram fields that represent a CX program. This should be refactored, as the names Deserialize and initDeserialization create some naming conflict.
-func initDeserialization(prgrm *CXProgram, s *SerializedCXProgram) {
-	prgrm.Memory = s.Memory
-	prgrm.Packages = make(map[string]CXPackageIndex, len(s.Packages))
-	prgrm.CallStack = make([]CXCall, constants.CALLSTACK_SIZE)
-	prgrm.Heap.StartsAt = types.Cast_i64_to_ptr(s.Program.HeapStartsAt)
-	prgrm.Heap.Pointer = types.Cast_i64_to_ptr(s.Program.HeapPointer)
-	prgrm.Stack.Size = types.Cast_i64_to_ptr(s.Program.StackSize)
-	prgrm.Data.Size = types.Cast_i64_to_ptr(s.Program.DataSegmentSize)
-	prgrm.Data.StartsAt = types.Cast_i64_to_ptr(s.Program.DataSegmentStartsAt)
-	prgrm.Heap.Size = types.Cast_i64_to_ptr(s.Program.HeapSize)
-	prgrm.Version = deserializeString(s.Program.VersionOffset, s.Program.VersionSize, s)
-
-	// This means reinstantiate memory and add DataSegmentMemory
-	if len(s.DataSegmentMemory) > 0 && len(s.Memory) == 0 {
-		minHeapSize := MinHeapSize()
-		prgrm.Memory = make([]byte, constants.STACK_SIZE+minHeapSize)
-		y := 0
-		for i := prgrm.Data.StartsAt; i < prgrm.Data.StartsAt+prgrm.Data.Size; i++ {
-			prgrm.Memory[i] = s.DataSegmentMemory[y]
-			y++
-		}
-	}
-	deserializePackages(s, prgrm)
+// SerializeDebugInfo returns the byte size of each part of the uncompressed
+// serialized program. wholeMemory gives the sizes of the bytes that
+// compressed serialization compresses.
+func SerializeDebugInfo(prgrm *CXProgram, includeMemory, wholeMemory bool) (SerializedDataSize, error) {
+	_, sizes, err := encodeCXProgram(prgrm, includeMemory || wholeMemory)
+	return sizes, err
 }
 
 // Deserialize deserializes a serialized CX program back to its golang struct representation.
-func Deserialize(b []byte, useCompression bool) (prgrm *CXProgram) {
-	prgrm = &CXProgram{}
-	var s SerializedCXProgram
+// A nil codec reads b as uncompressed. A non-nil codec must be initialized.
+// The program's CompileErrorPrint is left nil for the caller to set.
+// OBJMODEL: state.CXProgramMng.CXProgramAlloc(), phase 4 #371.
+// Now a constructor, site S0461.
+func Deserialize(b []byte, codec *lz4codec.Codec) (*CXProgram, error) {
+	if codec != nil {
+		var err error
+		if b, err = decompressCopy(codec, b); err != nil {
+			return nil, err
+		}
+	}
+	if err := SerializedHeaderCheck(b); err != nil {
+		return nil, err
+	}
+	decoder := serializeDecoder{serializeDecoderBytes: b, serializeDecoderPosition: serializeHeaderSize}
+	// OBJMODEL: state.CXProgramMng.CXProgramAlloc(), phase 4 #371.
+	// Now a heap literal, site S0462.
+	prgrm := &CXProgram{CxIrState: &CxIrState{}}
+	prgrm.CxIrState.CxIrStateInit()
+	prgrm.Version = int64(binary.LittleEndian.Uint64(b[len(serializeMagic)+8:]))
+	var calls []serializeCallReference
+	decoder.serializeDecoderSection("program", func(section *serializeDecoder) { calls = deserializeProgramFields(prgrm, section) })
+	decoder.serializeDecoderSection("strings", func(section *serializeDecoder) { deserializeStrings(prgrm, section) })
+	decoder.serializeDecoderSection("packages", func(section *serializeDecoder) { deserializePackages(prgrm, section) })
+	decoder.serializeDecoderSection("structs", func(section *serializeDecoder) { deserializeStructs(prgrm, section) })
+	decoder.serializeDecoderSection("functions", func(section *serializeDecoder) { deserializeFunctions(prgrm, section) })
+	decoder.serializeDecoderSection("expressions", func(section *serializeDecoder) { deserializeExpressions(prgrm, section) })
+	decoder.serializeDecoderSection("arguments", func(section *serializeDecoder) { deserializeArguments(prgrm, section) })
+	decoder.serializeDecoderSection("type signatures", func(section *serializeDecoder) { deserializeTypeSignatures(prgrm, section) })
+	decoder.serializeDecoderSection("memory", func(section *serializeDecoder) { deserializeMemory(prgrm, section) })
+	if decoder.serializeDecoderError == nil && decoder.serializeDecoderRemaining() != 0 {
+		decoder.serializeDecoderFailf("%d bytes after the last section", decoder.serializeDecoderRemaining())
+	}
+	deserializeCallStack(prgrm, &decoder, calls)
+	if decoder.serializeDecoderError != nil {
+		return nil, decoder.serializeDecoderError
+	}
+	return prgrm, nil
+}
 
-	if useCompression {
-		// Uncompress using LZ4
-		UncompressBytesLZ4(&b)
+// SerializedHeaderCheck returns nil when b starts with the header of a
+// program this cx can load: the magic, this format version, this pointer size
+// and this language version. Otherwise it says which one differs.
+func SerializedHeaderCheck(b []byte) error {
+	if len(b) < serializeHeaderSize || string(b[:len(serializeMagic)]) != serializeMagic {
+		return fmt.Errorf("not a serialized CX program")
+	}
+	position := len(serializeMagic)
+	if format := binary.LittleEndian.Uint32(b[position:]); format != serializeFormatVersion {
+		return fmt.Errorf("serialized program has format %d, this cx reads format %d, recompile it from source", format, serializeFormatVersion)
+	}
+	if pointerSize := binary.LittleEndian.Uint32(b[position+4:]); pointerSize != uint32(types.POINTER_SIZE) {
+		return fmt.Errorf("serialized program was compiled with %d byte pointers, this cx uses %d byte pointers, load it with a cx built to match (the ptr64 build tag gives 8)", pointerSize, types.POINTER_SIZE)
+	}
+	if version := int64(binary.LittleEndian.Uint64(b[position+8:])); version != constants.LanguageVersionCurrent {
+		return fmt.Errorf("serialized program is language version %d, this CX implements version %d, recompile it from source", version, constants.LanguageVersionCurrent)
+	}
+	return nil
+}
+
+// encodeCXProgram serializes prgrm without compression and returns the size
+// of each part.
+func encodeCXProgram(prgrm *CXProgram, includeMemory bool) ([]byte, SerializedDataSize, error) {
+	var sizes SerializedDataSize
+	if err := serializeUnusedManagersCheck(prgrm.CxIrState); err != nil {
+		return nil, sizes, err
+	}
+	encoder := serializeEncoder{serializeEncoderBytes: make([]byte, 0, 4096)}
+	encoder.serializeEncoderBytes = append(encoder.serializeEncoderBytes, serializeMagic...)
+	encoder.serializeEncoderBytes = binary.LittleEndian.AppendUint32(encoder.serializeEncoderBytes, serializeFormatVersion)
+	encoder.serializeEncoderBytes = binary.LittleEndian.AppendUint32(encoder.serializeEncoderBytes, uint32(types.POINTER_SIZE))
+	encoder.serializeEncoderBytes = binary.LittleEndian.AppendUint64(encoder.serializeEncoderBytes, uint64(prgrm.Version))
+	sizes.Header = len(encoder.serializeEncoderBytes)
+
+	sections := []struct {
+		size *int
+		body func(section *serializeEncoder) error
+	}{
+		{&sizes.Program, func(section *serializeEncoder) error { return serializeProgramFields(prgrm, section) }},
+		{&sizes.Strings, func(section *serializeEncoder) error { serializeStrings(prgrm, section); return nil }},
+		{&sizes.Packages, func(section *serializeEncoder) error { return serializePackages(prgrm, section) }},
+		{&sizes.Structs, func(section *serializeEncoder) error { serializeStructs(prgrm, section); return nil }},
+		{&sizes.Functions, func(section *serializeEncoder) error { return serializeFunctions(prgrm, section) }},
+		{&sizes.Expressions, func(section *serializeEncoder) error { return serializeExpressions(prgrm, section) }},
+		{&sizes.Arguments, func(section *serializeEncoder) error { return serializeArguments(prgrm, section) }},
+		{&sizes.TypeSignatures, func(section *serializeEncoder) error { return serializeTypeSignatures(prgrm, section) }},
+		{&sizes.Memory, func(section *serializeEncoder) error { serializeMemory(prgrm, section, includeMemory); return nil }},
+	}
+	for _, section := range sections {
+		before := len(encoder.serializeEncoderBytes)
+		if err := encoder.serializeEncoderSection(section.body); err != nil {
+			return nil, sizes, err
+		}
+		*section.size = len(encoder.serializeEncoderBytes) - before
+	}
+	return encoder.serializeEncoderBytes, sizes, nil
+}
+
+// serializeUnusedManagersCheck fails when a manager that no compile stage
+// fills yet holds an object, since the serialized form does not carry it.
+func serializeUnusedManagersCheck(state *CxIrState) error {
+	unused := []struct {
+		name string
+		used bool
+	}{
+		{"CXProgramMng", state.CXProgramMng.CXProgramMngNext != 0},
+		{"CXPackageMng", state.CXPackageMng.CXPackageMngNext != 0},
+		{"CXFunctionMng", state.CXFunctionMng.CXFunctionMngNext != 0},
+		{"CXNativeFunctionMng", state.CXNativeFunctionMng.CXNativeFunctionMngNext != 0},
+		{"CXStructMng", state.CXStructMng.CXStructMngNext != 0},
+		{"CXExpressionMng", state.CXExpressionMng.CXExpressionMngNext != 0},
+		{"CXAtomicOperatorMng", state.CXAtomicOperatorMng.CXAtomicOperatorMngNext != 0},
+		{"CXCallMng", state.CXCallMng.CXCallMngNext != 0},
+	}
+	for _, manager := range unused {
+		if manager.used {
+			return fmt.Errorf("cannot serialize the program: %s holds objects and the serialized form does not carry them yet", manager.name)
+		}
+	}
+	return nil
+}
+
+// compressCopy compresses b with codec and copies the result out of the
+// codec's buffer.
+func compressCopy(codec *lz4codec.Codec, b []byte) ([]byte, error) {
+	out, err := codec.Compress(b)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), out...), nil
+}
+
+// decompressCopy decompresses b with codec and copies the result out of the
+// codec's buffer.
+func decompressCopy(codec *lz4codec.Codec, b []byte) ([]byte, error) {
+	out, err := codec.Decompress(b)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), out...), nil
+}
+
+// ----------------------------------------------------------------
+//                     References between objects
+
+// serializeStructReference returns the index in prgrm.CXStructs of the struct
+// a pointer field names, or -1 for nil.
+func serializeStructReference(prgrm *CXProgram, strct *CXStruct) (int64, error) {
+	if strct == nil {
+		return -1, nil
+	}
+	if strct.Index >= 0 && strct.Index < len(prgrm.CXStructs) {
+		arena := &prgrm.CXStructs[strct.Index]
+		if arena == strct || arena.Name == strct.Name && arena.Package == strct.Package {
+			return int64(strct.Index), nil
+		}
+	}
+	return 0, fmt.Errorf("cannot serialize the program: struct %q is referenced but is not in CXStructs", prgrm.CXProgramNameText(strct.Name))
+}
+
+func deserializeStructReference(prgrm *CXProgram, decoder *serializeDecoder) *CXStruct {
+	index := decoder.serializeDecoderIntRange(-1, int64(len(prgrm.CXStructs))-1, "struct reference")
+	if index < 0 || decoder.serializeDecoderError != nil {
+		return nil
+	}
+	// OBJMODEL: state.CXStructMng.CXStructGet(gid), phase 5 #337.
+	// Now a pointer into an arena, as compiled programs hold it.
+	return &prgrm.CXStructs[index]
+}
+
+// serializeOwnedStruct writes a struct that a function, an operator or a
+// package owns through a pointer, such as its inputs or globals.
+func serializeOwnedStruct(encoder *serializeEncoder, strct *CXStruct) {
+	encoder.serializeEncoderBool(strct != nil)
+	if strct != nil {
+		serializeStruct(encoder, strct)
+	}
+}
+
+func deserializeOwnedStruct(decoder *serializeDecoder) *CXStruct {
+	if !decoder.serializeDecoderBool() {
+		return nil
+	}
+	// OBJMODEL: state.CXStructMng.CXStructAlloc(), phase 4 #336.
+	// Now a heap literal, as compiled programs hold it.
+	strct := &CXStruct{}
+	deserializeStruct(decoder, strct)
+	return strct
+}
+
+func serializeStruct(encoder *serializeEncoder, strct *CXStruct) {
+	encoder.serializeEncoderInt(int64(strct.Index))
+	encoder.serializeEncoderInt(int64(strct.Name))
+	encoder.serializeEncoderInt(int64(strct.Package))
+	encoder.serializeEncoderLength(len(strct.Fields), strct.Fields == nil)
+	for _, field := range strct.Fields {
+		encoder.serializeEncoderInt(int64(field))
+	}
+	encoder.serializeEncoderInt(int64(strct.FileName))
+	encoder.serializeEncoderInt(int64(strct.FileLine))
+	encoder.serializeEncoderInt(int64(strct.FileColumn))
+}
+
+func deserializeStruct(decoder *serializeDecoder, strct *CXStruct) {
+	strct.Index = decoder.serializeDecoderIntValue()
+	strct.Name = stringpool.StringGid(decoder.serializeDecoderInt())
+	strct.Package = CXPackageIndex(decoder.serializeDecoderIntValue())
+	if length := decoder.serializeDecoderLength(1); length >= 0 {
+		strct.Fields = make([]CXTypeSignatureIndex, length)
+		for i := range strct.Fields {
+			strct.Fields[i] = CXTypeSignatureIndex(decoder.serializeDecoderIntValue())
+		}
+	}
+	strct.FileName = SourceFileGid(decoder.serializeDecoderInt())
+	strct.FileLine = decoder.serializeDecoderIntValue()
+	strct.FileColumn = decoder.serializeDecoderIntValue()
+}
+
+// ----------------------------------------------------------------
+//                     Managers
+
+// serializeManagerSlots is the bookkeeping of one manager besides its
+// objects, see docs/ObjectModel.md.
+type serializeManagerSlots struct {
+	serializeManagerSlotsCapacity    int
+	serializeManagerSlotsGenerations []uint32
+	serializeManagerSlotsLive        []bool
+	serializeManagerSlotsFree        []uint32
+	serializeManagerSlotsNext        uint32
+	serializeManagerSlotsRetired     uint32
+	serializeManagerSlotsLen         int
+	serializeManagerSlotsGrowable    bool
+}
+
+// serializeManager writes a manager's slots up to Next and its live objects,
+// so that every Gid stays valid after deserializing.
+func serializeManager[Object any](encoder *serializeEncoder, objects []Object, slots serializeManagerSlots, objectEncode func(object *Object) error) error {
+	next := int(slots.serializeManagerSlotsNext)
+	encoder.serializeEncoderUint(uint64(slots.serializeManagerSlotsCapacity))
+	encoder.serializeEncoderUint(uint64(next))
+	encoder.serializeEncoderUint(uint64(slots.serializeManagerSlotsRetired))
+	encoder.serializeEncoderUint(uint64(slots.serializeManagerSlotsLen))
+	encoder.serializeEncoderBool(slots.serializeManagerSlotsGrowable)
+	encoder.serializeEncoderLength(len(slots.serializeManagerSlotsFree), slots.serializeManagerSlotsFree == nil)
+	for _, free := range slots.serializeManagerSlotsFree {
+		encoder.serializeEncoderUint(uint64(free))
+	}
+	for index := 0; index < next; index++ {
+		encoder.serializeEncoderUint(uint64(slots.serializeManagerSlotsGenerations[index]))
+		live := slots.serializeManagerSlotsLive[index]
+		encoder.serializeEncoderBool(live)
+		if live {
+			if err := objectEncode(&objects[index]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// deserializeManager reads what serializeManager wrote and checks that the
+// slot counts agree, the invariant every manager call asserts.
+func deserializeManager[Object any](decoder *serializeDecoder, name string, objectDecode func(object *Object)) ([]Object, serializeManagerSlots) {
+	var slots serializeManagerSlots
+	capacity := decoder.serializeDecoderUint()
+	next := decoder.serializeDecoderUint()
+	slots.serializeManagerSlotsRetired = decoder.serializeDecoderUint32()
+	length := decoder.serializeDecoderUint()
+	slots.serializeManagerSlotsGrowable = decoder.serializeDecoderBool()
+	freeLength := decoder.serializeDecoderLength(1)
+	if decoder.serializeDecoderError != nil {
+		return nil, slots
+	}
+	free := uint64(max(freeLength, 0))
+	// Each slot up to Next takes at least two bytes, a free slot one.
+	if capacity > objmodel.GidCapMax || next > capacity || length > next || free > next ||
+		next > uint64(decoder.serializeDecoderRemaining()/2) || capacity > next+1<<20 ||
+		length != next-free-uint64(slots.serializeManagerSlotsRetired) {
+		decoder.serializeDecoderFailf("%s has Cap %d, Next %d, Len %d, %d free and %d retired slots", name, capacity, next, length, free, slots.serializeManagerSlotsRetired)
+		return nil, slots
+	}
+	slots.serializeManagerSlotsCapacity = int(capacity)
+	slots.serializeManagerSlotsNext = uint32(next)
+	slots.serializeManagerSlotsLen = int(length)
+	if freeLength >= 0 {
+		slots.serializeManagerSlotsFree = make([]uint32, free)
+	}
+	for i := range slots.serializeManagerSlotsFree {
+		slot := decoder.serializeDecoderUint32()
+		if uint64(slot) >= next {
+			decoder.serializeDecoderFailf("%s free slot %d is not below Next %d", name, slot, next)
+			return nil, slots
+		}
+		slots.serializeManagerSlotsFree[i] = slot
+	}
+	objects := make([]Object, capacity)
+	slots.serializeManagerSlotsGenerations = make([]uint32, capacity)
+	slots.serializeManagerSlotsLive = make([]bool, capacity)
+	live := uint64(0)
+	for index := uint64(0); index < next && decoder.serializeDecoderError == nil; index++ {
+		slots.serializeManagerSlotsGenerations[index] = decoder.serializeDecoderUint32()
+		if decoder.serializeDecoderBool() {
+			slots.serializeManagerSlotsLive[index] = true
+			live++
+			objectDecode(&objects[index])
+		}
+	}
+	if decoder.serializeDecoderError == nil && live != length {
+		decoder.serializeDecoderFailf("%s has %d live slots, Len %d", name, live, length)
+	}
+	return objects, slots
+}
+
+// ----------------------------------------------------------------
+//                     Program section
+
+// serializeCallReference is a call stack entry whose operator is a function
+// index, resolved once every section is read.
+type serializeCallReference struct {
+	serializeCallReferenceOperator     int64
+	serializeCallReferenceLine         int
+	serializeCallReferenceFramePointer types.Pointer
+}
+
+func serializeProgramFields(prgrm *CXProgram, encoder *serializeEncoder) error {
+	encoder.serializeEncoderPointer(prgrm.Stack.Size)
+	encoder.serializeEncoderPointer(prgrm.Stack.StartsAt)
+	encoder.serializeEncoderPointer(prgrm.Stack.Pointer)
+	encoder.serializeEncoderPointer(prgrm.Data.Size)
+	encoder.serializeEncoderPointer(prgrm.Data.StartsAt)
+	encoder.serializeEncoderPointer(prgrm.Heap.Size)
+	encoder.serializeEncoderPointer(prgrm.Heap.StartsAt)
+	encoder.serializeEncoderPointer(prgrm.Heap.Pointer)
+
+	names := make([]stringpool.StringGid, 0, len(prgrm.Packages))
+	for name := range prgrm.Packages {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool { return names[i] < names[j] })
+	encoder.serializeEncoderLength(len(names), prgrm.Packages == nil)
+	for _, name := range names {
+		encoder.serializeEncoderInt(int64(name))
+		encoder.serializeEncoderInt(int64(prgrm.Packages[name]))
+	}
+	encoder.serializeEncoderInt(int64(prgrm.CurrentPackage))
+
+	encoder.serializeEncoderLength(len(prgrm.ProgramInput), prgrm.ProgramInput == nil)
+	for _, input := range prgrm.ProgramInput {
+		encoder.serializeEncoderInt(int64(input))
 	}
 
-	deserializeRaw(b, 0, types.Cast_int_to_ptr(len(b)), &s)
-	initDeserialization(prgrm, &s)
+	// Only the entries up to the last one in use are written.
+	used := 0
+	for i, call := range prgrm.CallStack {
+		if call != (CXCall{}) {
+			used = i + 1
+		}
+	}
+	encoder.serializeEncoderUint(uint64(len(prgrm.CallStack)))
+	encoder.serializeEncoderPointer(prgrm.CallCounter)
+	encoder.serializeEncoderUint(uint64(used))
+	for _, call := range prgrm.CallStack[:used] {
+		operator := int64(-1)
+		if call.Operator != nil {
+			operator = int64(call.Operator.Index)
+		}
+		encoder.serializeEncoderInt(operator)
+		encoder.serializeEncoderInt(int64(call.Line))
+		encoder.serializeEncoderPointer(call.FramePointer)
+	}
+	encoder.serializeEncoderBool(prgrm.Terminated)
 
-	return prgrm
+	encoder.serializeEncoderLength(len(prgrm.SysInitExprs), prgrm.SysInitExprs == nil)
+	for i := range prgrm.SysInitExprs {
+		serializeExpression(encoder, &prgrm.SysInitExprs[i])
+	}
+	return nil
 }
 
-// CopyProgramState copies the program state from `prgrm1` to `prgrm2`.
-func CopyProgramState(sPrgrm1, sPrgrm2 *[]byte) {
-	idxSize := types.Cast_ui64_to_ptr(encoder.Size(serializedCXProgramIndex{}))
+func deserializeProgramFields(prgrm *CXProgram, decoder *serializeDecoder) []serializeCallReference {
+	prgrm.Stack.Size = decoder.serializeDecoderPointer()
+	prgrm.Stack.StartsAt = decoder.serializeDecoderPointer()
+	prgrm.Stack.Pointer = decoder.serializeDecoderPointer()
+	prgrm.Data.Size = decoder.serializeDecoderPointer()
+	prgrm.Data.StartsAt = decoder.serializeDecoderPointer()
+	prgrm.Heap.Size = decoder.serializeDecoderPointer()
+	prgrm.Heap.StartsAt = decoder.serializeDecoderPointer()
+	prgrm.Heap.Pointer = decoder.serializeDecoderPointer()
 
-	var index1 serializedCXProgramIndex
-	var index2 serializedCXProgramIndex
+	if length := decoder.serializeDecoderLength(2); length >= 0 {
+		prgrm.Packages = make(map[stringpool.StringGid]CXPackageIndex, length)
+		for i := 0; i < length; i++ {
+			name := stringpool.StringGid(decoder.serializeDecoderInt())
+			prgrm.Packages[name] = CXPackageIndex(decoder.serializeDecoderIntValue())
+		}
+	}
+	prgrm.CurrentPackage = CXPackageIndex(decoder.serializeDecoderIntValue())
 
-	deserializeRaw((*sPrgrm1), 0, idxSize, &index1)
-	deserializeRaw((*sPrgrm2), 0, idxSize, &index2)
+	if length := decoder.serializeDecoderLength(1); length >= 0 {
+		prgrm.ProgramInput = make([]CXArgumentIndex, length)
+		for i := range prgrm.ProgramInput {
+			prgrm.ProgramInput[i] = CXArgumentIndex(decoder.serializeDecoderIntValue())
+		}
+	}
 
-	var prgrm1Info serializedProgram
-	deserializeRaw((*sPrgrm1),
-		types.Cast_i64_to_ptr(index1.ProgramOffset),
-		types.Cast_i64_to_ptr(index1.CallsOffset-index1.ProgramOffset),
-		&prgrm1Info)
+	stackLength := decoder.serializeDecoderUint()
+	prgrm.CallCounter = decoder.serializeDecoderPointer()
+	used := decoder.serializeDecoderUint()
+	if decoder.serializeDecoderError != nil {
+		return nil
+	}
+	if stackLength > uint64(constants.CALLSTACK_SIZE) || used > stackLength || used > uint64(decoder.serializeDecoderRemaining()/3) {
+		decoder.serializeDecoderFailf("call stack of %d entries with %d in use", stackLength, used)
+		return nil
+	}
+	// OBJMODEL: state.CXCallMng (manager storage) or []CXCallGid, phase 4 #366.
+	// Now a slice of objects, as cxinit.MakeProgram makes it.
+	prgrm.CallStack = make([]CXCall, stackLength)
+	calls := make([]serializeCallReference, used)
+	for i := range calls {
+		calls[i].serializeCallReferenceOperator = decoder.serializeDecoderInt()
+		calls[i].serializeCallReferenceLine = decoder.serializeDecoderIntValue()
+		calls[i].serializeCallReferenceFramePointer = decoder.serializeDecoderPointer()
+	}
+	prgrm.Terminated = decoder.serializeDecoderBool()
 
-	var prgrm2Info serializedProgram
-	deserializeRaw((*sPrgrm2),
-		types.Cast_i64_to_ptr(index2.ProgramOffset),
-		types.Cast_i64_to_ptr(index2.CallsOffset-index2.ProgramOffset),
-		&prgrm2Info)
+	if length := decoder.serializeDecoderLength(5); length >= 0 {
+		prgrm.SysInitExprs = make([]CXExpression, length)
+		for i := range prgrm.SysInitExprs {
+			deserializeExpression(decoder, &prgrm.SysInitExprs[i])
+		}
+	}
+	return calls
+}
 
-	// the stack segment should be 0 for prgrm1, but just in case
-	var prgrmState []byte
-	prgrmState = append(prgrmState, make([]byte, prgrm2Info.StackSize)...)
-	// We are only interested on extracting the data segment
-	prgrmState = append(prgrmState, (*sPrgrm1)[index1.StringsOffset+prgrm1Info.StackSize:index1.StringsOffset+prgrm1Info.StackSize+(prgrm2Info.HeapStartsAt-prgrm2Info.StackSize)]...)
-
-	for i, byt := range prgrmState {
-		(*sPrgrm2)[i+int(index2.MemoryOffset)] = byt
+// deserializeCallStack points the call stack entries at their functions,
+// which are read after the program section.
+func deserializeCallStack(prgrm *CXProgram, decoder *serializeDecoder, calls []serializeCallReference) {
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	for i, call := range calls {
+		operator := call.serializeCallReferenceOperator
+		if operator < -1 || operator >= int64(len(prgrm.CXFunctions)) {
+			decoder.serializeDecoderFailf("call %d names function %d of %d", i, operator, len(prgrm.CXFunctions))
+			return
+		}
+		if operator >= 0 {
+			// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
+			// Now a pointer into an arena, as the call stack holds it.
+			prgrm.CallStack[i].Operator = &prgrm.CXFunctions[operator]
+		}
+		prgrm.CallStack[i].Line = call.serializeCallReferenceLine
+		prgrm.CallStack[i].FramePointer = call.serializeCallReferenceFramePointer
 	}
 }
 
-// GetSerializedStackSize returns the stack size of a serialized CX program starts.
-func GetSerializedStackSize(sPrgrm []byte) int {
-	idxSize := types.Cast_ui64_to_ptr(encoder.Size(serializedCXProgramIndex{}))
-	var index serializedCXProgramIndex
-	deserializeRaw(sPrgrm, 0, idxSize, &index)
+// ----------------------------------------------------------------
+//                     Strings section
 
-	var prgrmInfo serializedProgram
-	deserializeRaw(sPrgrm,
-		types.Cast_i64_to_ptr(index.ProgramOffset),
-		types.Cast_i64_to_ptr(index.CallsOffset-index.ProgramOffset),
-		&prgrmInfo)
-
-	return int(prgrmInfo.StackSize)
+func serializeStrings(prgrm *CXProgram, encoder *serializeEncoder) {
+	state := prgrm.CxIrState
+	pool := &state.StringPool
+	encoder.serializeEncoderUint(uint64(pool.StringPoolLen()))
+	for slot := 0; slot < pool.StringPoolLen(); slot++ {
+		gid := stringpool.StringGid(objmodel.GidCompose(stringpool.StringGidTypeTag, objmodel.GidGenerationFirst, uint32(slot)))
+		encoder.serializeEncoderByteSlice(pool.StringPoolBytes(gid))
+	}
+	encoder.serializeEncoderBool(pool.StringPoolFrozen)
+	encoder.serializeEncoderInt(int64(state.CxIrStateNameMain))
+	encoder.serializeEncoderInt(int64(state.CxIrStateNameSysInit))
+	encoder.serializeEncoderInt(int64(state.CxIrStateNameOsArgs))
+	encoder.serializeEncoderInt(int64(state.CxIrStateNameOs))
+	encoder.serializeEncoderUint(uint64(len(state.SourceFileMng.SourceFileMngPaths)))
+	for _, path := range state.SourceFileMng.SourceFileMngPaths {
+		encoder.serializeEncoderInt(int64(path))
+	}
 }
 
-// GetSerializedDataSize returns the size of the data segment of a serialized CX program.
-func GetSerializedDataSize(sPrgrm []byte) int {
-	idxSize := types.Cast_ui64_to_ptr(encoder.Size(serializedCXProgramIndex{}))
-	var index serializedCXProgramIndex
-	deserializeRaw(sPrgrm, 0, idxSize, &index)
+// deserializeStrings interns the strings in their slot order, which gives
+// every string the Gid it had.
+func deserializeStrings(prgrm *CXProgram, decoder *serializeDecoder) {
+	state := prgrm.CxIrState
+	count := decoder.serializeDecoderUint()
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	if count > uint64(decoder.serializeDecoderRemaining()) {
+		decoder.serializeDecoderFail(errSerializeTruncated)
+		return
+	}
+	state.StringPool.StringPoolInit(max(int(count), 1024), max(decoder.serializeDecoderRemaining(), 16384))
+	for slot := uint64(0); slot < count && decoder.serializeDecoderError == nil; slot++ {
+		text := decoder.serializeDecoderByteSlice()
+		if decoder.serializeDecoderError != nil {
+			return
+		}
+		if _, found := state.StringPool.StringPoolFind(text); found {
+			decoder.serializeDecoderFailf("string slot %d repeats an earlier string or is empty", slot)
+			return
+		}
+		state.StringPool.StringPoolIntern(text)
+	}
+	frozen := decoder.serializeDecoderBool()
+	names := []*stringpool.StringGid{&state.CxIrStateNameMain, &state.CxIrStateNameSysInit, &state.CxIrStateNameOsArgs, &state.CxIrStateNameOs}
+	for _, name := range names {
+		*name = deserializeStringGid(decoder, &state.StringPool)
+	}
+	paths := decoder.serializeDecoderUint()
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	if paths > uint64(decoder.serializeDecoderRemaining()) {
+		decoder.serializeDecoderFail(errSerializeTruncated)
+		return
+	}
+	state.SourceFileMng.SourceFileMngPaths = make([]stringpool.StringGid, paths)
+	for i := range state.SourceFileMng.SourceFileMngPaths {
+		state.SourceFileMng.SourceFileMngPaths[i] = deserializeStringGid(decoder, &state.StringPool)
+	}
+	if frozen {
+		state.StringPool.StringPoolFreeze()
+	}
+}
 
-	var prgrmInfo serializedProgram
-	deserializeRaw(sPrgrm,
-		types.Cast_i64_to_ptr(index.ProgramOffset),
-		types.Cast_i64_to_ptr(index.CallsOffset-index.ProgramOffset),
-		&prgrmInfo)
+// deserializeStringGid reads a string Gid and checks that it names a slot.
+func deserializeStringGid(decoder *serializeDecoder, pool *stringpool.StringPool) stringpool.StringGid {
+	gid := decoder.serializeDecoderInt()
+	if gid == int64(stringpool.StringGidNil) {
+		return stringpool.StringGidNil
+	}
+	if objmodel.GidTypeTag(gid) != stringpool.StringGidTypeTag || objmodel.GidGeneration(gid) != objmodel.GidGenerationFirst ||
+		uint64(objmodel.GidIndex(gid)) >= uint64(pool.StringPoolLen()) {
+		decoder.serializeDecoderFailf("string Gid %#x", gid)
+		return stringpool.StringGidNil
+	}
+	return stringpool.StringGid(gid)
+}
 
-	return int(prgrmInfo.HeapStartsAt - prgrmInfo.StackSize)
+// ----------------------------------------------------------------
+//                     Packages section
+
+func serializePackages(prgrm *CXProgram, encoder *serializeEncoder) error {
+	encoder.serializeEncoderLength(len(prgrm.CXPackages), prgrm.CXPackages == nil)
+	for i := range prgrm.CXPackages {
+		pkg := &prgrm.CXPackages[i]
+		encoder.serializeEncoderInt(int64(pkg.Name))
+		encoder.serializeEncoderInt(int64(pkg.Index))
+		serializeNameMap(encoder, pkg.Imports)
+		serializeNameMap(encoder, pkg.Functions)
+		serializeNameMap(encoder, pkg.Structs)
+		keys := make([]CXPackageMethodKey, 0, len(pkg.Methods))
+		for key := range pkg.Methods {
+			keys = append(keys, key)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if keys[i].CXPackageMethodKeyStruct != keys[j].CXPackageMethodKeyStruct {
+				return keys[i].CXPackageMethodKeyStruct < keys[j].CXPackageMethodKeyStruct
+			}
+			return keys[i].CXPackageMethodKeyMethod < keys[j].CXPackageMethodKeyMethod
+		})
+		encoder.serializeEncoderLength(len(keys), pkg.Methods == nil)
+		for _, key := range keys {
+			encoder.serializeEncoderInt(int64(key.CXPackageMethodKeyStruct))
+			encoder.serializeEncoderInt(int64(key.CXPackageMethodKeyMethod))
+			encoder.serializeEncoderInt(int64(pkg.Methods[key]))
+		}
+		serializeOwnedStruct(encoder, pkg.Globals)
+		encoder.serializeEncoderInt(int64(pkg.CurrentFunction))
+	}
+	return nil
+}
+
+func deserializePackages(prgrm *CXProgram, decoder *serializeDecoder) {
+	length := decoder.serializeDecoderLength(8)
+	if length < 0 {
+		return
+	}
+	// OBJMODEL: state.CXPackageMng (manager storage) or []CXPackageGid, phase 4 #361.
+	// Now a slice of objects, the arena of a compiled program.
+	prgrm.CXPackages = make([]CXPackage, length)
+	for i := range prgrm.CXPackages {
+		pkg := &prgrm.CXPackages[i]
+		pkg.Name = stringpool.StringGid(decoder.serializeDecoderInt())
+		pkg.Index = decoder.serializeDecoderIntValue()
+		pkg.Imports = deserializeNameMap[CXPackageIndex](decoder)
+		pkg.Functions = deserializeNameMap[CXFunctionIndex](decoder)
+		pkg.Structs = deserializeNameMap[CXStructIndex](decoder)
+		if count := decoder.serializeDecoderLength(3); count >= 0 {
+			pkg.Methods = make(map[CXPackageMethodKey]CXFunctionIndex, count)
+			for j := 0; j < count; j++ {
+				var key CXPackageMethodKey
+				key.CXPackageMethodKeyStruct = stringpool.StringGid(decoder.serializeDecoderInt())
+				key.CXPackageMethodKeyMethod = stringpool.StringGid(decoder.serializeDecoderInt())
+				pkg.Methods[key] = CXFunctionIndex(decoder.serializeDecoderIntValue())
+			}
+		}
+		pkg.Globals = deserializeOwnedStruct(decoder)
+		pkg.CurrentFunction = CXFunctionIndex(decoder.serializeDecoderIntValue())
+	}
+}
+
+// serializeNameMap writes a map from names to indexes in name Gid order.
+func serializeNameMap[Index ~int](encoder *serializeEncoder, names map[stringpool.StringGid]Index) {
+	keys := make([]stringpool.StringGid, 0, len(names))
+	for key := range names {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	encoder.serializeEncoderLength(len(keys), names == nil)
+	for _, key := range keys {
+		encoder.serializeEncoderInt(int64(key))
+		encoder.serializeEncoderInt(int64(names[key]))
+	}
+}
+
+func deserializeNameMap[Index ~int](decoder *serializeDecoder) map[stringpool.StringGid]Index {
+	length := decoder.serializeDecoderLength(2)
+	if length < 0 {
+		return nil
+	}
+	names := make(map[stringpool.StringGid]Index, length)
+	for i := 0; i < length; i++ {
+		key := stringpool.StringGid(decoder.serializeDecoderInt())
+		names[key] = Index(decoder.serializeDecoderIntValue())
+	}
+	return names
+}
+
+// ----------------------------------------------------------------
+//                     Structs section
+
+func serializeStructs(prgrm *CXProgram, encoder *serializeEncoder) {
+	encoder.serializeEncoderLength(len(prgrm.CXStructs), prgrm.CXStructs == nil)
+	for i := range prgrm.CXStructs {
+		serializeStruct(encoder, &prgrm.CXStructs[i])
+	}
+}
+
+func deserializeStructs(prgrm *CXProgram, decoder *serializeDecoder) {
+	length := decoder.serializeDecoderLength(4)
+	if length < 0 {
+		return
+	}
+	// OBJMODEL: state.CXStructMng (manager storage) or []CXStructGid, phase 4 #336.
+	// Now a slice of objects, the arena of a compiled program.
+	prgrm.CXStructs = make([]CXStruct, length)
+	for i := range prgrm.CXStructs {
+		deserializeStruct(decoder, &prgrm.CXStructs[i])
+	}
+}
+
+// ----------------------------------------------------------------
+//                     Functions section
+
+func serializeFunctions(prgrm *CXProgram, encoder *serializeEncoder) error {
+	encoder.serializeEncoderLength(len(prgrm.CXFunctions), prgrm.CXFunctions == nil)
+	for i := range prgrm.CXFunctions {
+		if err := serializeFunction(prgrm, encoder, &prgrm.CXFunctions[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func serializeFunction(prgrm *CXProgram, encoder *serializeEncoder, fn *CXFunction) error {
+	encoder.serializeEncoderInt(int64(fn.Index))
+	encoder.serializeEncoderInt(int64(fn.Name))
+	encoder.serializeEncoderInt(int64(fn.Package))
+	encoder.serializeEncoderInt(int64(fn.AtomicOPCode))
+	serializeOwnedStruct(encoder, fn.Inputs)
+	serializeOwnedStruct(encoder, fn.Outputs)
+	encoder.serializeEncoderLength(len(fn.Expressions), fn.Expressions == nil)
+	for i := range fn.Expressions {
+		serializeExpression(encoder, &fn.Expressions[i])
+	}
+	encoder.serializeEncoderLength(len(fn.LocalVariables), fn.LocalVariables == nil)
+	for _, name := range fn.LocalVariables {
+		encoder.serializeEncoderInt(int64(name))
+	}
+	encoder.serializeEncoderInt(int64(fn.LineCount))
+	encoder.serializeEncoderPointer(fn.Size)
+	encoder.serializeEncoderInt(int64(fn.FileName))
+	encoder.serializeEncoderInt(int64(fn.FileLine))
+	encoder.serializeEncoderInt(int64(fn.FileColumn))
+	encoder.serializeEncoderLength(len(fn.ListOfPointers), fn.ListOfPointers == nil)
+	for _, arg := range fn.ListOfPointers {
+		encoder.serializeEncoderBool(arg != nil)
+		if arg != nil {
+			if err := serializeArgument(prgrm, encoder, arg); err != nil {
+				return err
+			}
+		}
+	}
+	encoder.serializeEncoderLength(len(fn.EscapeInputs), fn.EscapeInputs == nil)
+	for _, escape := range fn.EscapeInputs {
+		encoder.serializeEncoderUint(uint64(escape))
+	}
+	encoder.serializeEncoderLength(len(fn.ListOfSlots), fn.ListOfSlots == nil)
+	for i := range fn.ListOfSlots {
+		slot := &fn.ListOfSlots[i]
+		encoder.serializeEncoderPointer(slot.CXFunctionSlotOffset)
+		encoder.serializeEncoderPointers(slot.CXFunctionSlotLengths)
+		encoder.serializeEncoderInt(int64(slot.CXFunctionSlotType))
+		encoder.serializeEncoderInts(slot.CXFunctionSlotSpecifiers)
+		strct, err := serializeStructReference(prgrm, slot.CXFunctionSlotStruct)
+		if err != nil {
+			return err
+		}
+		encoder.serializeEncoderInt(strct)
+	}
+	return nil
+}
+
+func deserializeFunctions(prgrm *CXProgram, decoder *serializeDecoder) {
+	length := decoder.serializeDecoderLength(16)
+	if length < 0 {
+		return
+	}
+	// OBJMODEL: state.CXFunctionMng (manager storage) or []CXFunctionGid, phase 4 #351.
+	// Now a slice of objects, the arena of a compiled program.
+	prgrm.CXFunctions = make([]CXFunction, length)
+	for i := range prgrm.CXFunctions {
+		deserializeFunction(prgrm, decoder, &prgrm.CXFunctions[i])
+	}
+}
+
+func deserializeFunction(prgrm *CXProgram, decoder *serializeDecoder, fn *CXFunction) {
+	fn.Index = decoder.serializeDecoderIntValue()
+	fn.Name = stringpool.StringGid(decoder.serializeDecoderInt())
+	fn.Package = CXPackageIndex(decoder.serializeDecoderIntValue())
+	fn.AtomicOPCode = decoder.serializeDecoderIntValue()
+	fn.Inputs = deserializeOwnedStruct(decoder)
+	fn.Outputs = deserializeOwnedStruct(decoder)
+	if length := decoder.serializeDecoderLength(5); length >= 0 {
+		fn.Expressions = make([]CXExpression, length)
+		for i := range fn.Expressions {
+			deserializeExpression(decoder, &fn.Expressions[i])
+		}
+	}
+	if length := decoder.serializeDecoderLength(1); length >= 0 {
+		fn.LocalVariables = make([]stringpool.StringGid, length)
+		for i := range fn.LocalVariables {
+			fn.LocalVariables[i] = stringpool.StringGid(decoder.serializeDecoderInt())
+		}
+	}
+	fn.LineCount = decoder.serializeDecoderIntValue()
+	fn.Size = decoder.serializeDecoderPointer()
+	fn.FileName = SourceFileGid(decoder.serializeDecoderInt())
+	fn.FileLine = decoder.serializeDecoderIntValue()
+	fn.FileColumn = decoder.serializeDecoderIntValue()
+	if length := decoder.serializeDecoderLength(1); length >= 0 {
+		// OBJMODEL: state.CXArgumentMng (manager storage) or []CXArgumentGid, phase 4 #326.
+		// Now a slice of pointers, as compiled programs hold the GC roots.
+		fn.ListOfPointers = make([]*CXArgument, length)
+		for i := range fn.ListOfPointers {
+			if decoder.serializeDecoderBool() {
+				// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+				// Now a heap literal, as compiled programs hold the GC roots.
+				fn.ListOfPointers[i] = &CXArgument{}
+				deserializeArgument(prgrm, decoder, fn.ListOfPointers[i])
+			}
+		}
+	}
+	if length := decoder.serializeDecoderLength(1); length >= 0 {
+		fn.EscapeInputs = make([]CXFunctionEscape, length)
+		for i := range fn.EscapeInputs {
+			escape := decoder.serializeDecoderUint()
+			if escape > uint64(CXFunctionEscapeHeap) {
+				decoder.serializeDecoderFailf("escape %d", escape)
+				return
+			}
+			fn.EscapeInputs[i] = CXFunctionEscape(escape)
+		}
+	}
+	if length := decoder.serializeDecoderLength(5); length >= 0 {
+		fn.ListOfSlots = make([]CXFunctionSlot, length)
+		for i := range fn.ListOfSlots {
+			slot := &fn.ListOfSlots[i]
+			slot.CXFunctionSlotOffset = decoder.serializeDecoderPointer()
+			slot.CXFunctionSlotLengths = decoder.serializeDecoderPointers()
+			slot.CXFunctionSlotType = types.Code(decoder.serializeDecoderIntValue())
+			slot.CXFunctionSlotSpecifiers = decoder.serializeDecoderInts()
+			slot.CXFunctionSlotStruct = deserializeStructReference(prgrm, decoder)
+		}
+	}
+}
+
+// ----------------------------------------------------------------
+//                     Expressions section
+
+func serializeExpression(encoder *serializeEncoder, expr *CXExpression) {
+	encoder.serializeEncoderInt(int64(expr.ExpressionType))
+	encoder.serializeEncoderUint(uint64(expr.ExpressionScopeOpenCount))
+	encoder.serializeEncoderUint(uint64(expr.ExpressionScopeCloseCount))
+	encoder.serializeEncoderInt(int64(expr.Index))
+	encoder.serializeEncoderInt(int64(expr.Type))
+}
+
+func deserializeExpression(decoder *serializeDecoder, expr *CXExpression) {
+	expr.ExpressionType = CXEXPR_TYPE(decoder.serializeDecoderIntValue())
+	expr.ExpressionScopeOpenCount = deserializeUint8(decoder)
+	expr.ExpressionScopeCloseCount = deserializeUint8(decoder)
+	expr.Index = decoder.serializeDecoderIntValue()
+	expr.Type = CXOPERATION_TYPE(decoder.serializeDecoderIntValue())
+}
+
+func serializeExpressions(prgrm *CXProgram, encoder *serializeEncoder) error {
+	encoder.serializeEncoderLength(len(prgrm.CXAtomicOps), prgrm.CXAtomicOps == nil)
+	for i := range prgrm.CXAtomicOps {
+		op := &prgrm.CXAtomicOps[i]
+		serializeOwnedStruct(encoder, op.Inputs)
+		serializeOwnedStruct(encoder, op.Outputs)
+		encoder.serializeEncoderInt(int64(op.Operator))
+		encoder.serializeEncoderInt(int64(op.Function))
+		encoder.serializeEncoderInt(int64(op.Package))
+		encoder.serializeEncoderInt(int64(op.Label))
+		encoder.serializeEncoderInt(int64(op.ThenLines))
+		encoder.serializeEncoderInt(int64(op.ElseLines))
+	}
+	manager := &prgrm.CxIrState.CXLineMng
+	return serializeManager(encoder, manager.CXLineMngObjects, serializeManagerSlots{
+		len(manager.CXLineMngObjects), manager.CXLineMngGenerations, manager.CXLineMngLive, manager.CXLineMngFree,
+		manager.CXLineMngNext, manager.CXLineMngRetired, manager.CXLineMngLen, manager.CXLineMngGrowable,
+	}, func(line *CXLine) error {
+		encoder.serializeEncoderInt(int64(line.FileName))
+		encoder.serializeEncoderInt(int64(line.LineNumber))
+		encoder.serializeEncoderInt(int64(line.LineColumn))
+		encoder.serializeEncoderInt(int64(line.LineStr))
+		return nil
+	})
+}
+
+func deserializeExpressions(prgrm *CXProgram, decoder *serializeDecoder) {
+	if length := decoder.serializeDecoderLength(8); length >= 0 {
+		// OBJMODEL: state.CXAtomicOperatorMng (manager storage) or []CXAtomicOperatorGid, phase 4 #341.
+		// Now a slice of objects, the arena of a compiled program.
+		prgrm.CXAtomicOps = make([]CXAtomicOperator, length)
+		for i := range prgrm.CXAtomicOps {
+			op := &prgrm.CXAtomicOps[i]
+			op.Inputs = deserializeOwnedStruct(decoder)
+			op.Outputs = deserializeOwnedStruct(decoder)
+			op.Operator = CXFunctionIndex(decoder.serializeDecoderIntValue())
+			op.Function = CXFunctionIndex(decoder.serializeDecoderIntValue())
+			op.Package = CXPackageIndex(decoder.serializeDecoderIntValue())
+			op.Label = stringpool.StringGid(decoder.serializeDecoderInt())
+			op.ThenLines = decoder.serializeDecoderIntValue()
+			op.ElseLines = decoder.serializeDecoderIntValue()
+		}
+	}
+	objects, slots := deserializeManager(decoder, "CXLineMng", func(line *CXLine) {
+		line.FileName = SourceFileGid(decoder.serializeDecoderInt())
+		line.LineNumber = decoder.serializeDecoderIntValue()
+		line.LineColumn = decoder.serializeDecoderIntValue()
+		line.LineStr = stringpool.StringGid(decoder.serializeDecoderInt())
+	})
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	prgrm.CxIrState.CXLineMng = CXLineMng{
+		objects, slots.serializeManagerSlotsGenerations, slots.serializeManagerSlotsLive, slots.serializeManagerSlotsFree,
+		slots.serializeManagerSlotsNext, slots.serializeManagerSlotsRetired, slots.serializeManagerSlotsLen, slots.serializeManagerSlotsGrowable,
+	}
+}
+
+// ----------------------------------------------------------------
+//                     Arguments section
+
+func serializeArgument(prgrm *CXProgram, encoder *serializeEncoder, arg *CXArgument) error {
+	encoder.serializeEncoderInt(int64(arg.Name))
+	encoder.serializeEncoderInt(int64(arg.Index))
+	encoder.serializeEncoderInt(int64(arg.Package))
+	encoder.serializeEncoderPointers(arg.Lengths)
+	encoder.serializeEncoderInts(arg.DereferenceOperations)
+	encoder.serializeEncoderInts(arg.DeclarationSpecifiers)
+	encoder.serializeEncoderLength(len(arg.Indexes), arg.Indexes == nil)
+	for _, index := range arg.Indexes {
+		encoder.serializeEncoderInt(int64(index))
+	}
+	for _, list := range [][]CXArgumentIndex{arg.Fields, arg.Inputs, arg.Outputs} {
+		encoder.serializeEncoderLength(len(list), list == nil)
+		for _, index := range list {
+			encoder.serializeEncoderInt(int64(index))
+		}
+	}
+	encoder.serializeEncoderInt(int64(arg.Type))
+	encoder.serializeEncoderInt(int64(arg.PointerTargetType))
+	encoder.serializeEncoderPointer(arg.Size)
+	encoder.serializeEncoderPointer(arg.Offset)
+	encoder.serializeEncoderInt(int64(arg.PassBy))
+	encoder.serializeEncoderInt(int64(arg.ArgDetails))
+	strct, err := serializeStructReference(prgrm, arg.StructType)
+	if err != nil {
+		return err
+	}
+	encoder.serializeEncoderInt(strct)
+	encoder.serializeEncoderBool(arg.PreviouslyDeclared)
+	return nil
+}
+
+func deserializeArgument(prgrm *CXProgram, decoder *serializeDecoder, arg *CXArgument) {
+	arg.Name = stringpool.StringGid(decoder.serializeDecoderInt())
+	arg.Index = decoder.serializeDecoderIntValue()
+	arg.Package = CXPackageIndex(decoder.serializeDecoderIntValue())
+	arg.Lengths = decoder.serializeDecoderPointers()
+	arg.DereferenceOperations = decoder.serializeDecoderInts()
+	arg.DeclarationSpecifiers = decoder.serializeDecoderInts()
+	if length := decoder.serializeDecoderLength(1); length >= 0 {
+		arg.Indexes = make([]CXTypeSignatureIndex, length)
+		for i := range arg.Indexes {
+			arg.Indexes[i] = CXTypeSignatureIndex(decoder.serializeDecoderIntValue())
+		}
+	}
+	for _, list := range []*[]CXArgumentIndex{&arg.Fields, &arg.Inputs, &arg.Outputs} {
+		if length := decoder.serializeDecoderLength(1); length >= 0 {
+			*list = make([]CXArgumentIndex, length)
+			for i := range *list {
+				(*list)[i] = CXArgumentIndex(decoder.serializeDecoderIntValue())
+			}
+		}
+	}
+	arg.Type = types.Code(decoder.serializeDecoderIntValue())
+	arg.PointerTargetType = types.Code(decoder.serializeDecoderIntValue())
+	arg.Size = decoder.serializeDecoderPointer()
+	arg.Offset = decoder.serializeDecoderPointer()
+	arg.PassBy = decoder.serializeDecoderIntValue()
+	arg.ArgDetails = CXArgumentDebugGid(decoder.serializeDecoderInt())
+	arg.StructType = deserializeStructReference(prgrm, decoder)
+	arg.PreviouslyDeclared = decoder.serializeDecoderBool()
+}
+
+func serializeArguments(prgrm *CXProgram, encoder *serializeEncoder) error {
+	arguments := &prgrm.CxIrState.CXArgumentMng
+	err := serializeManager(encoder, arguments.CXArgumentMngObjects, serializeManagerSlots{
+		len(arguments.CXArgumentMngObjects), arguments.CXArgumentMngGenerations, arguments.CXArgumentMngLive, arguments.CXArgumentMngFree,
+		arguments.CXArgumentMngNext, arguments.CXArgumentMngRetired, arguments.CXArgumentMngLen, arguments.CXArgumentMngGrowable,
+	}, func(arg *CXArgument) error { return serializeArgument(prgrm, encoder, arg) })
+	if err != nil {
+		return err
+	}
+	debug := &prgrm.CxIrState.CXArgumentDebugMng
+	return serializeManager(encoder, debug.CXArgumentDebugMngObjects, serializeManagerSlots{
+		len(debug.CXArgumentDebugMngObjects), debug.CXArgumentDebugMngGenerations, debug.CXArgumentDebugMngLive, debug.CXArgumentDebugMngFree,
+		debug.CXArgumentDebugMngNext, debug.CXArgumentDebugMngRetired, debug.CXArgumentDebugMngLen, debug.CXArgumentDebugMngGrowable,
+	}, func(details *CXArgumentDebug) error {
+		encoder.serializeEncoderInt(int64(details.FileName))
+		encoder.serializeEncoderInt(int64(details.FileLine))
+		encoder.serializeEncoderInt(int64(details.FileColumn))
+		return nil
+	})
+}
+
+func deserializeArguments(prgrm *CXProgram, decoder *serializeDecoder) {
+	arguments, slots := deserializeManager(decoder, "CXArgumentMng", func(arg *CXArgument) { deserializeArgument(prgrm, decoder, arg) })
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	prgrm.CxIrState.CXArgumentMng = CXArgumentMng{
+		arguments, slots.serializeManagerSlotsGenerations, slots.serializeManagerSlotsLive, slots.serializeManagerSlotsFree,
+		slots.serializeManagerSlotsNext, slots.serializeManagerSlotsRetired, slots.serializeManagerSlotsLen, slots.serializeManagerSlotsGrowable,
+	}
+	debug, slots := deserializeManager(decoder, "CXArgumentDebugMng", func(details *CXArgumentDebug) {
+		details.FileName = SourceFileGid(decoder.serializeDecoderInt())
+		details.FileLine = decoder.serializeDecoderIntValue()
+		details.FileColumn = decoder.serializeDecoderIntValue()
+	})
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	prgrm.CxIrState.CXArgumentDebugMng = CXArgumentDebugMng{
+		debug, slots.serializeManagerSlotsGenerations, slots.serializeManagerSlotsLive, slots.serializeManagerSlotsFree,
+		slots.serializeManagerSlotsNext, slots.serializeManagerSlotsRetired, slots.serializeManagerSlotsLen, slots.serializeManagerSlotsGrowable,
+	}
+}
+
+// ----------------------------------------------------------------
+//                     Type signatures section
+
+func serializeTypeSignatures(prgrm *CXProgram, encoder *serializeEncoder) error {
+	state := prgrm.CxIrState
+	signatures := &state.CXTypeSignatureMng
+	err := serializeManager(encoder, signatures.CXTypeSignatureMngObjects, serializeManagerSlots{
+		len(signatures.CXTypeSignatureMngObjects), signatures.CXTypeSignatureMngGenerations, signatures.CXTypeSignatureMngLive, signatures.CXTypeSignatureMngFree,
+		signatures.CXTypeSignatureMngNext, signatures.CXTypeSignatureMngRetired, signatures.CXTypeSignatureMngLen, signatures.CXTypeSignatureMngGrowable,
+	}, func(signature *CXTypeSignature) error {
+		encoder.serializeEncoderInt(int64(signature.Index))
+		encoder.serializeEncoderInt(int64(signature.Name))
+		encoder.serializeEncoderPointer(signature.Offset)
+		encoder.serializeEncoderInt(int64(signature.Type))
+		encoder.serializeEncoderInt(int64(signature.Package))
+		encoder.serializeEncoderInt(int64(signature.PassBy))
+		encoder.serializeEncoderBool(signature.IsDeref)
+		encoder.serializeEncoderInt(int64(signature.Meta))
+		encoder.serializeEncoderInt(int64(signature.ArgDetails))
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	arrays := &state.CXTypeSignature_ArrayMng
+	err = serializeManager(encoder, arrays.CXTypeSignature_ArrayMngObjects, serializeManagerSlots{
+		len(arrays.CXTypeSignature_ArrayMngObjects), arrays.CXTypeSignature_ArrayMngGenerations, arrays.CXTypeSignature_ArrayMngLive, arrays.CXTypeSignature_ArrayMngFree,
+		arrays.CXTypeSignature_ArrayMngNext, arrays.CXTypeSignature_ArrayMngRetired, arrays.CXTypeSignature_ArrayMngLen, arrays.CXTypeSignature_ArrayMngGrowable,
+	}, func(array *CXTypeSignature_Array) error {
+		encoder.serializeEncoderInt(int64(array.Meta))
+		encoder.serializeEncoderPointers(array.Lengths)
+		encoder.serializeEncoderLength(len(array.Indexes), array.Indexes == nil)
+		for _, index := range array.Indexes {
+			encoder.serializeEncoderInt(int64(index))
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	structs := &state.CXTypeSignature_StructMng
+	return serializeManager(encoder, structs.CXTypeSignature_StructMngObjects, serializeManagerSlots{
+		len(structs.CXTypeSignature_StructMngObjects), structs.CXTypeSignature_StructMngGenerations, structs.CXTypeSignature_StructMngLive, structs.CXTypeSignature_StructMngFree,
+		structs.CXTypeSignature_StructMngNext, structs.CXTypeSignature_StructMngRetired, structs.CXTypeSignature_StructMngLen, structs.CXTypeSignature_StructMngGrowable,
+	}, func(signature *CXTypeSignature_Struct) error {
+		encoder.serializeEncoderLength(len(signature.Fields), signature.Fields == nil)
+		for _, field := range signature.Fields {
+			encoder.serializeEncoderInt(int64(field))
+		}
+		strct, err := serializeStructReference(prgrm, signature.StructType)
+		encoder.serializeEncoderInt(strct)
+		return err
+	})
+}
+
+func deserializeTypeSignatures(prgrm *CXProgram, decoder *serializeDecoder) {
+	state := prgrm.CxIrState
+	signatures, slots := deserializeManager(decoder, "CXTypeSignatureMng", func(signature *CXTypeSignature) {
+		signature.Index = CXTypeSignatureIndex(decoder.serializeDecoderIntValue())
+		signature.Name = stringpool.StringGid(decoder.serializeDecoderInt())
+		signature.Offset = decoder.serializeDecoderPointer()
+		signature.Type = CXTypeSignature_TYPE(decoder.serializeDecoderIntValue())
+		signature.Package = CXPackageIndex(decoder.serializeDecoderIntValue())
+		signature.PassBy = decoder.serializeDecoderIntValue()
+		signature.IsDeref = decoder.serializeDecoderBool()
+		signature.Meta = decoder.serializeDecoderIntValue()
+		signature.ArgDetails = CXArgumentDebugGid(decoder.serializeDecoderInt())
+	})
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	state.CXTypeSignatureMng = CXTypeSignatureMng{
+		signatures, slots.serializeManagerSlotsGenerations, slots.serializeManagerSlotsLive, slots.serializeManagerSlotsFree,
+		slots.serializeManagerSlotsNext, slots.serializeManagerSlotsRetired, slots.serializeManagerSlotsLen, slots.serializeManagerSlotsGrowable,
+	}
+	arrays, slots := deserializeManager(decoder, "CXTypeSignature_ArrayMng", func(array *CXTypeSignature_Array) {
+		array.Meta = decoder.serializeDecoderIntValue()
+		array.Lengths = decoder.serializeDecoderPointers()
+		if length := decoder.serializeDecoderLength(1); length >= 0 {
+			array.Indexes = make([]CXTypeSignatureIndex, length)
+			for i := range array.Indexes {
+				array.Indexes[i] = CXTypeSignatureIndex(decoder.serializeDecoderIntValue())
+			}
+		}
+	})
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	state.CXTypeSignature_ArrayMng = CXTypeSignature_ArrayMng{
+		arrays, slots.serializeManagerSlotsGenerations, slots.serializeManagerSlotsLive, slots.serializeManagerSlotsFree,
+		slots.serializeManagerSlotsNext, slots.serializeManagerSlotsRetired, slots.serializeManagerSlotsLen, slots.serializeManagerSlotsGrowable,
+	}
+	structs, slots := deserializeManager(decoder, "CXTypeSignature_StructMng", func(signature *CXTypeSignature_Struct) {
+		if length := decoder.serializeDecoderLength(1); length >= 0 {
+			signature.Fields = make([]CXArgumentIndex, length)
+			for i := range signature.Fields {
+				signature.Fields[i] = CXArgumentIndex(decoder.serializeDecoderIntValue())
+			}
+		}
+		signature.StructType = deserializeStructReference(prgrm, decoder)
+	})
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	state.CXTypeSignature_StructMng = CXTypeSignature_StructMng{
+		structs, slots.serializeManagerSlotsGenerations, slots.serializeManagerSlotsLive, slots.serializeManagerSlotsFree,
+		slots.serializeManagerSlotsNext, slots.serializeManagerSlotsRetired, slots.serializeManagerSlotsLen, slots.serializeManagerSlotsGrowable,
+	}
+}
+
+// ----------------------------------------------------------------
+//                     Memory section
+
+// serializeMemory writes the size of the memory and, when includeMemory is
+// set, the bytes from its first to its last nonzero byte.
+func serializeMemory(prgrm *CXProgram, encoder *serializeEncoder, includeMemory bool) {
+	encoder.serializeEncoderUint(uint64(len(prgrm.Memory)))
+	encoder.serializeEncoderBool(includeMemory)
+	if !includeMemory {
+		return
+	}
+	first, last := 0, len(prgrm.Memory)
+	for first < last && prgrm.Memory[first] == 0 {
+		first++
+	}
+	for last > first && prgrm.Memory[last-1] == 0 {
+		last--
+	}
+	encoder.serializeEncoderUint(uint64(first))
+	encoder.serializeEncoderByteSlice(prgrm.Memory[first:last])
+}
+
+func deserializeMemory(prgrm *CXProgram, decoder *serializeDecoder) {
+	size := decoder.serializeDecoderUint()
+	included := decoder.serializeDecoderBool()
+	if decoder.serializeDecoderError != nil {
+		return
+	}
+	limit := uint64(prgrm.Heap.StartsAt) + uint64(prgrm.Heap.Size)
+	if size > uint64(types.InvalidPointer) || size > limit+uint64(prgrm.Stack.Size)+uint64(prgrm.Data.Size) {
+		decoder.serializeDecoderFailf("memory of %d bytes for a stack of %d, data of %d and a heap of %d", size, prgrm.Stack.Size, prgrm.Data.Size, prgrm.Heap.Size)
+		return
+	}
+	prgrm.Memory = make([]byte, size)
+	if !included {
+		return
+	}
+	first := decoder.serializeDecoderUint()
+	stored := decoder.serializeDecoderByteSlice()
+	if decoder.serializeDecoderError == nil && (first > size || uint64(len(stored)) > size-first) {
+		decoder.serializeDecoderFailf("%d memory bytes at %d do not fit %d", len(stored), first, size)
+		return
+	}
+	copy(prgrm.Memory[first:], stored)
 }

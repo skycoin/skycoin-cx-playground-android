@@ -53,7 +53,8 @@ without changes to verification or the UI.
 ## The `app` package for CX
 
 Programs draw a display list that the host renders with Gio's GPU renderer
-(OpenGL ES on Android). CX does not issue GL calls itself.
+(OpenGL ES on Android). CX does not issue GL calls itself. Programs import the
+package with `import "sys/app"`.
 
 | Function | Purpose |
 | --- | --- |
@@ -67,12 +68,10 @@ Programs draw a display list that the host renders with Gio's GPU renderer
 | `app.ShouldClose() bool` | the user pressed back |
 | `app.Rune(code i32) str` | a key code as text, as `sprintf` has no `%c` |
 
-Console output from `printf` and `str.print` is shown on screen.
+Console output from `printf` and `string.PrintLine` is shown on screen, and so
+are compile and runtime errors.
 
 ## Known limits
-
-The CX compiler calls `os.Exit` on many compile errors, so a broken program
-closes the app. The bundled apps are all compiled by `make test`.
 
 A program cannot be interrupted. Back stops a `gfx` program at its next
 `app.ShouldClose()`; a console program runs to the end first.

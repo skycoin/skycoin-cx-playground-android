@@ -1,7 +1,6 @@
 package execute
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -10,31 +9,16 @@ import (
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
-func getLastLine(cxprogram *ast.CXProgram) ast.CXExpression {
-	for c := cxprogram.CallCounter - 1; c >= 0; c-- {
-		if cxprogram.CallStack[c].Line+1 >= len(cxprogram.CallStack[c].Operator.Expressions) {
-			// then it'll also return from this function call; continue
-			continue
-		}
-		return cxprogram.CallStack[c].Operator.Expressions[cxprogram.CallStack[c].Line+1]
-		// cxprogram.CallStack[c].Operator.Expressions[cxprogram.CallStack[cxprogram.CallCounter-1].Line + 1]
-	}
-
-	cxAtomicOp := &ast.CXAtomicOperator{
-		Operator: -1,
-		Function: -1,
-	}
-
-	index := cxprogram.AddCXAtomicOp(cxAtomicOp)
-	return ast.CXExpression{
-		Index: index,
-		Type:  ast.CX_ATOMIC_OPERATOR,
-	}
-}
-
+// RunCxAst runs cxprogram. A runtime error ends the run with nil and is left
+// in cxprogram.RuntimeError for the printer package, see #413.
 func RunCxAst(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall types.Pointer) error {
 	defer ast.RuntimeError(cxprogram)
+	return runLoop(cxprogram, untilEnd, maxOps, untilCall)
+}
 
+// runLoop is RunCxAst without the deferred RuntimeError. A panic goes up to
+// the RunCxAst that runs the opcode which called Callback.
+func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall types.Pointer) error {
 	var inputs []ast.CXValue
 	var outputs []ast.CXValue
 	var opCount int = 0
@@ -46,63 +30,7 @@ func RunCxAst(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall typ
 			panic(constants.STACK_OVERFLOW_ERROR)
 		}
 
-		if !untilEnd {
-			var inName string
-			var toCallName string
-			var toCall ast.CXExpression
-
-			if call.Line >= call.Operator.LineCount && cxprogram.CallCounter == 0 {
-				cxprogram.Terminated = true
-				cxprogram.CallStack[0].Operator = nil
-				cxprogram.CallCounter = 0
-				fmt.Println("in:terminated")
-				return nil
-			}
-
-			if call.Line >= call.Operator.LineCount && cxprogram.CallCounter != 0 {
-				toCall = getLastLine(cxprogram)
-				// toCall = cxprogram.CallStack[cxprogram.CallCounter-1].Operator.Expressions[cxprogram.CallStack[cxprogram.CallCounter-1].Line + 1]
-				inName = cxprogram.CallStack[cxprogram.CallCounter-1].Operator.Name
-			} else {
-				toCall = call.Operator.Expressions[call.Line]
-				inName = call.Operator.Name
-			}
-
-			if toCall.Type == ast.CX_LINE {
-				call.Line++
-				opCount++
-				continue
-			}
-
-			cxAtomicOp, err := cxprogram.GetCXAtomicOp(toCall.Index)
-			if err != nil {
-				panic(err)
-			}
-
-			cxAtomicOpOperator := cxprogram.GetFunctionFromArray(cxAtomicOp.Operator)
-
-			if cxAtomicOpOperator == nil {
-				// then it's a declaration
-				toCallName = "declaration"
-			} else if cxAtomicOpOperator.IsBuiltIn() {
-				toCallName = ast.OpNames[cxAtomicOpOperator.AtomicOPCode]
-			} else {
-				if cxAtomicOpOperator.Name != "" {
-					opPkg := cxprogram.CXPackages[cxAtomicOpOperator.Package]
-					toCallName = opPkg.Name + "." + cxAtomicOpOperator.Name
-				} else {
-					// then it's the end of the program got from nested function calls
-					cxprogram.Terminated = true
-					cxprogram.CallStack[0].Operator = nil
-					cxprogram.CallCounter = 0
-					fmt.Println("in:terminated")
-					return nil
-				}
-			}
-
-			fmt.Printf("in:%s, expr#:%d, calling:%s()\n", inName, call.Line+1, toCallName)
-			opCount++
-		}
+		opCount++
 
 		err := call.Call(cxprogram, &inputs, &outputs)
 		if err != nil {
@@ -117,12 +45,14 @@ func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 	var inputs []ast.CXValue
 	var outputs []ast.CXValue
 
-	fn, err := mod.SelectFunction(cxprogram, constants.SYS_INIT_FUNC)
+	fn, err := mod.SelectFunction(cxprogram, cxprogram.CxIrState.CxIrStateNameSysInit)
 	if err != nil {
 		return err
 	}
 
 	// *init function
+	// OBJMODEL: state.CXCallMng.CXCallAlloc(), phase 4 #366.
+	// Now a constructor call, site S1249.
 	mainCall := MakeCall(cxprogram, fn)
 	cxprogram.CallStack[0] = mainCall
 	cxprogram.Stack.Pointer = fn.Size
@@ -143,11 +73,11 @@ func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 }
 
 func feedOSArgs(cxprogram *ast.CXProgram, args []string) error {
-	if osPkg, err := cxprogram.SelectPackage(constants.OS_PKG); err == nil {
+	if osPkg, err := cxprogram.SelectPackage(cxprogram.CxIrState.CxIrStateNameOs); err == nil {
 		argsOffset := types.Pointer(0)
-		if osGlbl, err := osPkg.GetGlobal(cxprogram, constants.OS_ARGS); err == nil {
+		if osGlbl, err := osPkg.GetGlobal(cxprogram, cxprogram.CxIrState.CxIrStateNameOsArgs); err == nil {
 			for _, arg := range args {
-				argOffset := types.AllocWrite_obj_data(cxprogram, cxprogram.Memory, []byte(arg))
+				argOffset := ast.AllocateStr(cxprogram, arg)
 
 				var argOffsetBytes [types.POINTER_SIZE]byte
 				types.Write_ptr(argOffsetBytes[:], 0, argOffset)
@@ -173,7 +103,7 @@ func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
 	// cxprogram.Stacks = append(cxprogram.Stacks, MakeStack(1024))
 
 	if cxprogram.CallStack[0].Operator == nil {
-		mod, err := cxprogram.SelectPackage(constants.MAIN_PKG)
+		mod, err := cxprogram.SelectPackage(cxprogram.CxIrState.CxIrStateNameMain)
 		if err != nil {
 			return err
 		}
@@ -184,7 +114,7 @@ func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
 			return err
 		}
 
-		fn, err := mod.SelectFunction(cxprogram, constants.MAIN_FUNC)
+		fn, err := mod.SelectFunction(cxprogram, cxprogram.CxIrState.CxIrStateNameMain)
 		if err != nil {
 			return err
 		}
@@ -194,6 +124,8 @@ func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
 		}
 
 		// main function
+		// OBJMODEL: state.CXCallMng.CXCallAlloc(), phase 4 #366.
+		// Now a constructor call, site S1250.
 		mainCall := MakeCall(cxprogram, fn)
 		mainCall.FramePointer = cxprogram.Stack.Pointer
 		// initializing program resources
@@ -214,6 +146,9 @@ func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
 	if err := RunCxAst(cxprogram, untilEnd, maxOps, types.InvalidPointer); err != nil {
 		return err
 	}
+	if cxprogram.RuntimeError.RuntimeErrorRecordRaised {
+		return nil
+	}
 
 	if cxprogram.Terminated {
 		cxprogram.Terminated = false
@@ -229,7 +164,11 @@ func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
 	return nil
 }
 
+// OBJMODEL: state.CXCallMng.CXCallAlloc(), phase 4 #366.
+// Now a constructor, site S1251.
 func MakeCall(prgrm *ast.CXProgram, op *ast.CXFunction) ast.CXCall {
+	// OBJMODEL: state.CXCallMng.CXCallAlloc(), phase 4 #366.
+	// Now a value literal, site S1252.
 	return ast.CXCall{
 		Operator:     op,
 		Line:         0,

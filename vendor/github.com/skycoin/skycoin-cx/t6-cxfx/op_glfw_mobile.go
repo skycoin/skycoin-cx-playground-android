@@ -7,6 +7,7 @@ import (
 	//"golang.org/x/mobile/event/paint"
 )
 
+// VIOLATION: state outside State. Owner: t6-cxfx; moves to GLContextMng in phase 1.
 var goapp app.App
 
 func SetGOApp(a app.App) {

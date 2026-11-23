@@ -231,6 +231,8 @@ func opI32JmpEq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1294.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -248,6 +250,8 @@ func opI32JmpUnEq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1295.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -265,6 +269,8 @@ func opI32JmpGt(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1296.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -282,6 +288,8 @@ func opI32JmpGtEq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1297.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -299,6 +307,8 @@ func opI32JmpLt(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1298.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -316,6 +326,8 @@ func opI32JmpLtEq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1299.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -333,6 +345,8 @@ func opI32JmpZero(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1300.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)
@@ -350,6 +364,8 @@ func opI32JmpNotZero(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
+	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
+	// Now an arena getter, site S1301.
 	cxAtomicOp, err := prgrm.GetCXAtomicOp(expr.Index)
 	if err != nil {
 		panic(err)

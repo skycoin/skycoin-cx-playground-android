@@ -120,3 +120,21 @@ func AllocateSeq(program interface{}, size types.Pointer) (offset types.Pointer)
 	// consideration only heap offsets.
 	return addr + prgrm.Heap.StartsAt
 }
+
+// AllocateStr returns a new str object holding data. It writes the object
+// after the allocation, which may give prgrm a new Memory.
+func AllocateStr(prgrm *CXProgram, data string) types.Pointer {
+	size := types.OBJECT_HEADER_SIZE + types.Cast_int_to_ptr(len(data))
+	object := AllocateSeq(prgrm, size)
+	types.Write_obj_data(prgrm.Memory, object, size, []byte(data))
+	return object
+}
+
+// AllocateStrAt writes a new str object holding data at address. An address
+// inside a heap object stays pinned, so it moves with the object.
+func AllocateStrAt(prgrm *CXProgram, address types.Pointer, data string) {
+	prgrm.Heap.Pinned = address
+	object := AllocateStr(prgrm, data)
+	address, prgrm.Heap.Pinned = prgrm.Heap.Pinned, 0
+	types.Write_ptr(prgrm.Memory, address, object)
+}

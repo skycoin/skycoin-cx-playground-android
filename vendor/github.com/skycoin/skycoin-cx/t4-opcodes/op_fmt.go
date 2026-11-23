@@ -92,24 +92,7 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 		lInps := len(inputs[specifiersCounter+1:])
 		for c := 0; c < lInps; c++ {
 			inp := &inputs[specifiersCounter+1+c]
-			var inpArg *ast.CXArgument
-			if inp.TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
-				inpArg = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inp.TypeSignature.Meta))
-			} else {
-				panic("type is not type cx argument deprecate\n\n")
-			}
-
-			elt := inpArg.GetAssignmentElement(prgrm)
-			typ := ""
-			_ = typ
-			if elt.StructType != nil {
-				// then it's struct type
-				typ = elt.StructType.Name
-			} else {
-				// then it's native type
-				typ = elt.Type.Name()
-			}
-
+			typ := inp.TypeSignature.GetValueTypeName(prgrm)
 			if c == lInps-1 {
 				extra += fmt.Sprintf("%s=%s", typ, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature))
 			} else {

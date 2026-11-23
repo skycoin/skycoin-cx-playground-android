@@ -11,6 +11,8 @@ func opSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	var inp0 *ast.CXArgument
 	var sliceLen types.Pointer
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1310.
 		inp0 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 
 		elt := inp0.GetAssignmentElement(prgrm)
@@ -19,8 +21,6 @@ func opSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 			sliceOffset := types.Read_ptr(prgrm.Memory, inputs[0].Offset)
 			if sliceOffset > 0 && sliceOffset.IsValid() {
 				sliceLen = ast.GetSliceLen(prgrm, sliceOffset)
-			} else if sliceOffset < 0 {
-				panic(constants.CX_RUNTIME_ERROR)
 			}
 			// TODO: Had to add elt.Lengths to avoid doing this for arrays, but not entirely sure why
 		} else if (elt.PointerTargetType == types.STR || elt.Type == types.STR) && elt.Lengths == nil {
@@ -29,20 +29,24 @@ func opSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 			sliceLen = elt.Lengths[len(elt.Indexes)]
 		}
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_ARRAY_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1311.
 		arrDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[0].TypeSignature.Meta)
 		sliceLen = arrDetails.Lengths[len(arrDetails.Indexes)]
-	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC || inputs[0].TypeSignature.Type == ast.TYPE_POINTER_SLICE_ATOMIC && inputs[0].TypeSignature.IsDeref {
 		sliceOffset := types.Read_ptr(prgrm.Memory, inputs[0].Offset)
 		if sliceOffset > 0 && sliceOffset.IsValid() {
 			sliceLen = ast.GetSliceLen(prgrm, sliceOffset)
-		} else if sliceOffset < 0 {
-			panic(constants.CX_RUNTIME_ERROR)
 		}
-	} else if inputs[0].TypeSignature.Type == ast.TYPE_STRUCT {
+	} else if inputs[0].TypeSignature.Type == ast.TYPE_STRUCT || inputs[0].TypeSignature.Type == ast.TYPE_POINTER_STRUCT {
+		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
+		// Now an arena getter, site S1312.
 		structDetails := prgrm.GetCXTypeSignatureStructFromArray(inputs[0].TypeSignature.Meta)
 
 		fldLen := len(structDetails.Fields)
 		if fldLen > 0 {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1313.
 			fld := prgrm.GetCXArgFromArray(structDetails.Fields[fldLen-1])
 			fld = fld.GetAssignmentElement(prgrm)
 
@@ -50,8 +54,6 @@ func opSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 				sliceOffset := types.Read_ptr(prgrm.Memory, inputs[0].Offset)
 				if sliceOffset > 0 && sliceOffset.IsValid() {
 					sliceLen = ast.GetSliceLen(prgrm, sliceOffset)
-				} else if sliceOffset < 0 {
-					panic(constants.CX_RUNTIME_ERROR)
 				}
 				// TODO: Had to add elt.Lengths to avoid doing this for arrays, but not entirely sure why
 			} else if (fld.PointerTargetType == types.STR || fld.Type == types.STR) && fld.Lengths == nil {
@@ -75,6 +77,8 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	var inp0Type, inp1Type, out0Type types.Code
 	var input0IsSlice, outputIsSlice bool
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1314.
 		inp0 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 		inp0Type = inp0.Type
 		if inp0.Type == types.POINTER {
@@ -84,16 +88,22 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 		eltInp0 := inp0.GetAssignmentElement(prgrm)
 		input0IsSlice = eltInp0.IsSlice()
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC || inputs[0].TypeSignature.Type == ast.TYPE_POINTER_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1315.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[0].TypeSignature.Meta)
 		inp0Type = types.Code(sliceDetails.Meta)
 
 		input0IsSlice = true
-	} else if inputs[0].TypeSignature.Type == ast.TYPE_STRUCT {
+	} else if inputs[0].TypeSignature.Type == ast.TYPE_STRUCT || inputs[0].TypeSignature.Type == ast.TYPE_POINTER_STRUCT {
 		inp0Type = types.STRUCT
 
+		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
+		// Now an arena getter, site S1316.
 		structDetails := prgrm.GetCXTypeSignatureStructFromArray(inputs[0].TypeSignature.Meta)
 		fldLen := len(structDetails.Fields)
 		if fldLen > 0 {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1317.
 			fld := prgrm.GetCXArgFromArray(structDetails.Fields[fldLen-1])
 			fld = fld.GetAssignmentElement(prgrm)
 			input0IsSlice = fld.IsSlice()
@@ -108,6 +118,8 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	}
 
 	if inputs[1].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1318.
 		inp1 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[1].TypeSignature.Meta))
 		inp1Type = inp1.Type
 		if inp1.Type == types.POINTER {
@@ -118,6 +130,8 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	}
 
 	if outputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1319.
 		out0 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(outputs[0].TypeSignature.Meta))
 
 		out0 := out0.GetAssignmentElement(prgrm)
@@ -130,15 +144,21 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 		outputIsSlice = out0.IsSlice()
 
 	} else if outputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC || outputs[0].TypeSignature.Type == ast.TYPE_POINTER_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1320.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(outputs[0].TypeSignature.Meta)
 		out0Type = types.Code(sliceDetails.Meta)
 		outputIsSlice = true
-	} else if outputs[0].TypeSignature.Type == ast.TYPE_STRUCT {
+	} else if outputs[0].TypeSignature.Type == ast.TYPE_STRUCT || outputs[0].TypeSignature.Type == ast.TYPE_POINTER_STRUCT {
 		out0Type = types.STRUCT
 
+		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
+		// Now an arena getter, site S1321.
 		structDetails := prgrm.GetCXTypeSignatureStructFromArray(outputs[0].TypeSignature.Meta)
 		fldLen := len(structDetails.Fields)
 		if fldLen > 0 {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1322.
 			fld := prgrm.GetCXArgFromArray(structDetails.Fields[fldLen-1])
 			fld = fld.GetAssignmentElement(prgrm)
 			outputIsSlice = fld.IsSlice()
@@ -156,7 +176,7 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	sliceInputsLen := types.Cast_int_to_ptr(len(sliceInputs))
 
 	if inp0Type != inp1Type || inp0Type != out0Type || !input0IsSlice || !outputIsSlice {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
 	var inputSliceLen types.Pointer
@@ -166,7 +186,8 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	}
 
 	// Preparing slice in case more memory is needed for the new element.
-	outputSliceOffset := ast.SliceAppendResize(prgrm, inputs[0].FramePointer, outputs[0].TypeSignature, inputs[0].TypeSignature, ast.GetDerefSizeSlice(prgrm, inputs[0].TypeSignature), sliceInputsLen)
+	eltSize := ast.GetDerefSizeSlice(prgrm, inputs[0].TypeSignature)
+	outputSliceOffset := ast.SliceAppendResize(prgrm, inputs[0].FramePointer, outputs[0].TypeSignature, inputs[0].TypeSignature, eltSize, sliceInputsLen)
 
 	// We need to update the address of the output and input, as the final offsets
 	// could be on the heap and they could have been moved by the GC.
@@ -175,6 +196,8 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 		var inp *ast.CXArgument
 		var inpType types.Code
 		if input.TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+			// Now an arena getter, site S1323.
 			inp = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(input.TypeSignature.Meta))
 			inpType = inp.Type
 			if inp.Type == types.POINTER {
@@ -185,14 +208,20 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 		}
 
 		if inp0Type != inpType {
-			panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+			panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 		}
-		if inpType == types.STR || inpType == types.AFF {
+		if ast.CXTypeSignaturePassBy(prgrm, input.TypeSignature) == constants.PASSBY_REFERENCE {
+			// append(ps, &x) appends the address of x.
+			var obj [types.POINTER_SIZE]byte
+			types.Write_ptr(obj[:], 0, ast.PointerOfAddress(prgrm, input.Offset))
+			ast.SliceAppendWrite(prgrm, outputSliceOffset, obj[:], inputSliceLen+types.Cast_int_to_ptr(i))
+		} else if (inpType == types.STR || inpType == types.AFF) && eltSize == types.POINTER_SIZE {
+			// An array of str, as [][2]str appends, is copied whole below.
 			var obj [types.POINTER_SIZE]byte
 			types.Write_ptr(obj[:], 0, types.Read_ptr(prgrm.Memory, input.Offset))
 			ast.SliceAppendWrite(prgrm, outputSliceOffset, obj[:], inputSliceLen+types.Cast_int_to_ptr(i))
 		} else {
-			obj := inputs[1].Get_bytes(prgrm)
+			obj := types.GetSlice_byte(prgrm.Memory, input.Offset, eltSize)
 			ast.SliceAppendWrite(prgrm, outputSliceOffset, obj, inputSliceLen+types.Cast_int_to_ptr(i))
 		}
 	}
@@ -206,6 +235,8 @@ func opSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	var inpType, outType types.Code
 	var inpIsSlice, outIsSlice bool
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1324.
 		inp0 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 		eltInp0 := inp0.GetAssignmentElement(prgrm)
 		inpSize = eltInp0.Size
@@ -213,6 +244,8 @@ func opSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 		inpType = inp0.Type
 		inpIsSlice = eltInp0.IsSlice()
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1325.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[0].TypeSignature.Meta)
 		inpSize = types.Code(sliceDetails.Meta).Size()
 
@@ -223,10 +256,14 @@ func opSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	}
 
 	if outputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1326.
 		out0 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(outputs[0].TypeSignature.Meta))
 		outType = out0.Type
 		outIsSlice = out0.GetAssignmentElement(prgrm).IsSlice()
 	} else if outputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1327.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(outputs[0].TypeSignature.Meta)
 
 		outType = types.Code(sliceDetails.Meta)
@@ -238,7 +275,7 @@ func opSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	fp := inputs[0].FramePointer
 
 	if inpType != outType || !inpIsSlice || !outIsSlice {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
 	outputSliceOffset := ast.SliceResize(prgrm, fp, outputs[0].TypeSignature, inputs[0].TypeSignature, types.Cast_i32_to_ptr(inputs[1].Get_i32(prgrm)), inpSize)
@@ -251,6 +288,8 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	var inp0Type, inp2Type, out0Type types.Code
 	var inpIsSlice, outIsSlice bool
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1328.
 		inp0 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 
 		inp0Type = inp0.Type
@@ -264,6 +303,8 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 
 		inpIsSlice = false
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1329.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[0].TypeSignature.Meta)
 
 		inp0Type = types.Code(sliceDetails.Meta)
@@ -273,6 +314,8 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	}
 
 	if inputs[2].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1330.
 		inp2 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[2].TypeSignature.Meta))
 
 		inp2Type = inp2.Type
@@ -284,6 +327,8 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	}
 
 	if outputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1331.
 		out0 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(outputs[0].TypeSignature.Meta))
 
 		out0Type = out0.Type
@@ -297,6 +342,8 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 
 		outIsSlice = false
 	} else if outputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1332.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(outputs[0].TypeSignature.Meta)
 
 		out0Type = types.Code(sliceDetails.Meta)
@@ -308,7 +355,7 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	fp := inputs[0].FramePointer
 
 	if inp0Type != inp2Type || inp0Type != out0Type || !inpIsSlice || !outIsSlice {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
 	index := types.Cast_i32_to_ptr(inputs[1].Get_i32(prgrm))
@@ -333,12 +380,16 @@ func opSliceRemoveElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	var inpSize types.Pointer
 
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1333.
 		inp0 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 
 		inpType = inp0.Type
 		inpIsSlice = inp0.GetAssignmentElement(prgrm).IsSlice()
 		inpSize = inp0.GetAssignmentElement(prgrm).Size
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1334.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[0].TypeSignature.Meta)
 
 		inpType = types.Code(sliceDetails.Meta)
@@ -349,11 +400,15 @@ func opSliceRemoveElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	}
 
 	if outputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1335.
 		out0 := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(outputs[0].TypeSignature.Meta))
 
 		outType = out0.Type
 		outIsSlice = out0.GetAssignmentElement(prgrm).IsSlice()
 	} else if outputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1336.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(outputs[0].TypeSignature.Meta)
 
 		outType = types.Code(sliceDetails.Meta)
@@ -365,7 +420,7 @@ func opSliceRemoveElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	fp := inputs[0].FramePointer
 
 	if inpType != outType || !inpIsSlice || !outIsSlice {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
 	outputSliceOffset := ast.SliceRemove(prgrm, fp, outputs[0].TypeSignature, inputs[0].TypeSignature, types.Cast_i32_to_ptr(inputs[1].Get_i32(prgrm)), inpSize)
@@ -378,6 +433,8 @@ func opSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	var dstSize types.Pointer
 	var dstIsSlice bool
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1337.
 		dstInput := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 		dstElem := dstInput.GetAssignmentElement(prgrm)
 
@@ -385,6 +442,8 @@ func opSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 		dstSize = dstElem.Size
 		dstIsSlice = dstElem.IsSlice()
 	} else if inputs[0].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1338.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[0].TypeSignature.Meta)
 
 		dstType = types.Code(sliceDetails.Meta)
@@ -398,6 +457,8 @@ func opSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	var srcSize types.Pointer
 	var srcIsSlice bool
 	if inputs[1].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, site S1339.
 		srcInput := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[1].TypeSignature.Meta))
 		srcElem := srcInput.GetAssignmentElement(prgrm)
 
@@ -405,6 +466,8 @@ func opSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 		srcSize = srcElem.Size
 		srcIsSlice = srcElem.IsSlice()
 	} else if inputs[1].TypeSignature.Type == ast.TYPE_SLICE_ATOMIC {
+		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
+		// Now an arena getter, site S1340.
 		sliceDetails := prgrm.GetCXTypeSignatureArrayFromArray(inputs[1].TypeSignature.Meta)
 
 		srcType = types.Code(sliceDetails.Meta)
@@ -420,20 +483,20 @@ func opSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	srcOffset := ast.GetSliceOffset(prgrm, fp, inputs[1].TypeSignature)
 
 	if dstType != srcType || !dstIsSlice || !srcIsSlice || dstSize != srcSize {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
 	dst := ast.GetSliceData(prgrm, dstOffset, dstSize)
 	src := ast.GetSliceData(prgrm, srcOffset, srcSize)
 
 	var count types.Pointer
-	if dstType == srcType && dstOffset >= 0 && srcOffset >= 0 {
+	if dstType == srcType {
 		count = types.Cast_int_to_ptr(copy(dst, src))
 		if count%dstSize != 0 {
-			panic(constants.CX_RUNTIME_ERROR)
+			panic(types.CX_RUNTIME_ERROR)
 		}
 	} else {
-		panic(constants.CX_RUNTIME_INVALID_ARGUMENT)
+		panic(types.CX_RUNTIME_INVALID_ARGUMENT)
 	}
 
 	outputs[0].Set_i32(prgrm, types.Cast_ptr_to_i32(count/dstSize)) // TODO:PTR use ptr instead of i32

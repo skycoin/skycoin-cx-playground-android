@@ -90,6 +90,7 @@ const (
 )
 
 // gogl
+// VIOLATION: state outside State. Owner: t6-cxfx; moves to GLContextMng in phase 1.
 var glctx gl.Context
 
 func SetGLContext(ctx gl.Context) {

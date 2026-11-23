@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
-	"github.com/skycoin/skycoin-cx/t0-util"
+	"github.com/skycoin/skycoin-cx/t0-util" // thin: only ProgramFileSystemPathFromBytes, ProgramSandboxFileOpen; no depth gain
 	"github.com/skycoin/skycoin-cx/t3-ast"
 
 	//"bytes"
@@ -65,7 +65,10 @@ func Slice_f32_ToPtr(value []float32) unsafe.Pointer {
 	return unsafe.Pointer(&value[0])
 }
 
+// VIOLATION: state outside State. Owner: t6-cxfx; moves to GIFMng in phase 1.
 var gifs map[string]*gif.GIF = make(map[string]*gif.GIF, 0)
+
+// VIOLATION: state outside State. Owner: t6-cxfx; moves to TextureMng in phase 1.
 var textures map[string]Texture = make(map[string]Texture, 0)
 
 func decodeImg(file *os.File, cpuCopy bool) (data []byte, width int32, height int32, pixels []float32) {
@@ -259,12 +262,19 @@ func decodeHdr(file *os.File) (data []byte, i32Width int32, i32Height int32) {
 	return
 }
 
-func uploadTexture(path string, target uint32, level uint32, cpuCopy bool) {
-	file, err := util.CXOpenFile(path)
-	defer file.Close()
-	if err != nil {
-		panic(fmt.Sprintf("texture %q not found on disk: %v\n", path, err))
+// uploadTexture loads the program path in pathBytes from the sandbox. Textures
+// stay keyed by the path text the program passed.
+func uploadTexture(prgrm *ast.CXProgram, pathBytes []byte, target uint32, level uint32, cpuCopy bool) {
+	path := string(pathBytes)
+	programPath, fileError := util.ProgramFileSystemPathFromBytes(pathBytes)
+	if fileError != nil {
+		panic(fmt.Sprintf("texture %q: %s\n", path, fileError.FileErrorMessage))
 	}
+	file, fileError := util.ProgramSandboxFileOpen(prgrm.ProgramSandboxRoot, programPath)
+	if fileError != nil {
+		panic(fmt.Sprintf("texture %q not found on disk: %s\n", path, fileError.FileErrorMessage))
+	}
+	defer file.Close()
 
 	ext := filepath.Ext(path)
 	var data []byte
@@ -322,7 +332,7 @@ func opGlNewTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CX
 	cxglTexParameteri(cxglTEXTURE_2D, cxglTEXTURE_WRAP_S, cxglCLAMP_TO_EDGE)
 	cxglTexParameteri(cxglTEXTURE_2D, cxglTEXTURE_WRAP_T, cxglCLAMP_TO_EDGE)
 
-	uploadTexture(inputs[0].Get_str(prgrm), cxglTEXTURE_2D, 0, false)
+	uploadTexture(prgrm, ast.ProgramStringBytesRead(prgrm, &inputs[0]), cxglTEXTURE_2D, 0, false)
 
 	outputs[0].Set_i32(prgrm, int32(texture))
 }
@@ -342,12 +352,13 @@ func opGlNewTextureCube(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []as
 	var pattern string = inputs[0].Get_str(prgrm)
 	var extension string = inputs[1].Get_str(prgrm)
 	for i := 0; i < 6; i++ {
-		uploadTexture(fmt.Sprintf("%s%s%s", pattern, faces[i], extension), uint32(cxglTEXTURE_CUBE_MAP_POSITIVE_X+i), 0, false)
+		uploadTexture(prgrm, []byte(pattern+faces[i]+extension), uint32(cxglTEXTURE_CUBE_MAP_POSITIVE_X+i), 0, false)
 	}
 	outputs[0].Set_i32(prgrm, int32(texture))
 }
 
 func opCxReleaseTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+	// VIOLATION: created outside manager; phase 1.
 	textures[inputs[0].Get_str(prgrm)] = Texture{}
 }
 
@@ -376,17 +387,17 @@ func opCxTextureGetPixel(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []a
 }
 
 func opGlUploadImageToTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	uploadTexture(inputs[0].Get_str(prgrm), uint32(inputs[1].Get_i32(prgrm)), uint32(inputs[2].Get_i32(prgrm)), inputs[3].Get_bool(prgrm))
+	uploadTexture(prgrm, ast.ProgramStringBytesRead(prgrm, &inputs[0]), uint32(inputs[1].Get_i32(prgrm)), uint32(inputs[2].Get_i32(prgrm)), inputs[3].Get_bool(prgrm))
 }
 
 func opGlNewGIF(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	path := inputs[0].Get_str(prgrm)
 
-	file, err := util.CXOpenFile(path)
-	defer file.Close()
-	if err != nil {
-		panic(fmt.Sprintf("file not found %q, %v", path, err))
+	file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0])
+	if fileError != nil {
+		panic(fmt.Sprintf("file not found %q, %s", path, fileError.FileErrorMessage))
 	}
+	defer file.Close()
 
 	reader := bufio.NewReader(file)
 	gif, err := gif.DecodeAll(reader)
@@ -716,7 +727,7 @@ func opGlBindAttribLocation(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs 
 	cxglBindAttribLocation(
 		uint32(inputs[0].Get_i32(prgrm)),
 		uint32(inputs[1].Get_i32(prgrm)),
-		inputs[2].Get_str(prgrm))
+		ast.ProgramStringBytesRead(prgrm, &inputs[2]))
 }
 
 func opGlCompileShader(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
@@ -754,7 +765,7 @@ func opGlEnableVertexAttribArray(prgrm *ast.CXProgram, inputs []ast.CXValue, out
 func opGlGetAttribLocation(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outV0 := cxglGetAttribLocation(
 		uint32(inputs[0].Get_i32(prgrm)),
-		inputs[1].Get_str(prgrm))
+		ast.ProgramStringBytesRead(prgrm, &inputs[1]))
 	outputs[0].Set_i32(prgrm, outV0)
 }
 
@@ -789,7 +800,7 @@ func opGlGetShaderInfoLog(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 func opGlGetUniformLocation(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outV0 := cxglGetUniformLocation(
 		uint32(inputs[0].Get_i32(prgrm)),
-		inputs[1].Get_str(prgrm))
+		ast.ProgramStringBytesRead(prgrm, &inputs[1]))
 	outputs[0].Set_i32(prgrm, outV0)
 }
 
@@ -802,7 +813,7 @@ func opGlShaderSource(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	cxglShaderSource(
 		uint32(inputs[0].Get_i32(prgrm)),
 		inputs[1].Get_i32(prgrm),
-		inputs[2].Get_str(prgrm))
+		ast.ProgramStringBytesRead(prgrm, &inputs[2]))
 }
 
 func opGlUseProgram(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {

@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
-	"github.com/skycoin/skycoin-cx/t1-constants"
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -33,16 +32,17 @@ func Callback(cxprogram *ast.CXProgram, fn *ast.CXFunction, inputs [][]byte) (ou
 
 	newCallOperatorInputs := newCall.Operator.GetInputs(cxprogram)
 	for i, inp := range inputs {
+		// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+		// Now an arena getter, site S1247.
 		newCallOperatorInputTypeSig := cxprogram.GetCXTypeSignatureFromArray(newCallOperatorInputs[i])
 		types.WriteSlice_byte(cxprogram.Memory, ast.GetFinalOffset(cxprogram, newFP, nil, newCallOperatorInputTypeSig), inp)
 	}
 
 	var maxOps = 0
 
-	//err := cxprogram.Run(true, maxOps, previousCall)
-	err := RunCxAst(cxprogram, true, maxOps, previousCall)
+	err := runLoop(cxprogram, true, maxOps, previousCall)
 	if err != nil {
-		os.Exit(constants.CX_INTERNAL_ERROR)
+		os.Exit(types.CX_INTERNAL_ERROR)
 	}
 
 	cxprogram.CallCounter = previousCall
@@ -50,6 +50,8 @@ func Callback(cxprogram *ast.CXProgram, fn *ast.CXFunction, inputs [][]byte) (ou
 
 	fnOutputs := fn.GetOutputs(cxprogram)
 	for _, outputIdx := range fnOutputs {
+		// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
+		// Now an arena getter, site S1248.
 		output := cxprogram.GetCXTypeSignatureFromArray(outputIdx)
 
 		// Making a copy of the bytes, so if we modify the bytes being held by `outputs`

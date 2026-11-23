@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "name": "Benchmark: skycoin-cx classics",
+  "description": "Ackermann, recursive and iterative factorial, digital root from skycoin-cx/benchmarks",
+  "kind": "console",
+  "entry": "main.cx",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cx",
+      "size": 1751,
+      "sha256": "04f3ce6cf6643c7feb4833969a5f8853532136d15cda09b0da6c9a05aa9f6916",
+      "chunks": [
+        "04f3ce6cf6643c7feb4833969a5f8853532136d15cda09b0da6c9a05aa9f6916"
+      ]
+    }
+  ]
+}

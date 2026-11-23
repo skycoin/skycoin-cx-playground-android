@@ -1,6 +1,6 @@
 package main
 
-import "time"
+import "sys/time"
 
 func sumInts(n i32) (s i64) {
 	var i i32

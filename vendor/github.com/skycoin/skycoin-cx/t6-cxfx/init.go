@@ -5,7 +5,7 @@ package cxfx
 import (
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t3-ast"
-	"github.com/skycoin/skycoin-cx/t4-opcodes"
+	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only In, Out, RegisterFunction; registration API, keep
 )
 
 func RegisterPackage(prgrm *ast.CXProgram) {
@@ -23,8 +23,14 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "gl.CxReleaseTexture", opCxReleaseTexture, opcodes.In(ast.ConstCxArg_STR), nil)
 	opcodes.RegisterFunction(prgrm, "gl.CxTextureGetPixel", opCxTextureGetPixel, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32))
 
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1431.
 	opcodes.RegisterFunction(prgrm, "gl.AppendF32", opGlAppend, opcodes.In(ast.Slice(types.UI8), ast.ConstCxArg_F32), opcodes.Out(ast.Slice(types.UI8)))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1432.
 	opcodes.RegisterFunction(prgrm, "gl.AppendUI16", opGlAppend, opcodes.In(ast.Slice(types.UI8), ast.ConstCxArg_UI16), opcodes.Out(ast.Slice(types.UI8)))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1433.
 	opcodes.RegisterFunction(prgrm, "gl.AppendUI32", opGlAppend, opcodes.In(ast.Slice(types.UI8), ast.ConstCxArg_UI32), opcodes.Out(ast.Slice(types.UI8)))
 
 	// gl_0.0
@@ -56,6 +62,8 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "gl.Hint", opGlHint, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.Scissor", opGlScissor, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.TexParameteri", opGlTexParameteri, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1434.
 	opcodes.RegisterFunction(prgrm, "gl.TexImage2D", opGlTexImage2D, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.UI32)), nil)
 	opcodes.RegisterFunction(prgrm, "gl.Clear", opGlClear, opcodes.In(ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.ClearColor", opGlClearColor, opcodes.In(ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32), nil)
@@ -92,10 +100,16 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "gl.BindBuffer", opGlBindBuffer, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.DeleteBuffers", opGlDeleteBuffers, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.GenBuffers", opGlGenBuffers, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1435.
 	opcodes.RegisterFunction(prgrm, "gl.BufferData", opGlBufferData, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.UI8), ast.ConstCxArg_I32), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1436.
 	opcodes.RegisterFunction(prgrm, "gl.BufferSubData", opGlBufferSubData, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.UI8)), nil)
 
 	//gl_2_0
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1437.
 	opcodes.RegisterFunction(prgrm, "gl.DrawBuffers", opGlDrawBuffers, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI32)), nil)
 	opcodes.RegisterFunction(prgrm, "gl.StencilOpSeparate", opGlStencilOpSeparate, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.StencilFuncSeparate", opGlStencilFuncSeparate, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
@@ -126,19 +140,43 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "gl.Uniform2i", opGlUniform2i, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.Uniform3i", opGlUniform3i, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.Uniform4i", opGlUniform4i, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1438.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform1fv", opGlUniform1fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_F32, ast.Slice(types.F32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1439.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform2fv", opGlUniform2fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_F32, ast.Slice(types.F32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1440.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform3fv", opGlUniform3fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.F32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1441.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform4fv", opGlUniform4fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.F32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1442.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform1iv", opGlUniform1iv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.I32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1443.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform2iv", opGlUniform2iv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.I32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1444.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform3iv", opGlUniform3iv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.I32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1445.
 	opcodes.RegisterFunction(prgrm, "gl.Uniform4iv", opGlUniform4iv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.Slice(types.I32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1446.
 	opcodes.RegisterFunction(prgrm, "gl.UniformMatrix2fv", opGlUniformMatrix2fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.Slice(types.F32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1447.
 	opcodes.RegisterFunction(prgrm, "gl.UniformMatrix3fv", opGlUniformMatrix3fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.Slice(types.F32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1448.
 	opcodes.RegisterFunction(prgrm, "gl.UniformMatrix4fv", opGlUniformMatrix4fv, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.Slice(types.F32)), nil)
 	opcodes.RegisterFunction(prgrm, "gl.UniformV4F", opGlUniformV4F, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_UND_TYPE), nil)
 	opcodes.RegisterFunction(prgrm, "gl.UniformM44F", opGlUniformM44F, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.ConstCxArg_UND_TYPE), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1449.
 	opcodes.RegisterFunction(prgrm, "gl.UniformM44FV", opGlUniformM44FV, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.Slice(types.UNDEFINED)), nil)
 	opcodes.RegisterFunction(prgrm, "gl.VertexAttribPointer", opGlVertexAttribPointer, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "gl.VertexAttribPointerI32", opGlVertexAttribPointerI32, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
@@ -196,8 +234,8 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "glfw.SetInputMode", opGlfwSetInputMode, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "glfw.SetWindowPos", opGlfwSetWindowPos, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "glfw.GetKey", opGlfwGetKey, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "glfw.func_i32_i32", opGlfwFuncI32I32, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "glfw.call_i32_i32", opGlfwCallI32I32, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.RegisterCallbackI32I32", opGlfwFuncI32I32, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.InvokeCallbackI32I32", opGlfwCallI32I32, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 	opcodes.RegisterFunction(prgrm, "glfw.GetWindowContentScale", opGlfwGetWindowContentScale, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "glfw.GetMonitorContentScale", opGlfwGetMonitorContentScale, nil, opcodes.Out(ast.ConstCxArg_F32, ast.ConstCxArg_F32))
 
@@ -213,29 +251,49 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "gltext.GlyphInfo", opGltextGlyphInfo, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
 
 	// goal
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1450.
 	opcodes.RegisterFunction(prgrm, "al.LoadWav", opAlLoadWav, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I64, ast.Slice(types.UI8)))
 
 	// openal
 	opcodes.RegisterFunction(prgrm, "al.CloseDevice", opAlCloseDevice, nil, nil)
 	opcodes.RegisterFunction(prgrm, "al.DeleteBuffers", opAlDeleteBuffers, opcodes.In(ast.ConstCxArg_I32), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1451.
 	opcodes.RegisterFunction(prgrm, "al.DeleteSources", opAlDeleteSources, opcodes.In(ast.Slice(types.I32)), nil)
 	opcodes.RegisterFunction(prgrm, "al.DeviceError", opAlDeviceError, nil, opcodes.Out(ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "al.Error", opAlError, nil, opcodes.Out(ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "al.Extensions", opAlExtensions, nil, opcodes.Out(ast.ConstCxArg_STR))
 	opcodes.RegisterFunction(prgrm, "al.OpenDevice", opAlOpenDevice, nil, nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1452.
 	opcodes.RegisterFunction(prgrm, "al.PauseSources", opAlPauseSources, opcodes.In(ast.Slice(types.I32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1453.
 	opcodes.RegisterFunction(prgrm, "al.PlaySources", opAlPlaySources, opcodes.In(ast.Slice(types.I32)), nil)
 	opcodes.RegisterFunction(prgrm, "al.Renderer", opAlRenderer, nil, opcodes.Out(ast.ConstCxArg_STR))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1454.
 	opcodes.RegisterFunction(prgrm, "al.RewindSources", opAlRewindSources, opcodes.In(ast.Slice(types.I32)), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1455.
 	opcodes.RegisterFunction(prgrm, "al.StopSources", opAlStopSources, opcodes.In(ast.Slice(types.I32)), nil)
 	opcodes.RegisterFunction(prgrm, "al.Vendor", opAlVendor, nil, opcodes.Out(ast.ConstCxArg_STR))
 	opcodes.RegisterFunction(prgrm, "al.Version", opAlVersion, nil, opcodes.Out(ast.ConstCxArg_STR))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1456.
 	opcodes.RegisterFunction(prgrm, "al.GenBuffers", opAlGenBuffers, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.Slice(types.I32)))
 	opcodes.RegisterFunction(prgrm, "al.BufferData", opAlBufferData, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_UND_TYPE, ast.ConstCxArg_I32), nil)
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1457.
 	opcodes.RegisterFunction(prgrm, "al.GenSources", opAlGenSources, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.Slice(types.I32)))
 	opcodes.RegisterFunction(prgrm, "al.SourceBuffersProcessed", opAlSourceBuffersProcessed, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "al.SourceBuffersQueued", opAlSourceBuffersQueued, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1458.
 	opcodes.RegisterFunction(prgrm, "al.SourceQueueBuffers", opAlSourceQueueBuffers, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I32)), nil)
 	opcodes.RegisterFunction(prgrm, "al.SourceState", opAlSourceState, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1459.
 	opcodes.RegisterFunction(prgrm, "al.SourceUnqueueBuffers", opAlSourceUnqueueBuffers, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I32)), nil)
 }

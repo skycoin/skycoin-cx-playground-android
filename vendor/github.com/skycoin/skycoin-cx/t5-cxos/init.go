@@ -5,7 +5,7 @@ package cxos
 import (
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t3-ast"
-	"github.com/skycoin/skycoin-cx/t4-opcodes"
+	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only In, Out, RegisterFunction; registration API, keep
 )
 
 func RegisterPackage(prgrm *ast.CXProgram) {
@@ -33,15 +33,35 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "os.ReadI16", opOsReadI16, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I16, ast.ConstCxArg_BOOL))
 	opcodes.RegisterFunction(prgrm, "os.ReadI8", opOsReadI8, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCXArg_I8, ast.ConstCxArg_BOOL))
 	opcodes.RegisterFunction(prgrm, "os.ReadBOOL", opOsReadBOOL, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_BOOL, ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1368.
 	opcodes.RegisterFunction(prgrm, "os.ReadF64Slice", opOsReadF64Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.F64), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.F64), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1369.
 	opcodes.RegisterFunction(prgrm, "os.ReadF32Slice", opOsReadF32Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.F32), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.F32), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1370.
 	opcodes.RegisterFunction(prgrm, "os.ReadUI64Slice", opOsReadUI64Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI64), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.UI64), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1371.
 	opcodes.RegisterFunction(prgrm, "os.ReadUI32Slice", opOsReadUI32Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI32), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.UI32), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1372.
 	opcodes.RegisterFunction(prgrm, "os.ReadUI16Slice", opOsReadUI16Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI16), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.UI16), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1373.
 	opcodes.RegisterFunction(prgrm, "os.ReadUI8Slice", opOsReadUI8Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI8), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.UI8), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1374.
 	opcodes.RegisterFunction(prgrm, "os.ReadI64Slice", opOsReadI64Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I64), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.I64), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1375.
 	opcodes.RegisterFunction(prgrm, "os.ReadI32Slice", opOsReadI32Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I32), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.I32), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1376.
 	opcodes.RegisterFunction(prgrm, "os.ReadI16Slice", opOsReadI16Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I16), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.I16), ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1377.
 	opcodes.RegisterFunction(prgrm, "os.ReadI8Slice", opOsReadI8Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I8), ast.ConstCxArg_UI64), opcodes.Out(ast.Slice(types.I8), ast.ConstCxArg_BOOL))
 	opcodes.RegisterFunction(prgrm, "os.ReadAllText", opOsReadAllText, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR, ast.ConstCxArg_BOOL))
 	opcodes.RegisterFunction(prgrm, "os.WriteStr", opOsWriteStr, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_BOOL))
@@ -56,15 +76,35 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "os.WriteI16", opOsWriteI16, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I16), opcodes.Out(ast.ConstCxArg_BOOL))
 	opcodes.RegisterFunction(prgrm, "os.WriteI8", opOsWriteI8, opcodes.In(ast.ConstCxArg_I32, ast.ConstCXArg_I8), opcodes.Out(ast.ConstCxArg_BOOL))
 	opcodes.RegisterFunction(prgrm, "os.WriteBOOL", opOsWriteBOOL, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1378.
 	opcodes.RegisterFunction(prgrm, "os.WriteF64Slice", opOsWriteF64Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.F64)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1379.
 	opcodes.RegisterFunction(prgrm, "os.WriteF32Slice", opOsWriteF32Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.F32)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1380.
 	opcodes.RegisterFunction(prgrm, "os.WriteUI64Slice", opOsWriteUI64Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI64)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1381.
 	opcodes.RegisterFunction(prgrm, "os.WriteUI32Slice", opOsWriteUI32Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI32)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1382.
 	opcodes.RegisterFunction(prgrm, "os.WriteUI16Slice", opOsWriteUI16Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI16)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1383.
 	opcodes.RegisterFunction(prgrm, "os.WriteUI8Slice", opOsWriteUI8Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI8)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1384.
 	opcodes.RegisterFunction(prgrm, "os.WriteI64Slice", opOsWriteI64Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I64)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1385.
 	opcodes.RegisterFunction(prgrm, "os.WriteI32Slice", opOsWriteI32Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I32)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1386.
 	opcodes.RegisterFunction(prgrm, "os.WriteI16Slice", opOsWriteI16Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I16)), opcodes.Out(ast.ConstCxArg_BOOL))
+	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
+	// Now a constructor call, site S1387.
 	opcodes.RegisterFunction(prgrm, "os.WriteI8Slice", opOsWriteI8Slice, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.I8)), opcodes.Out(ast.ConstCxArg_BOOL))
 
 	opcodes.RegisterFunction(prgrm, "os.Run", opOsRun, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_STR))
