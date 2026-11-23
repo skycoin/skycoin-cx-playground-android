@@ -251,6 +251,12 @@ are open.
 A program cannot be interrupted. Back stops a `gfx` program at its next
 `app.ShouldClose()`; a console program runs to the end first.
 
+On the rig, an ENTER sent with `adb shell input keyevent` as the first key
+after the app starts is sometimes lost before it reaches the program, in 4
+of 12 runs of a test whose first key was ENTER, with or without a tap
+before it. A letter or text as the first key always arrived. The cause is
+not known yet.
+
 ## Look
 
 The whole UI, CX `app.Text` included, is JetBrains Mono at one size on a

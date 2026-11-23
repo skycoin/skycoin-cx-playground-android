@@ -23,11 +23,10 @@ func main() {
 		cw, ch = app.CellSize()
 		kind, ex, ey, code = app.PollEvent()
 		for kind != app.NONE {
+			// Every key adds a line, as if it were followed by ENTER.
 			if kind == app.KEY {
-				if code == app.KEY_ENTER {
-					total = total + 1
-					lines = append(lines, sprintf("line %d", total))
-				}
+				total = total + 1
+				lines = append(lines, sprintf("line %d", total))
 			}
 			kind, ex, ey, code = app.PollEvent()
 		}

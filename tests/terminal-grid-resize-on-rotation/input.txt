@@ -3,8 +3,8 @@
 wait 1000
 screenshot portrait
 rotate 1
-wait 500
+wait 1500
 screenshot landscape
 rotate 0
-wait 500
+wait 1500
 screenshot back

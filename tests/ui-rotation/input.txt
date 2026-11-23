@@ -1,10 +1,11 @@
 # Turn to landscape, tap near the bottom right corner of the canvas, which
-# ends left of the navigation bar, then turn back.
+# ends left of the navigation bar, then turn back. The waits let the turn
+# finish, since a tap during it is mapped to the old orientation.
 screenshot portrait
 rotate 1
-wait 500
+wait 1500
 tap 1100 650
 screenshot landscape
 rotate 0
-wait 500
+wait 1500
 screenshot back

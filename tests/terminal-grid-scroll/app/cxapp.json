@@ -1,1 +1,1 @@
-{"name": "Terminal grid scroll", "description": "Test demo: a terminal that scrolls up one row per line once the grid is full", "kind": "gfx"}
+{"name": "Terminal grid scroll", "description": "Test demo: a terminal that scrolls up one row per added line once the grid is full", "kind": "gfx"}
