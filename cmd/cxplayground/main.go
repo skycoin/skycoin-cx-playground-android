@@ -81,6 +81,7 @@ type ui struct {
 
 	// Set while a program is selected.
 	cur      *store.App
+	bench    *benchmarkScreen // set instead of host for a benchmark app
 	host     *host
 	out      *console
 	done     chan struct{}
@@ -226,6 +227,12 @@ func (u *ui) layoutList(gtx layout.Context) {
 func (u *ui) start(a *store.App) {
 	u.cur, u.result, u.leaveReq, u.focused, u.edit = a, "", false, false, nil
 	u.runID++
+	if a.Manifest.Kind == "benchmark" {
+		u.host, u.bench = nil, newBenchmarkScreen(u.src, *a, u.w.Invalidate, u.trace)
+		u.trace.printf("start app=%q hash=%s", a.Manifest.Name, a.Hash)
+		return
+	}
+	u.bench = nil
 	u.host = newHost(u.w.Invalidate, u.trace)
 	u.out = &console{invalidate: u.w.Invalidate, trace: u.trace}
 	u.drawn, u.tracedFrame, u.tracedTexts = programFrame{}, 0, ""
@@ -263,7 +270,9 @@ func (u *ui) finished() bool {
 // leave asks the program to stop and returns to the list once it has.
 func (u *ui) leave() {
 	u.leaveReq = true
-	u.host.closed.Store(true)
+	if u.host != nil {
+		u.host.closed.Store(true)
+	}
 }
 
 func (u *ui) layoutRun(gtx layout.Context) {
@@ -278,6 +287,10 @@ func (u *ui) layoutRun(gtx layout.Context) {
 		if e, ok := ev.(key.Event); ok && e.State == key.Press {
 			u.leave()
 		}
+	}
+	if u.bench != nil {
+		u.layoutBenchmark(gtx)
+		return
 	}
 	done := u.finished()
 	if done && u.result == "" {

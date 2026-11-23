@@ -56,8 +56,8 @@ func readApp(t *testing.T, dir string) map[string][]byte {
 	return files
 }
 
-// TestApps runs every bundled app, and every test folder app, twice in one
-// process.
+// TestApps runs every bundled app with a main.cx, and every test folder app,
+// twice in one process.
 func TestApps(t *testing.T) {
 	dirs, _ := filepath.Glob("../apps/*")
 	testApps, _ := filepath.Glob("../tests/*/app")
@@ -67,6 +67,9 @@ func TestApps(t *testing.T) {
 	}
 	for round := 0; round < 2; round++ {
 		for _, d := range dirs {
+			if _, err := os.Stat(filepath.Join(d, "main.cx")); err != nil {
+				continue // the benchmark suite, run by gotests/benchmark-hashes
+			}
 			name := filepath.Base(d)
 			if name == "app" {
 				name = filepath.Base(filepath.Dir(d))

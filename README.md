@@ -94,6 +94,98 @@ mode logs each frame the program draws, the last event the program polled
 before drawing it, the texts it shows, each queued event with a sequence
 number and each line of console output, all starting with `cxtest`.
 
+## Benchmark suite
+
+The "Benchmark suite" app (`apps/benchmarks`, kind `benchmark`) runs the six
+programs of skycoin-cx `t0-benchmarks/compare` (count, fib, array, struct,
+memtest, primes) on the old executor, which the other apps use, and on the vm.
+Each program runs N times per executor (5 by default, `fewer` and `more`
+change it before `start`). The app then shows the results document, saves it
+to `benchmark-results/<time>-<run_id>.json` in the app's files dir and offers
+to upload it.
+
+The choices below were made without a spec and are provisional.
+
+- **Scale.** The phone scale is about 1/30 of the full skycoin-cx scale, so one
+  run of the suite on the old executor takes a few seconds on a desktop. The
+  sizes are in `apps/benchmarks/suite.json`. The expected hashes there are
+  derived from the math by `benchsuite.ExpectedHash`, a copy of
+  `compareExpected` in skycoin-cx `t0-benchmarks/compare_test.go`. Tests check
+  them against the math and the copy against skycoin-cx `expected.txt`.
+- **Time.** Wall time of `main` only. Parsing and compiling are left out. The
+  median of the N runs is reported, and every run is kept in `runs_ms`.
+- **ops/ms.** The app is not built with the `cxopcount` tag, because counting
+  costs time in the loop. The operation counts of each program are measured
+  once on a host and stored in `suite.json`, and
+  `go test -tags cxopcount ./gotests/benchmark-opcounts` checks them (`make test`
+  runs it). The old executor counts expressions and the vm counts
+  instructions, so ops/ms is only comparable within one executor.
+- **Upload.** POST of the document to `BENCHMARK_UPLOAD_URL`, set at build time
+  with `make apk BENCHMARK_UPLOAD_URL=https://host/runs`. It is empty by
+  default, and then the app says that upload is disabled. No server is
+  chosen yet.
+- **Device profile.** Android release and API level, manufacturer, model and
+  ABI from `getprop`, core count, highest `cpuinfo_max_freq`, `MemTotal`, and
+  the app, skycoin-cx and Go versions. The only identifier is a random run ID.
+  No serial, IMEI, account or location is read.
+
+### Results document
+
+```
+{
+  "schema": "cx-playground-benchmark/1",
+  "run_id": "32 hex digits, random per run",
+  "started_at": "RFC 3339 UTC", "finished_at": "RFC 3339 UTC",
+  "build": {"app_version", "app_revision"?, "skycoin_cx", "go_version"},
+  "device": {"os", "arch", "android_release"?, "android_sdk"?, "manufacturer"?,
+             "model"?, "abi"?, "cpu_cores", "cpu_max_mhz", "ram_total_mb"},
+  "suite": {"scale", "sizes": {"count_n", "fib_n", "array_rounds",
+            "struct_rounds", "mem_n", "mem_walk", "sieve_n", "miller_n",
+            "lucas_rounds"}, "runs"},
+  "results": [{
+    "benchmark": "count|fib|array|struct|memtest|primes",
+    "executor": "old|vm",
+    "status": "pass|fail|rejected|error",
+    "runs_ms": [n, ...], "median_ms": n,
+    "hash": "decimal FNV-1a the program printed",
+    "expected_hash": "decimal",
+    "operations"?: n, "ops_per_ms"?: n,
+    "message"?: "why it failed, was rejected or errored"
+  }]
+}
+```
+
+Fields marked `?` may be left out. Hashes are strings because they do not fit
+a JSON number. `pass` needs the expected hash and the `<name> pass` line,
+`rejected` means the vm does not lower the program. `benchsuite.Validate` is
+the full rule set and the collector applies it.
+
+### Collector
+
+`cmd/benchmark-collector` takes `POST /runs`, validates the document, stores it
+in a bbolt file keyed by run ID and lists all runs at `GET /runs.txt` (plain
+text) and `GET /` (HTML).
+
+```
+make collector
+build/benchmark-collector -addr 127.0.0.1:8090 -db benchmark-runs.db
+```
+
+It is not deployed anywhere. Where it runs and which URL the app uploads to
+are open.
+
+### Tests
+
+One folder per test under `gotests/`. They are go tests, kept apart from
+`tests/`, where the emulator driver expects every folder to hold an `app/`:
+
+| Folder | Checks |
+| --- | --- |
+| `benchmark-hashes` | expected hashes against the math and skycoin-cx, and every program run from the bundle on both executors prints them |
+| `benchmark-opcounts` | the operation counts in `suite.json` (needs `-tags cxopcount`) |
+| `results-schema-roundtrip` | a document encodes and decodes unchanged, malformed ones are refused |
+| `collector-accept-reject` | the collector stores a valid upload and refuses duplicates, bad and oversized ones |
+
 ## Known limits
 
 A program cannot be interrupted. Back stops a `gfx` program at its next

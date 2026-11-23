@@ -1,0 +1,48 @@
+package main
+
+// Bubble sorts a reversed [150]i32 12 times, 11175 swaps each.
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() {
+	var h ui64
+	h = 14695981039346656037UL
+	var ok bool
+	ok = true
+	var nums [150]i32
+	var i i32
+	var j i32
+	var t i32
+	var swaps i32
+	var round i32
+	for round = 0; round < 12; round++ {
+		for i = 0; i < 150; i++ {
+			nums[i] = 150 - i
+		}
+		swaps = 0
+		for i = 0; i < 149; i++ {
+			for j = 0; j < 149-i; j++ {
+				if nums[j] > nums[j+1] {
+					t = nums[j]
+					nums[j] = nums[j+1]
+					nums[j+1] = t
+					swaps++
+				}
+			}
+		}
+		h = fnv(h, i32.ui64(swaps))
+		ok = ok && swaps == 11175
+	}
+	for i = 0; i < 150; i++ {
+		h = fnv(h, i32.ui64(nums[i]))
+		ok = ok && nums[i] == i + 1
+	}
+	ui64.print(h)
+	if ok {
+		printf("array pass\n")
+	} else {
+		printf("array FAIL\n")
+	}
+}

@@ -1,0 +1,23 @@
+{
+  "scale": "phone",
+  "sizes": {
+    "count_n": 1000000,
+    "fib_n": 27,
+    "array_rounds": 12,
+    "struct_rounds": 2500,
+    "mem_n": 32768,
+    "mem_walk": 2048,
+    "sieve_n": 100000,
+    "miller_n": 15000,
+    "lucas_rounds": 1
+  },
+  "runs": 5,
+  "benchmarks": [
+    {"name": "count", "file": "count.cx", "expected_hash": "17727803403943808447", "operations": {"old": 6000014, "vm": 6000021}},
+    {"name": "fib", "file": "fib.cx", "expected_hash": "12546183366041830149", "operations": {"old": 3495925, "vm": 6038416}},
+    {"name": "array", "file": "array.cx", "expected_hash": "8801407059629469910", "operations": {"old": 2036840, "vm": 3651052}},
+    {"name": "struct", "file": "struct.cx", "expected_hash": "3993961243277266981", "operations": {"old": 1788119, "vm": 3051021}},
+    {"name": "memtest", "file": "memtest.cx", "expected_hash": "9833778128310793357", "operations": {"old": 6423367, "vm": 8520907}},
+    {"name": "primes", "file": "primes.cx", "expected_hash": "14456747749191347431", "operations": {"old": 4259124, "vm": 5252055}}
+  ]
+}

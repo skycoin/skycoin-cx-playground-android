@@ -1,0 +1,21 @@
+package main
+
+// Sums 0 to 999,999 into an i64.
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() {
+	var sum i64
+	var i i32
+	for i = 0; i < 1000000; i++ {
+		sum = sum + i32.i64(i)
+	}
+	ui64.print(fnv(14695981039346656037UL, i64.ui64(sum)))
+	if sum == 499999500000L {
+		printf("count pass\n")
+	} else {
+		printf("count FAIL\n")
+	}
+}

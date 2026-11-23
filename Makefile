@@ -1,4 +1,4 @@
-.PHONY: bundle check-bundle test vet apk install emulator-image emulator-smoke
+.PHONY: bundle check-bundle test vet apk install emulator-image emulator-smoke collector
 
 GOGIO_REF := 0magnet
 APPID := com.skycoin.cxplayground
@@ -6,6 +6,8 @@ ARCH ?= arm64,amd64
 APK ?= build/cx-playground.apk
 ANDROID_HOME ?= /opt/android-sdk
 ANDROID_NDK_ROOT ?= $(ANDROID_HOME)/ndk/30.0.16248370
+# Where the benchmark suite app POSTs results. Empty disables upload.
+BENCHMARK_UPLOAD_URL ?=
 export ANDROID_HOME ANDROID_NDK_ROOT
 
 bundle: ## Rebuild the embedded app bundle from apps/
@@ -17,6 +19,7 @@ check-bundle: ## Fail if the committed bundle is stale
 
 test: ## Run the tests, including every bundled CX app headless
 	go test ./...
+	go test -tags cxopcount ./gotests/benchmark-opcounts
 
 vet:
 	go vet ./...
@@ -26,7 +29,9 @@ build/gogio/gogio:
 
 apk: build/gogio/gogio check-bundle ## Build the APK for $(ARCH)
 	GOFLAGS=-mod=vendor ./build/gogio/gogio -target android -arch $(ARCH) -minsdk 26 \
-		-appid $(APPID) -name "CX Playground" -o $(APK) ./cmd/cxplayground
+		-appid $(APPID) -name "CX Playground" \
+		$(if $(BENCHMARK_UPLOAD_URL),-ldflags "-X main.benchmarkUploadURL=$(BENCHMARK_UPLOAD_URL)") \
+		-o $(APK) ./cmd/cxplayground
 
 install: apk ## Install the APK on the adb device and start it
 	adb install -r $(APK)
@@ -40,3 +45,6 @@ emulator-image: ## Build the headless Android emulator image
 emulator-smoke: ## Boot the rig, build the APK, run every test in tests/, stop the rig
 	docker image inspect $(RIG_IMAGE) > /dev/null 2>&1 || $(MAKE) emulator-image
 	go run ./cmd/emulator-driver suite -boot -stop -image $(RIG_IMAGE)
+
+collector: ## Build the benchmark results collector
+	go build -o build/benchmark-collector ./cmd/benchmark-collector
