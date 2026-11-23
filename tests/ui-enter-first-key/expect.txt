@@ -1,0 +1,2 @@
+out key 1 code=10 enter
+out key 2 code=97 97

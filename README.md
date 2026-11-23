@@ -112,6 +112,14 @@ table.
 Each injected step is timed until the frame that reflects it, `rotate` until
 the frame after its resize event.
 
+Before the first step the driver waits until input reaches the program: the
+app's window has focus in its own process (`mHasWindowFocus` in `dumpsys
+activity top`) and, for an app that draws frames, the canvas holds key focus
+(the app's `input focused=true` line). Then, if the display is in touch mode,
+it sends PAGE_UP to the app, see "Known limits". After a boot it also waits
+until the home screen has focus and SystemUI has turned on its theme
+overlays, which relaunches every app.
+
 | `expect.txt` line | Passes when |
 | --- | --- |
 | any other text | a test mode line contains it, after the line the previous one matched |
@@ -165,6 +173,7 @@ suite at once with that many runs.
 | `results-schema-roundtrip` (go) | a document encodes and decodes unchanged, malformed ones are refused |
 | `collector-accept-reject` (go) | the collector stores a valid upload and refuses duplicates, bad and oversized ones |
 | `femtoclaw-replay-in-app-runtime` (go) | the bundled femtoclaw app run through `store` and `cxrun` on the host prints the host replay's bytes, twice |
+| `ui-enter-first-key` | ENTER as the first key after the start reaches the program |
 
 ## Benchmark suite
 
@@ -251,11 +260,15 @@ are open.
 A program cannot be interrupted. Back stops a `gfx` program at its next
 `app.ShouldClose()`; a console program runs to the end first.
 
-On the rig, an ENTER sent with `adb shell input keyevent` as the first key
-after the app starts is sometimes lost before it reaches the program, in 4
-of 12 runs of a test whose first key was ENTER, with or without a tap
-before it. A letter or text as the first key always arrived. The cause is
-not known yet.
+A boot or a tap puts the display in touch mode, and Android consumes the
+first navigation key that takes a window out of it (ENTER, a DPAD key, TAB,
+PAGE_UP, in `ViewRootImpl.checkForLeavingTouchModeAndConsume`). So an ENTER
+sent first to an app started in touch mode never reached the program. Before
+the first step the driver sends PAGE_UP, which the app ignores, to spend that.
+A key sent to the home screen does not work for this, as its window may not
+know that the display is in touch mode. Keys sent before the app's window has
+focus in its own process, or while SystemUI relaunches every app after a
+boot, are dropped too, which the driver's waits cover.
 
 ## Look
 

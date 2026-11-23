@@ -408,7 +408,12 @@ func (u *ui) layoutCanvas(gtx layout.Context, cmds []cxrun.Cmd) layout.Dimension
 	event.Op(gtx.Ops, tag)
 
 	// The canvas holds key focus so hardware keys and IME text reach the
-	// program whether or not it opened the soft keyboard.
+	// program whether or not it opened the soft keyboard. The router drops
+	// focus without a FocusEvent when the canvas misses a frame, so ask it.
+	if f := gtx.Focused(tag); f != u.focused {
+		u.focused = f
+		u.trace.printf("input focused=%v", f)
+	}
 	if !u.focused {
 		gtx.Execute(key.FocusCmd{Tag: tag})
 	}
@@ -448,8 +453,6 @@ func (u *ui) layoutCanvas(gtx layout.Context, cmds []cxrun.Cmd) layout.Dimension
 			case key.NameReturn, key.NameEnter:
 				u.host.push(cxrun.Event{Kind: cxrun.EvKey, Code: cxrun.KeyEnter})
 			}
-		case key.FocusEvent:
-			u.focused = e.Focus
 		}
 	}
 	draw(gtx, u.th.Shaper, cmds)

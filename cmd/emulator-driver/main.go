@@ -96,6 +96,11 @@ func runCommand(ctx context.Context, name string, args []string) error {
 			return err
 		}
 		fmt.Printf("boot completed: emulator %d ms, host (docker run to adb) %d ms\n", res.emulator.Milliseconds(), res.host.Milliseconds())
+		begin := time.Now()
+		if err := d.waitSettled(ctx, time.Minute); err != nil {
+			return err
+		}
+		fmt.Printf("settled %d ms later\n", time.Since(begin).Milliseconds())
 		return nil
 	case "stop":
 		return o.stopRig(ctx)
@@ -196,6 +201,9 @@ func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, ski
 		}
 		shared.add("boot (docker run to boot completed)", res.host, res.emulator, "device ms: emulator start to boot completed")
 	} else if err := o.dev.waitBoot(ctx); err != nil {
+		return err
+	}
+	if err := shared.timed("settle (home focused, theme overlays on)", func() error { return o.dev.waitSettled(ctx, time.Minute) }); err != nil {
 		return err
 	}
 	if !skipBuild {

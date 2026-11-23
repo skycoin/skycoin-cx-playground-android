@@ -112,6 +112,11 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 		return failures
 	}
 	table.add(readyStep, first.arrived.Sub(startBegin), 0, "")
+	if err := table.timed("input ready (focus, touch mode off)", func() error { return s.waitInputReady(ctx, w, t) }); err != nil {
+		fail("input not ready: %v", err)
+		finish()
+		return failures
+	}
 
 	shots := map[string]string{}
 	pulled := map[string]string{}
@@ -374,4 +379,45 @@ func measureEvent(ctx context.Context, d *device, w *logWatch, step inputStep) (
 		row.note = fmt.Sprintf("%d events", len(events))
 	}
 	return row, nil
+}
+
+// waitInputReady waits until keys sent now reach the program: the app's
+// window has focus in its own process, for an app that draws frames the
+// latest "input focused" line of the canvas says true, and the display is
+// out of touch mode.
+func (s *session) waitInputReady(ctx context.Context, w *logWatch, t testFolder) error {
+	if err := s.dev.waitWindowFocus(ctx, s.appID, t.timeout); err != nil {
+		return err
+	}
+	if t.ready == "" {
+		if err := waitCanvasFocus(ctx, w, t.timeout); err != nil {
+			return err
+		}
+	}
+	return s.dev.leaveTouchMode(ctx)
+}
+
+func waitCanvasFocus(ctx context.Context, w *logWatch, timeout time.Duration) error {
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		lines, update := w.snapshot()
+		if lastInputFocus(lines) {
+			return nil
+		}
+		select {
+		case <-update:
+		case <-waitCtx.Done():
+			return errors.New("the canvas has no key focus")
+		}
+	}
+}
+// lastInputFocus reports whether the latest "input focused" line says true.
+func lastInputFocus(lines []logLine) bool {
+	for i := len(lines) - 1; i >= 0; i-- {
+		if v, ok := strings.CutPrefix(lines[i].trace, "input focused="); ok {
+			return v == "true"
+		}
+	}
+	return false
 }

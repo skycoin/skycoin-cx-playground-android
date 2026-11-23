@@ -1,0 +1,3 @@
+# ENTER as the very first key after the app starts, then a letter.
+key ENTER
+key A

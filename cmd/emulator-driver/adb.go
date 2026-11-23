@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -165,4 +166,103 @@ func (d *device) waitKeyboard(ctx context.Context, shown bool, timeout time.Dura
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+// waitSettled waits after boot until a home screen has window focus and the
+// SystemUI theme overlays are on. SystemUI turns them on seconds after
+// sys.boot_completed and every app relaunches then, which loses the keys sent
+// meanwhile. A device without the overlays is taken as settled after timeout.
+func (d *device) waitSettled(ctx context.Context, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		focus := currentFocus(d.shellOrEmpty(ctx, "dumpsys", "window"))
+		home := focus != "" && focus != "null" && !strings.Contains(focus, "FallbackHome")
+		if home && strings.Contains(d.shellOrEmpty(ctx, "cmd", "overlay", "list"), "[x] com.android.systemui:") {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			if home {
+				return nil
+			}
+			return fmt.Errorf("no home screen focused after %v, focus %q", timeout, focus)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+func (d *device) shellOrEmpty(ctx context.Context, args ...string) string {
+	out, _ := d.shell(ctx, args...)
+	return out
+}
+
+// currentFocus returns the window of the mCurrentFocus line of dumpsys window.
+func currentFocus(dump string) string {
+	_, rest, ok := strings.Cut(dump, "mCurrentFocus=")
+	if !ok {
+		return ""
+	}
+	line, _, _ := strings.Cut(rest, "\n")
+	return strings.TrimSpace(line)
+}
+
+// waitWindowFocus waits until the resumed activity of appID has window focus
+// in its own process. Android drops key events that reach a window before
+// its ViewRootImpl has seen the focus (ViewRootImpl.shouldDropInputEvent),
+// which happens while a cold started app is busy on its main thread.
+func (d *device) waitWindowFocus(ctx context.Context, appID string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if windowFocused(d.shellOrEmpty(ctx, "dumpsys", "activity", "top"), appID) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%s has no window focus after %v", appID, timeout)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// windowFocused reports whether dumpsys activity top shows a resumed
+// activity of appID whose view root has window focus.
+func windowFocused(dump, appID string) bool {
+	for _, a := range strings.Split(dump, "ACTIVITY ")[1:] {
+		if strings.HasPrefix(a, appID+"/") && strings.Contains(a, "mResumed=true") && strings.Contains(a, "mHasWindowFocus=true") {
+			return true
+		}
+	}
+	return false
+}
+
+// leaveTouchMode takes the display out of touch mode, which a boot or a tap
+// puts it in. A window created in touch mode loses the first navigation key
+// (ENTER, a DPAD key, TAB), which is consumed to leave touch mode
+// (ViewRootImpl checkForLeavingTouchModeAndConsume). The driver spends that
+// with PAGE_UP, a navigation key that the app ignores, sent to the app's own
+// window, since another window may not know the display is in touch mode.
+func (d *device) leaveTouchMode(ctx context.Context) error {
+	inTouchMode := func() bool { return strings.Contains(d.shellOrEmpty(ctx, "dumpsys", "window"), "mInTouchMode=true") }
+	for range 3 {
+		if !inTouchMode() {
+			return nil
+		}
+		if _, err := d.shell(ctx, "input", "keyevent", "KEYCODE_PAGE_UP"); err != nil {
+			return err
+		}
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) && inTouchMode() {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	if inTouchMode() {
+		return errors.New("the display stayed in touch mode after 3 PAGE_UP keys")
+	}
+	return nil
 }
