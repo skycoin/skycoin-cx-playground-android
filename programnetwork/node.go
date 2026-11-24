@@ -551,12 +551,10 @@ func (n *Node) GetPeers(address string) ([]PeerEntry, error) {
 			}
 			total = int(r.Total)
 			all = append(all, r.Entries...)
-			if len(r.Entries) > 0 || len(all) >= total {
-				continue
+			if len(r.Entries) == 0 && len(all) < total {
+				return all, programblocks.PacketTooSmall(n.PacketSize, n.Forms, MaxPeerEntryLength+getPeersReplyFixed, "peer %d in a get peers reply", len(all))
 			}
-			if n.Forms == programblocks.FormsFull {
-				return all, fmt.Errorf("%w: peer %d does not fit a get peers reply", programblocks.ErrPacketTooSmall, len(all))
-			}
+			continue
 		}
 		e, t, err := n.getPeerByParts(to, uint16(len(all)))
 		if err != nil {

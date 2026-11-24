@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,6 +182,10 @@ func TestBlockByPrefix(t *testing.T) {
 	}
 }
 
+// TestMismatchedPacketSizes fetches a program with each forms flag from
+// servers of other packet sizes. The short forms work with every pair. The
+// full forms work only when both sides hold a whole block, and otherwise
+// fail with error 6 naming the forms flag (D37).
 func TestMismatchedPacketSizes(t *testing.T) {
 	files, err := programblocks.ReadProgramDirectory("../../apps/benchmarks")
 	if err != nil {
@@ -193,34 +198,31 @@ func TestMismatchedPacketSizes(t *testing.T) {
 			t.Fatal(err)
 		}
 		go s.catalog.Serve(pc, serverSize)
-		for _, clientSize := range []int{1400, 1200, 512, 128, 64, 32} {
-			conn, err := net.Dial("udp", pc.LocalAddr().String())
-			if err != nil {
-				t.Fatal(err)
+		for _, forms := range []programblocks.Forms{programblocks.FormsFull, programblocks.FormsShort} {
+			for _, clientSize := range []int{1400, 1200, 512, 128, 64, 32} {
+				conn, err := net.Dial("udp", pc.LocalAddr().String())
+				if err != nil {
+					t.Fatal(err)
+				}
+				c := programblocks.NewClient(conn, s.signer)
+				c.PacketSize, c.Forms = clientSize, forms
+				p, err := c.FetchProgram("program")
+				conn.Close()
+				fits := forms == programblocks.FormsShort || min(serverSize, clientSize) >= programblocks.MinFullFormPacketSize
+				switch {
+				case fits && err != nil:
+					t.Fatalf("server %d, client %d, forms=%s: %v", serverSize, clientSize, forms, err)
+				case !fits && (!errors.Is(err, programblocks.ErrPacketTooSmall) || !strings.Contains(err.Error(), "forms flag")):
+					t.Fatalf("server %d, client %d, forms=%s: %v, want error 6 naming the forms flag", serverSize, clientSize, forms, err)
+				case fits && !bytes.Equal(p.Files["primes.cx"], files["primes.cx"]):
+					t.Fatalf("server %d, client %d, forms=%s: wrong files", serverSize, clientSize, forms)
+				case fits:
+					t.Logf("server %d, client %d, forms=%s: %d requests, largest reply %d bytes", serverSize, clientSize, forms, c.Stats.RequestsSent, c.Stats.LargestReply)
+				default:
+					t.Logf("server %d, client %d, forms=%s: %v", serverSize, clientSize, forms, err)
+				}
 			}
-			c := programblocks.NewClient(conn, s.signer)
-			c.PacketSize = clientSize
-			p, err := c.FetchProgram("program")
-			conn.Close()
-			if err != nil {
-				t.Fatalf("server %d, client %d: %v", serverSize, clientSize, err)
-			}
-			if !bytes.Equal(p.Files["primes.cx"], files["primes.cx"]) {
-				t.Fatalf("server %d, client %d: wrong files", serverSize, clientSize)
-			}
-			t.Logf("server %d, client %d: %d requests, largest reply %d bytes", serverSize, clientSize, c.Stats.RequestsSent, c.Stats.LargestReply)
 		}
 		pc.Close()
-	}
-	// The full forms below their floor fail with a clear error.
-	pc, _ := net.ListenPacket("udp", "127.0.0.1:0")
-	defer pc.Close()
-	go s.catalog.Serve(pc, 32)
-	conn, _ := net.Dial("udp", pc.LocalAddr().String())
-	defer conn.Close()
-	c := programblocks.NewClient(conn, s.signer)
-	c.PacketSize, c.Forms = 32, programblocks.FormsFull
-	if _, err := c.FetchProgram("program"); !errors.Is(err, programblocks.ErrPacketTooSmall) {
-		t.Fatalf("full forms at 32: %v", err)
 	}
 }

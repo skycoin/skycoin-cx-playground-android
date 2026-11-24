@@ -2,7 +2,7 @@
 // manages its peer list file, as described in "DHT prototype (#18)" in
 // docs/ProgramDistribution.md.
 //
-//	programnetwork node [-addr :7010] [-store DIR] [-peers FILE] [-packet 1200]
+//	programnetwork node [-addr :7010] [-store DIR] [-peers FILE] [-packet 1200] [-forms full]
 //	                    [-signer PUBKEY,...] [-subscribe HOST:PORT,...]
 //	                    [-publish DIR (-seed TEXT | -secret HEX)]
 //	                    [-config FILE] [-type thin|medium|super] [-budget BYTES]
@@ -101,6 +101,7 @@ func node(args []string) error {
 	storeDir := fl.String("store", "programnetwork-store", "store directory of the programs this node holds")
 	peersFile := fl.String("peers", "", "peer list file that get peers answers from")
 	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
+	formsName := fl.String("forms", "full", "request forms of downloads and get peers, full or short; a reply that cannot fit fails with error 6")
 	signers := fl.String("signer", "", "comma separated public keys, hex, whose programs the node downloads")
 	subscribe := fl.String("subscribe", "", "comma separated nodes to subscribe to")
 	publish := fl.String("publish", "", "directory of program directories to publish")
@@ -159,6 +160,9 @@ func node(args []string) error {
 		return err
 	}
 	n.PacketSize = *packet
+	if n.Forms, err = programblocks.ParseForms(*formsName); err != nil {
+		return err
+	}
 	n.Logf = func(format string, args ...any) {
 		fmt.Printf("%s %s\n", time.Now().Format("15:04:05.000"), fmt.Sprintf(format, args...))
 	}

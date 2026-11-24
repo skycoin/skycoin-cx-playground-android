@@ -17,8 +17,8 @@ import (
 
 // fetchKind marks an app that fetches its program over UDP instead of
 // holding it. Its args are the server address, the trusted signer public
-// key in hex and the program name, then optional settings packet=BYTES and
-// tries=N, see docs/ProgramDistribution.md.
+// key in hex and the program name, then optional settings packet=BYTES,
+// forms=full|short and tries=N, see docs/ProgramDistribution.md.
 const fetchKind = "fetch"
 
 // fetchClient returns a client for conn with the settings of args.
@@ -26,6 +26,14 @@ func fetchClient(conn net.Conn, signer cipher.PubKey, args []string) (*programbl
 	c := programblocks.NewClient(conn, signer)
 	for _, a := range args {
 		key, value, _ := strings.Cut(a, "=")
+		if key == "forms" {
+			forms, err := programblocks.ParseForms(value)
+			if err != nil {
+				return nil, err
+			}
+			c.Forms = forms
+			continue
+		}
 		n, err := strconv.Atoi(value)
 		switch {
 		case err != nil:
@@ -38,7 +46,7 @@ func fetchClient(conn net.Conn, signer cipher.PubKey, args []string) (*programbl
 		case key == "tries" && n > 0:
 			c.MaxTries = n
 		default:
-			return nil, fmt.Errorf("unknown fetch setting %q, want packet=BYTES or tries=N", a)
+			return nil, fmt.Errorf("unknown fetch setting %q, want packet=BYTES, forms=full|short or tries=N", a)
 		}
 	}
 	return c, nil
@@ -65,7 +73,7 @@ func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[
 	if err != nil {
 		return nil, nil, err
 	}
-	if c.PacketSize != programblocks.DefaultPacketSize {
+	if c.PacketSize != programblocks.DefaultPacketSize || c.Forms != programblocks.FormsFull {
 		forms := "full"
 		if c.ShortForms() {
 			forms = "short"

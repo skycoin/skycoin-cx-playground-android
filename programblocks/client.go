@@ -24,20 +24,53 @@ const (
 	maxBlockRounds      = 4
 )
 
-// Forms selects the request forms a client uses.
+// Forms is the client config flag that names the request forms (D37).
 type Forms int
 
-// FormsAuto uses the full forms (0x01 to 0x04) at MinFullFormPacketSize
-// and up and the short forms (0x05 to 0x08) below it (D37).
+// FormsFull uses the full forms (0x01 to 0x04) and whole units, FormsShort
+// the short forms (0x05 to 0x08) and parts of units. A client never
+// switches between them by itself.
 const (
-	FormsAuto Forms = iota
-	FormsFull
+	FormsFull Forms = iota
 	FormsShort
 )
 
-// ErrPacketTooSmall marks an operation whose request or smallest reply does
-// not fit the packet size.
-var ErrPacketTooSmall = errors.New("packet size too small for the operation")
+// String returns the flag value of f.
+func (f Forms) String() string {
+	if f == FormsShort {
+		return "short"
+	}
+	return "full"
+}
+
+// ParseForms reads the forms flag value full or short.
+func ParseForms(s string) (Forms, error) {
+	switch s {
+	case "full":
+		return FormsFull, nil
+	case "short":
+		return FormsShort, nil
+	}
+	return FormsFull, fmt.Errorf("forms %q, want full or short", s)
+}
+
+// ErrPacketTooSmall marks an operation whose request or reply does not fit
+// the configured packet size and forms.
+var ErrPacketTooSmall = errors.New("error 6, packet too small")
+
+// PacketTooSmall returns error 6 for an operation that does not fit the
+// configured packet size and forms, naming the flags that change it.
+func PacketTooSmall(packetSize int, forms Forms, need int, format string, a ...any) error {
+	hint := fmt.Sprintf("raise the packet flag to %d or more", need)
+	if forms == FormsFull {
+		hint += " or set the forms flag to short"
+	}
+	return fmt.Errorf("%w: %s at packet %d in the %s forms, %s", ErrPacketTooSmall, fmt.Sprintf(format, a...), packetSize, forms, hint)
+}
+
+func (c *Client) tooSmall(need int, format string, a ...any) error {
+	return PacketTooSmall(c.PacketSize, c.Forms, need, format, a...)
+}
 
 // Client fetches and verifies programs from a server over a connected UDP
 // socket.
@@ -76,13 +109,7 @@ func NewClient(conn net.Conn, trusted ...cipher.PubKey) *Client {
 
 // ShortForms reports whether the client uses the short forms.
 func (c *Client) ShortForms() bool {
-	switch c.Forms {
-	case FormsFull:
-		return false
-	case FormsShort:
-		return true
-	}
-	return c.PacketSize < MinFullFormPacketSize
+	return c.Forms == FormsShort
 }
 
 // prefixFitting returns the longest prefix of at most the client's prefix
@@ -151,7 +178,7 @@ func (c *Client) exchange(requests []Request, handle replyHandler) error {
 			r := queue[0]
 			queue = queue[1:]
 			if n := RequestLength(r); n > c.PacketSize {
-				return fmt.Errorf("%w: operation %#x request of %d bytes over %d", ErrPacketTooSmall, byte(r.Operation), n, c.PacketSize)
+				return c.tooSmall(n, "operation %#x request of %d bytes", byte(r.Operation), n)
 			}
 			r.RequestID = c.nextRequestID
 			f := &requestInFlight{request: r, timeout: c.FirstTimeout}
@@ -199,7 +226,11 @@ func (c *Client) exchange(requests []Request, handle replyHandler) error {
 		c.Stats.BytesReceived += n
 		c.Stats.LargestReply = max(c.Stats.LargestReply, n)
 		if reply.Operation == OperationError {
-			return &ReplyError{Code: reply.ErrorCode, Text: reply.ErrorText}
+			text := reply.ErrorText
+			if reply.ErrorCode == ErrorCodePacketTooSmall && c.Forms == FormsFull {
+				text += ", set the forms flag to short"
+			}
+			return &ReplyError{Code: reply.ErrorCode, Text: text}
 		}
 		if reply.Operation != f.request.Operation|ReplyFlag || !replyMatches(f.request, reply) {
 			return fmt.Errorf("%w: reply does not match its request", ErrPacket)
@@ -233,7 +264,7 @@ func (c *Client) ListManifestsPrefix() (Hash, int, uint32, error) {
 	var length uint32
 	n := c.prefixFitting(c.PacketSize - listPrefixReplyFixed)
 	if n == 0 {
-		return addr, 0, 0, fmt.Errorf("%w: list manifests prefix reply needs %d bytes", ErrPacketTooSmall, listPrefixReplyFixed+MinPrefixLength)
+		return addr, 0, 0, c.tooSmall(listPrefixReplyFixed+MinPrefixLength, "list manifests prefix reply")
 	}
 	err := c.exchange([]Request{{Operation: OperationListManifestsPrefix, PrefixLength: n}}, func(_ Request, r Reply) ([]Request, error) {
 		addr, length = r.Address, r.Total
@@ -281,10 +312,10 @@ func (c *Client) FetchManifest(addr Hash) (*Manifest, []byte, error) {
 func (c *Client) fetchManifest(addr Hash, known int) (*Manifest, []byte, Hash, error) {
 	var ask func(off, n int) Request
 	var piece int
-	if c.ShortForms() || known < len(addr) {
+	if c.Forms == FormsShort {
 		n := min(known, c.prefixFitting(c.PacketSize-byPrefixReplyFixed-1))
 		if n < MinPrefixLength {
-			return nil, nil, Hash{}, fmt.Errorf("%w: get manifest by prefix reply needs %d bytes", ErrPacketTooSmall, byPrefixReplyFixed+MinPrefixLength+1)
+			return nil, nil, Hash{}, c.tooSmall(byPrefixReplyFixed+MinPrefixLength+1, "get manifest by prefix reply")
 		}
 		piece = MaxByPrefixPayload(c.PacketSize, n)
 		ask = func(off, length int) Request {
@@ -293,7 +324,7 @@ func (c *Client) fetchManifest(addr Hash, known int) (*Manifest, []byte, Hash, e
 	} else {
 		piece = MaxManifestPayload(c.PacketSize)
 		if piece < 1 {
-			return nil, nil, Hash{}, fmt.Errorf("%w: get manifest reply needs %d bytes", ErrPacketTooSmall, manifestReplyFixed+1)
+			return nil, nil, Hash{}, c.tooSmall(manifestReplyFixed+1, "get manifest reply")
 		}
 		ask = func(off, length int) Request {
 			return Request{Operation: OperationGetManifest, Address: addr, Offset: uint64(off), Length: uint16(length)}
@@ -374,7 +405,7 @@ func (c *Client) FetchBlockEntries(addr Hash, first, count int) ([]BlockEntry, e
 	if !c.ShortForms() {
 		per := MaxBlockListEntries(c.PacketSize)
 		if per < 1 {
-			return nil, fmt.Errorf("%w: a %d-byte block entry needs a %d-byte get block list reply", ErrPacketTooSmall, BlockEntryLength, blockListReplyFixed+BlockEntryLength)
+			return nil, c.tooSmall(blockListReplyFixed+BlockEntryLength, "a %d-byte block entry in a get block list reply", BlockEntryLength)
 		}
 		out := make([]BlockEntry, count)
 		ask := func(id, n int) Request {
@@ -400,7 +431,7 @@ func (c *Client) FetchBlockEntries(addr Hash, first, count int) ([]BlockEntry, e
 	}
 	n := c.prefixFitting(c.PacketSize - byPrefixReplyFixed - 1)
 	if n == 0 {
-		return nil, fmt.Errorf("%w: get block list bytes reply needs %d bytes", ErrPacketTooSmall, byPrefixReplyFixed+MinPrefixLength+1)
+		return nil, c.tooSmall(byPrefixReplyFixed+MinPrefixLength+1, "get block list bytes reply")
 	}
 	piece := min(MaxByPrefixPayload(c.PacketSize, n), 0xFFFF)
 	start, length := (first-1)*BlockEntryLength, count*BlockEntryLength
@@ -456,36 +487,28 @@ func (c *Client) FetchFiles(addr Hash, m *Manifest) (map[string][]byte, error) {
 }
 
 // FetchInto fetches the blocks a, the assembly of the manifest at addr,
-// still misses, and verifies each one. When a reply holds whole blocks it
-// asks for as many as fit, two per packet at 1200 bytes. Below that it
-// asks for parts of blocks, with get blocks (0x04) in the full forms and
-// get block part (0x08) in the short forms. A store resumes a stopped
-// download by giving an assembly that holds the blocks it kept.
+// still misses, and verifies each one. In the full forms it asks get blocks
+// (0x04) for as many whole blocks as fit, two per packet at 1200 bytes, and
+// fails with error 6 when a reply cannot hold a whole block. In the short
+// forms it asks get block part (0x08) for parts of blocks. A store resumes a
+// stopped download by giving an assembly that holds the blocks it kept.
 func (c *Client) FetchInto(addr Hash, a *Assembly) error {
-	short := c.ShortForms()
-	var room, blockPrefix, manifestPrefix int
-	if short {
-		blockPrefix = c.prefixFitting(c.PacketSize - blockPartReplyFixed - 1)
-		if blockPrefix == 0 {
-			return fmt.Errorf("%w: get block part reply needs %d bytes", ErrPacketTooSmall, blockPartReplyFixed+MinPrefixLength+1)
+	if c.Forms == FormsFull {
+		room := min(MaxBlocksPayload(c.PacketSize), 0xFFFF)
+		if room < a.largestBlock() {
+			return c.tooSmall(blocksReplyFixed+a.largestBlock(), "a %d-byte block in a get blocks reply", a.largestBlock())
 		}
-		if manifestPrefix = min(blockPrefix, c.PacketSize-blockPartRequestFixed-blockPrefix); manifestPrefix < MinPrefixLength {
-			manifestPrefix = 0
-		}
-		room = MaxBlockPartPayload(c.PacketSize, blockPrefix)
-	} else if room = MaxBlocksPayload(c.PacketSize); room < 1 {
-		return fmt.Errorf("%w: get blocks reply needs %d bytes", ErrPacketTooSmall, blocksReplyFixed+1)
+		return c.fetchWholeBlocks(addr, a, room)
 	}
-	room = min(room, 0xFFFF)
-	if !short && room >= a.largestBlock() {
-		serverRoom, err := c.fetchWholeBlocks(addr, a, room)
-		if err != nil || a.Complete() {
-			return err
-		}
-		// The server sends smaller packets than this client: fetch the
-		// rest in parts that fit its replies.
-		room = serverRoom
+	blockPrefix := c.prefixFitting(c.PacketSize - blockPartReplyFixed - 1)
+	if blockPrefix == 0 {
+		return c.tooSmall(blockPartReplyFixed+MinPrefixLength+1, "get block part reply")
 	}
+	manifestPrefix := min(blockPrefix, c.PacketSize-blockPartRequestFixed-blockPrefix)
+	if manifestPrefix < MinPrefixLength {
+		manifestPrefix = 0
+	}
+	room := min(MaxBlockPartPayload(c.PacketSize, blockPrefix), 0xFFFF)
 	m := a.manifest
 	badReplies := map[int]int{}
 	for round := 0; !a.Complete(); round++ {
@@ -497,11 +520,8 @@ func (c *Client) FetchInto(addr Hash, a *Assembly) error {
 		targets := map[Request][]int{}
 		var requests []Request
 		add := func(i int, off, n uint64) {
-			r := Request{Operation: OperationGetBlocks, Address: addr, Offset: m.Packing[i].PackOffset + off, Length: uint16(n)}
-			if short {
-				r = Request{Operation: OperationGetBlockPart, Address: addr, PrefixLength: manifestPrefix,
-					BlockHash: m.Blocks[i].BlockHash, BlockPrefixLength: blockPrefix, Offset: off, Length: uint16(n)}
-			}
+			r := Request{Operation: OperationGetBlockPart, Address: addr, PrefixLength: manifestPrefix,
+				BlockHash: m.Blocks[i].BlockHash, BlockPrefixLength: blockPrefix, Offset: off, Length: uint16(n)}
 			if _, ok := targets[r]; !ok {
 				requests = append(requests, r)
 			}
@@ -517,13 +537,10 @@ func (c *Client) FetchInto(addr Hash, a *Assembly) error {
 			}
 			var next []Request
 			for _, i := range targets[req] {
-				off := req.Offset
-				if !short {
-					off -= m.Packing[i].PackOffset
-				} else if r.Total != m.Packing[i].BlockLength {
+				if r.Total != m.Packing[i].BlockLength {
 					return nil, fmt.Errorf("%w: block %d of %d bytes, the manifest says %d", ErrPacket, i+1, r.Total, m.Packing[i].BlockLength)
 				}
-				if _, err := a.AcceptPart(i, off, r.Payload); err != nil {
+				if _, err := a.AcceptPart(i, req.Offset, r.Payload); err != nil {
 					if !errors.Is(err, ErrBlockHash) {
 						return nil, err
 					}
@@ -537,11 +554,7 @@ func (c *Client) FetchInto(addr Hash, a *Assembly) error {
 			if rest := uint64(req.Length) - uint64(len(r.Payload)); rest > 0 {
 				before := len(requests)
 				for _, i := range targets[req] {
-					off := req.Offset + uint64(len(r.Payload))
-					if !short {
-						off -= m.Packing[i].PackOffset
-					}
-					add(i, off, rest)
+					add(i, req.Offset+uint64(len(r.Payload)), rest)
 				}
 				next = append(next, requests[before:]...)
 			}
@@ -555,15 +568,13 @@ func (c *Client) FetchInto(addr Hash, a *Assembly) error {
 }
 
 // fetchWholeBlocks fetches the missing blocks of a with get blocks, as
-// many whole blocks per request as fit in room bytes. When a reply holds
-// less than a block, because the server's packet size is smaller, it stops
-// after the round and returns the reply's length.
-func (c *Client) fetchWholeBlocks(addr Hash, a *Assembly, room int) (int, error) {
+// many whole blocks per request as fit in room bytes. A reply that holds
+// no whole block, from a server with a smaller packet size, is error 6.
+func (c *Client) fetchWholeBlocks(addr Hash, a *Assembly, room int) error {
 	badReplies := map[uint64]int{}
-	serverRoom := 0
-	for round := 0; !a.Complete() && serverRoom == 0; round++ {
+	for round := 0; !a.Complete(); round++ {
 		if round == maxBlockRounds {
-			return 0, errors.New("blocks still missing after the retries")
+			return errors.New("blocks still missing after the retries")
 		}
 		var requests []Request
 		for _, r := range a.MissingRanges(room) {
@@ -572,9 +583,6 @@ func (c *Client) fetchWholeBlocks(addr Hash, a *Assembly, room int) (int, error)
 		err := c.exchange(requests, func(req Request, r Reply) ([]Request, error) {
 			if r.Offset != req.Offset {
 				return nil, fmt.Errorf("%w: get blocks reply at %d, asked %d", ErrPacket, r.Offset, req.Offset)
-			}
-			if len(r.Payload) < int(req.Length) && len(r.Payload) < a.largestBlock() {
-				serverRoom = max(1, len(r.Payload))
 			}
 			if _, err := a.Accept(r.Offset, r.Payload); err != nil {
 				if !errors.Is(err, ErrBlockHash) {
@@ -588,23 +596,26 @@ func (c *Client) fetchWholeBlocks(addr Hash, a *Assembly, room int) (int, error)
 				return []Request{req}, nil
 			}
 			end, want := r.Offset+uint64(len(r.Payload)), req.Offset+uint64(req.Length)
-			if serverRoom > 0 || end >= want {
+			if end >= want {
 				return nil, nil
 			}
 			// A shorter reply holds whole blocks: ask again from the first
 			// block it did not hold whole.
 			for _, p := range a.manifest.Packing {
 				if p.PackOffset >= req.Offset && p.PackOffset+uint64(p.BlockLength) > end {
+					if p.PackOffset == req.Offset {
+						return nil, fmt.Errorf("%w: the server's get blocks reply held %d bytes, no whole block, set the forms flag to short", ErrPacketTooSmall, len(r.Payload))
+					}
 					return []Request{{Operation: OperationGetBlocks, Address: addr, Offset: p.PackOffset, Length: uint16(want - p.PackOffset)}}, nil
 				}
 			}
 			return nil, nil
 		})
 		if err != nil {
-			return serverRoom, err
+			return err
 		}
 	}
-	return serverRoom, nil
+	return nil
 }
 
 // ProgramNames returns the program names of the manifest list m.

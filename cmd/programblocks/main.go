@@ -3,8 +3,8 @@
 // docs/ProgramDistribution.md.
 //
 //	programblocks serve [-addr :7002] [-packet 1200] (-seed TEXT | -secret HEX) DIR
-//	programblocks fetch [-addr HOST:7002] [-packet 1200] -signer PUBKEY [-out DIR] [-text] PROGRAM
-//	programblocks list  [-addr HOST:7002] [-packet 1200] -signer PUBKEY
+//	programblocks fetch [-addr HOST:7002] [-packet 1200] [-forms full] -signer PUBKEY [-out DIR] [-text] PROGRAM
+//	programblocks list  [-addr HOST:7002] [-packet 1200] [-forms full] -signer PUBKEY
 //	programblocks signer (-seed TEXT | -secret HEX)
 //
 // Every subdirectory of DIR is a program named after it, with its
@@ -113,6 +113,7 @@ func fetch(cmd string, args []string) error {
 	fl := flag.NewFlagSet(cmd, flag.ExitOnError)
 	addr := fl.String("addr", "127.0.0.1:7002", "server UDP address")
 	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
+	formsName := fl.String("forms", "full", "request forms, full or short; a reply that cannot fit fails with error 6")
 	signerHex := fl.String("signer", "", "public key of the trusted signer, hex")
 	out := fl.String("out", "", "directory to write the program's files to")
 	text := fl.Bool("text", false, "print the program manifest in text form")
@@ -131,6 +132,9 @@ func fetch(cmd string, args []string) error {
 	defer conn.Close()
 	c := programblocks.NewClient(conn, pk)
 	c.PacketSize = *packet
+	if c.Forms, err = programblocks.ParseForms(*formsName); err != nil {
+		return err
+	}
 	start := time.Now()
 	if cmd == "list" {
 		list, _, _, err := c.FetchManifestList()

@@ -196,10 +196,10 @@ type floodResult struct {
 	held  bool
 }
 
-func (f *fixture) flood(t *testing.T, size int) floodResult {
+func (f *fixture) flood(t *testing.T, size int, forms programblocks.Forms) floodResult {
 	tl := newTally()
-	publisher, publisherAddr := f.node(t, size, programblocks.FormsAuto, tl)
-	subscriber, _ := f.node(t, size, programblocks.FormsAuto, tl)
+	publisher, publisherAddr := f.node(t, size, forms, tl)
+	subscriber, _ := f.node(t, size, forms, tl)
 	held := make(chan bool, 1)
 	subscriber.OnHeld = func(programnetwork.Held) { held <- true }
 	if err := subscriber.Subscribe(publisherAddr); err != nil {
@@ -248,9 +248,9 @@ func clientRun(forms programblocks.Forms, fetch func(*programblocks.Client, *fix
 
 var errNotHeld = errors.New("the subscriber did not get the program")
 
-func floodRun(ops ...byte) func(*testing.T, *fixture, int) (int, int, error) {
+func floodRun(forms programblocks.Forms, ops ...byte) func(*testing.T, *fixture, int) (int, int, error) {
 	return func(t *testing.T, f *fixture, size int) (int, int, error) {
-		r := f.floodAt(t, size)
+		r := f.floodAt(t, size, forms)
 		p, b := r.tally.total(ops...)
 		if len(ops) == 1 && ops[0] == byte(programnetwork.OperationSubscribe) && p >= 2 {
 			return p, b, nil
@@ -280,14 +280,19 @@ func peersRun(forms programblocks.Forms) func(*testing.T, *fixture, int) (int, i
 	}
 }
 
-var floods = map[int]floodResult{}
+type floodKey struct {
+	size  int
+	forms programblocks.Forms
+}
 
-func (f *fixture) floodAt(t *testing.T, size int) floodResult {
-	if r, ok := floods[size]; ok {
+var floods = map[floodKey]floodResult{}
+
+func (f *fixture) floodAt(t *testing.T, size int, forms programblocks.Forms) floodResult {
+	if r, ok := floods[floodKey{size, forms}]; ok {
 		return r
 	}
-	r := f.flood(t, size)
-	floods[size] = r
+	r := f.flood(t, size, forms)
+	floods[floodKey{size, forms}] = r
 	return r
 }
 
@@ -312,21 +317,24 @@ var operations = []operation{
 	{"get manifest by prefix 0x06", 20, "reply: header 6, prefix 1+4, offset 4, length 4, one byte", clientRun(short, fetchManifest)},
 	{"get block list 0x03", 92, "reply 44 with the 32-byte address, plus one 48-byte block entry", clientRun(full, fetchBlockList)},
 	{"get block list bytes 0x07", 20, "as get manifest by prefix", clientRun(short, fetchBlockList)},
-	{"get blocks 0x04", 49, "request and reply 48 with the 32-byte address, one byte", clientRun(full, fetchBlocks)},
+	{"get blocks 0x04", 560, "reply 48 with the 32-byte address, plus one whole 512-byte block", clientRun(full, fetchBlocks)},
 	{"get block part 0x08", 16, "reply: header 6, block prefix 1+4, offset 2, length 2, one byte", clientRun(short, fetchBlocks)},
-	{"fetch program, forms by size", 20, "get manifest by prefix", clientRun(programblocks.FormsAuto, func(c *programblocks.Client, f *fixture) error {
-		p, err := c.FetchProgram("benchmarks")
-		if err == nil && p.Address != f.address {
-			err = errors.New("wrong program")
-		}
-		return err
-	})},
-	{"subscribe 0x11", 10, "request and reply: header 6, lease 4", floodRun(byte(programnetwork.OperationSubscribe))},
-	{"have 0x10", 50, "request: header 6, 32-byte address, lengths 4 and 8", floodRun(byte(programnetwork.OperationHave))},
-	{"flood one program, forms by size", 50, "the have", floodRun()},
-	{"get peers 0x12", 110, "reply 11 plus the longest peer entry, 99", peersRun(full)},
-	{"get peer part 0x13", 13, "reply: header 6, total 2, index 2, length 1, offset 1, one byte", peersRun(short)},
-	{"get peers, forms by size", 13, "get peer part", peersRun(programblocks.FormsAuto)},
+	{"fetch program, forms=full", 560, "get blocks", clientRun(full, fetchProgram)},
+	{"fetch program, forms=short", 20, "get manifest by prefix", clientRun(short, fetchProgram)},
+	{"subscribe 0x11", 10, "request and reply: header 6, lease 4", floodRun(short, byte(programnetwork.OperationSubscribe))},
+	{"have 0x10", 50, "request: header 6, 32-byte address, lengths 4 and 8", floodRun(short, byte(programnetwork.OperationHave))},
+	{"flood one program, forms=full", 560, "get blocks", floodRun(full)},
+	{"flood one program, forms=short", 50, "the have", floodRun(short)},
+	{"get peers 0x12, forms=full", 110, "reply 11 plus the longest peer entry, 99", peersRun(full)},
+	{"get peer part 0x13, forms=short", 13, "reply: header 6, total 2, index 2, length 1, offset 1, one byte", peersRun(short)},
+}
+
+func fetchProgram(c *programblocks.Client, f *fixture) error {
+	p, err := c.FetchProgram("benchmarks")
+	if err == nil && p.Address != f.address {
+		err = errors.New("wrong program")
+	}
+	return err
 }
 
 func fetchManifest(c *programblocks.Client, f *fixture) error {

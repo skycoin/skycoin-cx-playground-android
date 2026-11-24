@@ -1,7 +1,7 @@
 # The app fetches fib-and-primes with a packet size of 128 bytes, from a
-# server that also sends at most 128 bytes, so it uses the short forms:
-# get manifest by prefix and get block part (#31). tcpdump captures the
-# packets so their lengths can be checked.
+# server that also sends at most 128 bytes, in the short forms that its
+# forms=short setting names (D37): get manifest by prefix and get block
+# part (#31). tcpdump captures the packets so their lengths can be checked.
 ready start app="Programs: fetch over UDP at 128 bytes"
 program-server 7004 served cx playground test signer
 program-packet 128

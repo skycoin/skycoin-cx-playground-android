@@ -20,7 +20,7 @@ const (
 	MinPacketSize = 16
 	MaxPacketSize = 65507
 	// MinFullFormPacketSize is the smallest packet whose get blocks reply
-	// holds a whole 512-byte block. Below it a client uses the short forms.
+	// holds a whole 512-byte block. Below it the full forms fail with error 6.
 	MinFullFormPacketSize = blocksReplyFixed + DefaultBlockSize
 	// MinPrefixLength and DefaultPrefixLength are the byte lengths of a
 	// manifest address or block hash prefix in the short forms (D36).

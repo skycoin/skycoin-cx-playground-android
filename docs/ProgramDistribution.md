@@ -555,32 +555,36 @@ With 8-byte prefixes a get block part request is 28 bytes and its reply
 carries 109 block bytes at 128 bytes, 45 at 64 and 13 at 32. A block longer
 than 65535 bytes cannot be named this way, and the server answers error 3.
 
-Which forms a client uses. `programblocks.Client.Forms` is `FormsAuto` by
-default: the full forms at 560 bytes and up, where a get blocks reply holds
-a whole 512-byte block, and the short forms below (D37). So at 1200 and
-1024 the packets are the same as before #31, and old requests keep working
-against a new server. The short forms need a server of #31; an older server
-answers them with error 3.
+Which forms a client uses. The client's config flag names the forms, full
+or short, and its packet size, and the client uses exactly those (D37).
+Nothing switches forms or falls back to parts by itself.
+`programblocks.Client.Forms` is `FormsFull` or `FormsShort`, the
+`-forms full|short` flag of `cmd/programblocks` and `cmd/programnetwork`,
+and the `forms=full|short` setting of a fetch app on the phone. The default
+is full with a 1200-byte packet, the same packets as before #31. The short
+forms need a server of #31; an older server answers them with error 3.
 
-Below 560 bytes in the full forms, and in the short forms, the client
-fetches each block in parts and checks the block's hash when all its parts
-are in. A client whose server has a smaller packet size gets replies shorter
-than it asked for. It keeps the whole blocks a reply holds, asks for the
-rest, and when a reply holds less than one block it fetches the remaining
-blocks in parts of the reply's size. So a client and a server of different
-packet sizes still work together
-(`tests/program-transport-short-forms`, server 1200, 128 and 64 with
-clients 1400 to 32).
+The full forms read whole units: a get blocks reply holds whole blocks and
+a get peers reply whole peer entries. A request whose reply cannot hold one
+whole unit at the configured size fails with error 6 (packet too small),
+and the error names the flag to change, for example "a 512-byte block in a
+get blocks reply at packet 512 in the full forms, raise the packet flag to
+560 or more or set the forms flag to short". The same holds when a server
+with a smaller packet size sends a get blocks reply that holds no whole
+block. The short forms read parts: the client fetches each block in parts
+and checks the block's hash when all its parts are in, so a short-form
+client works with a server of any packet size
+(`tests/program-transport-short-forms`).
 
 ### Packet size sweep (#31)
 
 This section answers D26 with measurements.
 `tests/program-packet-size-sweep` runs every operation over UDP on the host
-at each packet size, with the server and the client at the same size, and
-writes this table to `sweep-table.md` in its folder. It also checks every
-operation's floor, the smallest size its packet layout allows, against the
-runs: every size at or above the floor works and every size below it fails
-with "packet size too small".
+at each packet size, with the server and the client at the same size and
+the forms flag set for each row, and writes this table to `sweep-table.md`
+in its folder. It also checks every operation's floor, the smallest size
+its packet layout allows, against the runs: every size at or above the
+floor works and every size below it fails with error 6, packet too small.
 
 The reference program is `apps/benchmarks`: 8 files, a manifest of 2472
 bytes, 21 blocks and 8599 bytes of linear packing. A cell is the packets
@@ -602,15 +606,16 @@ were none.
 | get manifest by prefix 0x06 | 4/2560 | 6/2604 | 6/2604 | 12/2736 | 22/2956 | 48/3528 | 122/5156 | 550/14572 | fails | 20 | reply: header 6, prefix 1+4, offset 4, length 4, one byte |
 | get block list 0x03 | 2/1096 | 2/1096 | 4/1184 | 6/1272 | 12/1536 | 42/2856 | fails | fails | fails | 92 | reply 44 with the 32-byte address, plus one 48-byte block entry |
 | get block list bytes 0x07 | 2/1052 | 2/1052 | 4/1096 | 6/1140 | 10/1228 | 20/1448 | 50/2108 | 224/5936 | fails | 20 | as get manifest by prefix |
-| get blocks 0x04 | 16/9367 | 18/9463 | 28/9943 | 68/11863 | 102/13495 | 238/20023 | 1082/60535 | fails | fails | 49 | request and reply 48 with the 32-byte address, one byte |
+| get blocks 0x04 | 16/9367 | 18/9463 | 28/9943 | fails | fails | fails | fails | fails | fails | 560 | reply 48 with the 32-byte address, plus one whole 512-byte block |
 | get block part 0x08 | 42/9586 | 42/9586 | 42/9586 | 68/10197 | 102/10996 | 174/12688 | 408/18187 | 1350/40324 | 17198/275168 | 16 | reply: header 6, block prefix 1+4, offset 2, length 2, one byte |
-| fetch program, forms by size | 26/12995 | 28/13091 | 40/13667 | 92/13936 | 140/15058 | 238/17352 | 562/24933 | 1902/56231 | fails | 20 | get manifest by prefix |
+| fetch program, forms=full | 26/12995 | 28/13091 | 40/13667 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
+| fetch program, forms=short | 56/13093 | 56/13093 | 56/13093 | 92/13936 | 140/15058 | 238/17352 | 562/24933 | 1902/56231 | fails | 20 | get manifest by prefix |
 | subscribe 0x11 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 10 | request and reply: header 6, lease 4 |
 | have 0x10 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | fails | fails | 50 | request: header 6, 32-byte address, lengths 4 and 8 |
-| flood one program, forms by size | 14/11655 | 16/11749 | 21/11989 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
-| get peers 0x12 | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | fails | fails | fails | 110 | reply 11 plus the longest peer entry, 99 |
-| get peer part 0x13 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 12/335 | 26/482 | 108/1343 | 13 | reply: header 6, total 2, index 2, length 1, offset 1, one byte |
-| get peers, forms by size | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | 12/327 | 36/577 | 118/1438 | 13 | get peer part |
+| flood one program, forms=full | 14/11655 | 16/11749 | 21/11989 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
+| flood one program, forms=short | 27/11624 | 28/11647 | 28/11647 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
+| get peers 0x12, forms=full | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | fails | fails | fails | 110 | reply 11 plus the longest peer entry, 99 |
+| get peer part 0x13, forms=short | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 12/335 | 26/482 | 108/1343 | 13 | reply: header 6, total 2, index 2, length 1, offset 1, one byte |
 
 Findings:
 
@@ -620,28 +625,32 @@ Findings:
   checks the address, the signature and the signer when its last byte
   arrives.
 - The 32-byte address in every full-form packet sets their floors: 42 for
-  list manifests, 47 for get manifest, 49 for get blocks and 50 for have.
-  Get block list also needs one 48-byte block entry in a reply, 92 bytes.
-- Get peers needs room for its longest entry, 110 bytes for a 99-byte entry.
-  Get peer part reads an entry by range, and a node falls back to it for an
-  entry that does not fit, so get peers works down to 13 bytes.
+  list manifests, 47 for get manifest and 50 for have. Get block list also
+  needs one 48-byte block entry in a reply, 92 bytes.
+- The full forms read whole units (D37). Get blocks needs a whole 512-byte
+  block in a reply, 560 bytes, so a program fetch and a flood in the full
+  forms work at 560 and up and fail with error 6 below.
+- Get peers needs room for its longest entry, 110 bytes for a 99-byte
+  entry. Get peer part reads an entry by range, down to 13 bytes, when the
+  forms flag is short.
 - In the short forms the floor of every fetch operation is set by the
   6-byte header, the 5-byte shortest prefix and the offset and length
   fields: 15 for list manifests prefix, 20 for get manifest by prefix and
   get block list bytes, 16 for get block part. A whole program fetch works
   down to 20 bytes, where 16 fails at get manifest by prefix.
-- The flood needs the have, so its floor is 50 bytes (D35).
-- Every operation works at 64 bytes and up. That is the practical floor.
-  At 32 bytes a program can still be fetched from a server, in 1902 packets
-  instead of 28 at 1200, but a node cannot flood. At 16 no program can be
-  fetched.
-- Cost: fetching the program takes 28 packets and 13091 bytes at 1200, 238
-  packets and 17352 bytes at 128 (1.3 times the bytes), 562 and 24933 at 64
-  (1.9 times), and 1902 and 56231 at 32 (4.3 times).
-- At 1200 the short forms would send fewer bytes but more packets: get
-  manifest by prefix saves 138 bytes, while get block part takes 42 packets
-  where get blocks takes 18, because a part never spans two blocks. So the
-  full forms stay the default above 560 bytes (D37).
+- The flood needs the have, so its floor in the short forms is 50 bytes
+  (D35).
+- In the short forms every operation works at 64 bytes and up. That is the
+  practical floor. At 32 bytes a program can still be fetched from a
+  server, in 1902 packets instead of 56 at 1200, but a node cannot flood.
+  At 16 no program can be fetched.
+- Cost: in the full forms fetching the program takes 28 packets and 13091
+  bytes at 1200. In the short forms it takes 56 packets and 13093 bytes at
+  1200, 238 packets and 17352 bytes at 128, 562 and 24933 at 64, and 1902
+  and 56231 at 32 (4.3 times the bytes).
+- At 1200 the short forms send about the same bytes in twice the packets,
+  because a get block part never spans two blocks. So the forms flag
+  defaults to full.
 
 ### Loss, retries and order
 
@@ -653,7 +662,8 @@ packets.
 - A request with no reply after 250 ms is sent again, with the wait doubled
   each time up to 2 s, and the fetch fails after 8 tries of one request.
   The tries are a setting: a fetch app takes `tries=N` (and the packet
-  size as `packet=BYTES`) after its three args, and
+  size as `packet=BYTES` and the forms as `forms=full|short`) after its
+  three args, and
   `tests/program-transport-fetch-in-emulator-with-loss` makes 20 (#31).
   Under its 40% loss each way a request and its reply both arrive
   36% of the time, so 8 tries lost a request once in 36 and the fetch of
@@ -908,12 +918,12 @@ Reply (0x93) body:
 | 11 | 1 | u8 | offset |
 | 12 | n | bytes | entry bytes, at most packet size − 12 |
 
-A node asks with get peers and falls back to get peer part for an entry
-that does not fit a get peers reply, so get peers works down to 13 bytes.
-`programnetwork.Node.Forms` selects the forms as in the client: with
-`FormsFull` an entry that does not fit is an error, and with `FormsShort`
-every entry is read with get peer part. A node's downloads use the forms
-of its packet size, so a flood works at every size the have fits, 50 bytes
+`programnetwork.Node.Forms` is the node's forms flag, as in the client
+(D37). With `FormsFull` a node reads whole entries with get peers, and an
+entry that does not fit a reply is error 6 naming the flag. With
+`FormsShort` it reads every entry with get peer part, down to 13 bytes. A
+node's downloads use the same flag, so in the short forms a flood works at
+every size the have fits, 50 bytes and up, and in the full forms at 560
 and up.
 
 A malformed request gets the error reply (0xFF) of #15. The download uses
@@ -1469,22 +1479,13 @@ D36 ProgramHashPrefixLengthDecision
   two blocks that share 4 bytes.
 
 D37 ProgramShortFormSelectionDecision
-- What exists now: the full forms (0x01 to 0x04) and the short forms (0x05
-  to 0x08) both work at 1200 bytes.
-- Question: when does a client use the short forms?
-- Option a: below 560 bytes, where a get blocks reply no longer holds a
-  whole 512-byte block, and the full forms at 560 and up.
-- Option b: always, so every packet saves the bytes of the full address.
-- Option c: the client tries the short forms and falls back to the full
-  forms when the server answers error 3, for servers older than #31.
-- Evidence: at 1200 the short forms fetch the program manifest in 2604
-  bytes instead of 2742, but the linear packing in 42 packets instead of 18,
-  because a get block part never spans two blocks.
-- Recommendation: option a, because at 560 and up the full forms take fewer
-  packets and keep the packets of every existing client and server
-  unchanged, and below 560 the short forms carry more bytes per packet.
-  `Client.Forms` and `Node.Forms` force either form. Built: `FormsAuto` in
-  `programblocks/client.go`.
+- Decided 2026-11-24 (#43): "Client chooses, client config flag. Based
+  upon client choose. No automatic." The client uses exactly the forms and
+  packet size its config names, and a reply that cannot fit fails with
+  error 6 naming the flag. Built: `Client.Forms` and `Node.Forms`
+  (`FormsFull` by default, `FormsShort`), the `-forms` flag and the
+  `forms=` fetch setting, see "Short forms". `FormsAuto` and the fallback
+  to block parts and peer parts are removed.
 
 D38 MediumNodePinBudgetDecision
 - What exists now: #34 says a medium node stores up to a configured amount
