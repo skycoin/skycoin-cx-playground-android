@@ -1006,6 +1006,50 @@ func pointerToUint32(pointer types.Pointer) uint32 {
 	return uint32(pointer)
 }
 
+// libraryBufferInput reports whether a library function input is a byte
+// buffer, an input of undefined type. The caller passes a ui8 array, which
+// the function reads or fills in place, see docs/Networking.md.
+func libraryBufferInput(prgrm *ast.CXProgram, signatureIndex ast.CXTypeSignatureIndex) bool {
+	signature := prgrm.GetCXTypeSignatureFromArray(signatureIndex)
+	switch signature.Type {
+	case ast.TYPE_ATOMIC:
+		return types.Code(signature.Meta) == types.UNDEFINED
+	case ast.TYPE_CXARGUMENT_DEPRECATE:
+		return prgrm.GetCXArgFromArray(ast.CXArgumentIndex(signature.Meta)).Type == types.UNDEFINED
+	}
+	return false
+}
+
+// libraryBuffer lowers a byte buffer input as the address and the byte size
+// of the ui8 array, each a pointer, at offset of the block. The vm form
+// reads or fills memory there, as the old loop does at the array's offset.
+func (s *state) libraryBuffer(code []ir.Instr, signatureIndex ast.CXTypeSignatureIndex, offset uint32) ([]ir.Instr, ReasonCode) {
+	prgrm := s.statePrgrm
+	signature := prgrm.GetCXTypeSignatureFromArray(signatureIndex)
+	if signature.Type != ast.TYPE_ARRAY_ATOMIC || signature.GetType(prgrm) != types.UI8 {
+		return code, ReasonOperandNotScalar
+	}
+	code, p, reason := s.placeOf(code, signatureIndex)
+	if reason != ReasonNone {
+		return code, reason
+	}
+	code, address, reason := s.addressOf(code, p)
+	if reason != ReasonNone {
+		return code, reason
+	}
+	addressSlot := operand{operandOffset: s.scratch(machinePointerSize), operandSize: machinePointerSize}
+	operandSet(&address, 2, addressSlot)
+	// OpcodeAddressOf of an absolute A writes A itself, here the size.
+	sizeSlot := operand{operandOffset: s.scratch(machinePointerSize), operandSize: machinePointerSize}
+	size := ir.Instr{InstrOpcode: ir.OpcodeAddressOf, InstrA: p.placeSize}
+	operandSet(&size, 2, sizeSlot)
+	addressArg := ir.Instr{InstrOpcode: ir.OpcodeCallArg, InstrC: offset, InstrN: machinePointerSize}
+	operandSet(&addressArg, 0, addressSlot)
+	sizeArg := ir.Instr{InstrOpcode: ir.OpcodeCallArg, InstrC: offset + machinePointerSize, InstrN: machinePointerSize}
+	operandSet(&sizeArg, 0, sizeSlot)
+	return append(code, address, size, addressArg, sizeArg), ReasonNone
+}
+
 // libraryCall lowers a call of a system library function that has a vm form,
 // as call lowers a call: a block at sp holds the inputs and then the
 // outputs at the offsets of the native function, ir.OpcodeLibraryCall runs
@@ -1023,9 +1067,19 @@ func (s *state) libraryCall(code []ir.Instr, cxAtomicOp *ast.CXAtomicOperator, c
 		return code, ReasonOperandCount
 	}
 	const blockLimit = ^uint32(0)
-	inputSlots, reason := s.slots(calleeInputs, blockLimit)
-	if reason != ReasonNone {
-		return code, ReasonCalleeLayout
+	// A byte buffer input has no size of its own, so it takes the two
+	// pointers libraryBuffer writes.
+	inputSlots := make([]ir.Slot, len(calleeInputs))
+	for i, signatureIndex := range calleeInputs {
+		if libraryBufferInput(prgrm, signatureIndex) {
+			inputSlots[i].SlotSize = 2 * machinePointerSize
+			continue
+		}
+		slot, reason := s.slot(signatureIndex, blockLimit)
+		if reason != ReasonNone {
+			return code, ReasonCalleeLayout
+		}
+		inputSlots[i] = slot
 	}
 	outputSlots, reason := s.slots(calleeOutputs, blockLimit)
 	if reason != ReasonNone {
@@ -1043,6 +1097,12 @@ func (s *state) libraryCall(code []ir.Instr, cxAtomicOp *ast.CXAtomicOperator, c
 
 	code = append(code, ir.Instr{InstrOpcode: ir.OpcodeCallFrame, InstrN: blockSize})
 	for i, signatureIndex := range inputs {
+		if libraryBufferInput(prgrm, calleeInputs[i]) {
+			if code, reason = s.libraryBuffer(code, signatureIndex, inputSlots[i].SlotOffset); reason != ReasonNone {
+				return code, reason
+			}
+			continue
+		}
 		if ast.CXTypeSignaturePassBy(prgrm, prgrm.GetCXTypeSignatureFromArray(signatureIndex)) == constants.PASSBY_REFERENCE {
 			return code, ReasonOperandByReference
 		}

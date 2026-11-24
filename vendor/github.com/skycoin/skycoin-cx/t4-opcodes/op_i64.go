@@ -1,7 +1,6 @@
 package opcodes
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 
@@ -11,10 +10,10 @@ import (
 )
 
 // The built-in str function returns the base 10 string representation of operand 1.
-// VIOLATION STRHOT-094: O, the opcode works on Go string copies of CX strs, #412.
 func opI64ToStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	outV0 := strconv.FormatInt(inputs[0].Get_i64(prgrm), 10)
-	outputs[0].Set_str(prgrm, outV0)
+	formatted := strconv.AppendInt(formatBuffer(prgrm), inputs[0].Get_i64(prgrm), 10)
+	outputs[0].Set_str_bytes(prgrm, formatted)
+	formatBufferKeep(prgrm, formatted)
 }
 
 // The built-in i8 function returns operand 1 casted from type i64 to type i8.
@@ -72,9 +71,8 @@ func opI64ToF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 }
 
 // The print built-in function formats its arguments and prints them.
-// VIOLATION STRHOT-095: O, the opcode works on Go string copies of CX strs, #412.
 func opI64Print(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	fmt.Println(inputs[0].Get_i64(prgrm))
+	printFormattedLine(prgrm, strconv.AppendInt(formatBuffer(prgrm), inputs[0].Get_i64(prgrm), 10))
 }
 
 // The built-in add function returns the sum of the two operands.

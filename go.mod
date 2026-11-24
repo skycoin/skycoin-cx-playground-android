@@ -6,7 +6,7 @@ require (
 	github.com/0magnet/gio v0.10.4-0.20261113210149-b0467ff35c7e
 	github.com/pierrec/lz4/v4 v4.1.34
 	github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5
-	github.com/skycoin/skycoin-cx v0.0.0-20261124000345-d31a71b0e4b7
+	github.com/skycoin/skycoin-cx v0.0.0-20261124125939-d1a9862a4ae2
 	github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76
 	go.etcd.io/bbolt v1.5.0
 )

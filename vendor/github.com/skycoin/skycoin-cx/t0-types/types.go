@@ -236,6 +236,7 @@ func Read_f64(memory []byte, offset Pointer) float64 {
 	return math.Float64frombits(Read_ui64(memory, offset))
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_i8(memory []byte, offset Pointer) (out []int8) {
 	count := Cast_int_to_ptr(len(memory))
 	if count > 0 {
@@ -247,6 +248,7 @@ func ReadSlice_i8(memory []byte, offset Pointer) (out []int8) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_i16(memory []byte, offset Pointer) (out []int16) {
 	count := Cast_int_to_ptr(len(memory) / 2)
 	if count > 0 {
@@ -258,6 +260,7 @@ func ReadSlice_i16(memory []byte, offset Pointer) (out []int16) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_i32(memory []byte, offset Pointer) (out []int32) {
 	count := Cast_int_to_ptr(len(memory) / 4)
 	if count > 0 {
@@ -269,6 +272,7 @@ func ReadSlice_i32(memory []byte, offset Pointer) (out []int32) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_i64(memory []byte, offset Pointer) (out []int64) {
 	count := Cast_int_to_ptr(len(memory) / 8)
 	if count > 0 {
@@ -280,6 +284,7 @@ func ReadSlice_i64(memory []byte, offset Pointer) (out []int64) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_ui8(memory []byte, offset Pointer) (out []uint8) {
 	count := Cast_int_to_ptr(len(memory))
 	if count > 0 {
@@ -291,6 +296,7 @@ func ReadSlice_ui8(memory []byte, offset Pointer) (out []uint8) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_ui16(memory []byte, offset Pointer) (out []uint16) {
 	count := Cast_int_to_ptr(len(memory) / 2)
 	if count > 0 {
@@ -302,6 +308,7 @@ func ReadSlice_ui16(memory []byte, offset Pointer) (out []uint16) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_ui32(memory []byte, offset Pointer) (out []uint32) {
 	count := Cast_int_to_ptr(len(memory) / 4)
 	if count > 0 {
@@ -324,6 +331,7 @@ func ReadSlice_ui64(memory []byte, offset Pointer) (out []uint64) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_f32(memory []byte, offset Pointer) (out []float32) {
 	count := Cast_int_to_ptr(len(memory) / 4)
 	if count > 0 {
@@ -335,6 +343,7 @@ func ReadSlice_f32(memory []byte, offset Pointer) (out []float32) {
 	return
 }
 
+// VIOLATION VMALLOC-012: copies a slice into a new Go slice, for the boundary opcodes only, #407.
 func ReadSlice_f64(memory []byte, offset Pointer) (out []float64) {
 	count := Cast_int_to_ptr(len(memory) / 8)
 	if count > 0 {

@@ -31,18 +31,6 @@ const (
 	CONST_OS_SEEK_SET
 	CONST_OS_SEEK_CUR
 	CONST_OS_SEEK_END
-
-	// json
-	CONST_JSON_TOKEN_NULL
-	CONST_JSON_TOKEN_DELIM
-	CONST_JSON_TOKEN_BOOL
-	CONST_JSON_TOKEN_F64
-	CONST_JSON_TOKEN_NUMBER
-	CONST_JSON_TOKEN_STR
-	CONST_JSON_DELIM_CURLY_LEFT
-	CONST_JSON_DELIM_CURLY_RIGHT
-	CONST_JSON_DELIM_SQUARE_LEFT
-	CONST_JSON_DELIM_SQUARE_RIGHT
 )
 
 const (
@@ -54,7 +42,7 @@ const (
 	OS_RUN_TIMEOUT
 )
 
-// InitConstants registers the os.* and json.* constants through constantAdd,
+// InitConstants registers the os.* constants through constantAdd,
 // actions.AddConstI32 in cx. Taking it as an argument keeps the compiler out
 // of this package, so the cx build core can link the file library.
 func InitConstants(constantAdd func(code int, name string, value int32)) {
@@ -87,15 +75,4 @@ func InitConstants(constantAdd func(code int, name string, value int32)) {
 	constantAdd(CONST_OS_SEEK_CUR, "os.SEEK_CUR", OS_SEEK_CUR)
 	constantAdd(CONST_OS_SEEK_END, "os.SEEK_END", OS_SEEK_END)
 
-	// json
-	constantAdd(CONST_JSON_TOKEN_NULL, "json.TOKEN_NULL", JSON_TOKEN_NULL)
-	constantAdd(CONST_JSON_TOKEN_DELIM, "json.TOKEN_DELIM", JSON_TOKEN_DELIM)
-	constantAdd(CONST_JSON_TOKEN_BOOL, "json.TOKEN_BOOL", JSON_TOKEN_BOOL)
-	constantAdd(CONST_JSON_TOKEN_F64, "json.TOKEN_F64", JSON_TOKEN_F64)
-	constantAdd(CONST_JSON_TOKEN_NUMBER, "json.TOKEN_NUMBER", JSON_TOKEN_NUMBER)
-	constantAdd(CONST_JSON_TOKEN_STR, "json.TOKEN_STR", JSON_TOKEN_STR)
-	constantAdd(CONST_JSON_DELIM_CURLY_LEFT, "json.DELIM_CURLY_LEFT", JSON_DELIM_CURLY_LEFT)
-	constantAdd(CONST_JSON_DELIM_CURLY_RIGHT, "json.DELIM_CURLY_RIGHT", JSON_DELIM_CURLY_RIGHT)
-	constantAdd(CONST_JSON_DELIM_SQUARE_LEFT, "json.DELIM_SQUARE_LEFT", JSON_DELIM_SQUARE_LEFT)
-	constantAdd(CONST_JSON_DELIM_SQUARE_RIGHT, "json.DELIM_SQUARE_RIGHT", JSON_DELIM_SQUARE_RIGHT)
 }

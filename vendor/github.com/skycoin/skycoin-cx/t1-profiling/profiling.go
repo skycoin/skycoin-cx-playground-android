@@ -60,6 +60,7 @@ func StartCPUProfileFile(path string, profRate int) (stop func() error, err erro
 // StartCPUProfileOnFile is StartCPUProfile writing to f at a nonzero profRate.
 // It closes f on stop or failure.
 // VIOLATION STRHOT-016: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func StartCPUProfileOnFile(f *os.File, profRate int) (stop func() error, err error) {
 	// test against default value to avoid warning
 	if profRate != 100 {

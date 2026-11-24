@@ -19,7 +19,7 @@ func AssertFailed() bool {
 }
 
 // TODO: Rework
-// VIOLATION STRHOT-118: O, the opcode works on Go string copies of CX strs, #412.
+// VIOLATION STRHOT-118: E, the text of a failed assert, built only when it fails, #412.
 func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (same bool) {
 	var byts1, byts2 []byte
 	var inp0 *ast.CXArgument
@@ -29,8 +29,8 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 		inp0 = prgrm.GetCXArgFromArray(ast.CXArgumentIndex(inputs[0].TypeSignature.Meta))
 
 		if inp0.Type == types.STR || inp0.PointerTargetType == types.STR {
-			byts1 = []byte(inputs[0].Get_str(prgrm))
-			byts2 = []byte(inputs[1].Get_str(prgrm))
+			byts1 = inputs[0].Get_str_bytes(prgrm)
+			byts2 = inputs[1].Get_str_bytes(prgrm)
 		} else {
 			byts1 = inputs[0].Get_bytes(prgrm)
 			byts2 = inputs[1].Get_bytes(prgrm)
@@ -65,8 +65,8 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 		}
 
 		if isStr {
-			byts1 = []byte(inputs[0].Get_str(prgrm))
-			byts2 = []byte(inputs[1].Get_str(prgrm))
+			byts1 = inputs[0].Get_str_bytes(prgrm)
+			byts2 = inputs[1].Get_str_bytes(prgrm)
 		} else {
 			byts1 = inputs[0].Get_bytes(prgrm)
 			byts2 = inputs[1].Get_bytes(prgrm)
@@ -76,14 +76,13 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 	}
 
 	same = bytes.Equal(byts1, byts2)
-	message := inputs[2].Get_str(prgrm)
-
 	if !same {
+		message := inputs[2].Get_str_bytes(prgrm)
 		call := prgrm.GetCurrentCall()
 		// expr := call.Operator.Expressions[call.Line]
 		cxLine, _ := prgrm.GetPreviousCXLine(call.Operator.Expressions, call.Line)
 
-		if message != "" {
+		if len(message) != 0 {
 			fmt.Printf("%s: %d: result was not equal to the expected value; %s\n", prgrm.CXProgramSourceFileText(cxLine.FileName), cxLine.LineNumber, message)
 		} else {
 			fmt.Printf("%s: %d: result was not equal to the expected value\n", prgrm.CXProgramSourceFileText(cxLine.FileName), cxLine.LineNumber)

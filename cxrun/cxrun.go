@@ -20,6 +20,7 @@ import (
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
 	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
+	cxnet "github.com/skycoin/skycoin-cx/t5-cxnet"
 	cxos "github.com/skycoin/skycoin-cx/t5-cxos"
 	cxinit "github.com/skycoin/skycoin-cx/t7-init"
 	cxparsing "github.com/skycoin/skycoin-cx/t9-cxparsing"
@@ -94,6 +95,7 @@ func init() {
 	packages.DefaultPackages = append(packages.DefaultPackages, "app")
 	actions.InitConstants()
 	cxos.InitConstants(actions.AddConstI32)
+	cxnet.InitConstants(actions.AddConstI32)
 	resetCompiler()
 }
 
@@ -118,6 +120,8 @@ var ErrCompile = errors.New("compilation failed")
 // in the output.
 var ErrRuntime = errors.New("runtime error")
 
+var errNetRecordAndReplay = errors.New("NetRecord and NetReplay cannot both be set")
+
 // Run compiles the .cx files in files, entry first, and runs main on the old
 // executor. Program output, including compiler errors, is written to out.
 // Only one program runs at a time.
@@ -140,6 +144,10 @@ type Options struct {
 	// LibrariesAll. A call into another one stops the program with
 	// CX_RUNTIME_LIBRARY_DISABLED.
 	Libraries []string
+	// NetRecord writes every net update of the run to this replay record,
+	// as cx --net-record. NetReplay runs from such a record and opens no
+	// socket, as cx --net-replay. See docs/Networking.md of skycoin-cx.
+	NetRecord, NetReplay string
 }
 
 // RunWith is Run with options.
@@ -156,6 +164,9 @@ func RunOn(files map[string][]byte, entry string, executor Executor, h Host, out
 
 func runOn(files map[string][]byte, entry string, executor Executor, opts Options, h Host, out io.Writer) (elapsed time.Duration, err error) {
 	err = compileWith(files, entry, opts, h, out, func() error {
+		if err := netRunStart(opts); err != nil {
+			return err
+		}
 		elapsed, err = runCompiledOn(executor, opts.Args)
 		return err
 	})
@@ -193,7 +204,7 @@ func compileWith(files map[string][]byte, entry string, opts Options, h Host, ou
 	defer restore()
 
 	host, cmds = h, cmds[:0]
-	defer func() { host = nil; netCloseAll() }()
+	defer func() { host = nil; netRunStop() }()
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("cx panic: %v", r)

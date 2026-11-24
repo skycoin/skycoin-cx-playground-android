@@ -1,8 +1,9 @@
 package opcodes
 
 import (
-	"fmt"
+	"os"
 	"strconv"
+	"unicode/utf8"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
 	// GCREACH: t3-ast owns the heap and the GC roots. This file allocates strs, which
@@ -10,11 +11,15 @@ import (
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
-// VIOLATION STRHOT-086: O, the opcode works on Go string copies of CX strs, #412.
-func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) []byte {
-	fmtStr := inputs[0].Get_str(prgrm)
+// buildString appends the text printf and sprintf make of inputs to res and
+// returns it. Only %v and the extra arguments of a short format go through
+// Go strings, the printed values of GetPrintableValue.
+// VIOLATION STRHOT-086: P, %v and extra arguments append the text of a printed value, #412.
+// VIOLATION VMALLOC-022: appending grows the format buffer past its size, once, #407.
+// VIOLATION VMALLOC-015: %v and extra arguments build the Go string of a printed value, #407.
+func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, res []byte) []byte {
+	fmtStr := inputs[0].Get_str_bytes(prgrm)
 
-	var res []byte
 	var specifiersCounter int
 	var lenStr = int(len(fmtStr))
 
@@ -31,7 +36,7 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 		}
 		if ch == '%' {
 			if specifiersCounter+1 == len(inputs) {
-				res = append(res, []byte(fmt.Sprintf("%%!%c(MISSING)", nextCh))...)
+				res = append(utf8.AppendRune(append(res, "%!"...), rune(nextCh)), "(MISSING)"...)
 				c++
 				continue
 			}
@@ -44,37 +49,37 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 			}
 			switch nextCh {
 			case 's':
-				res = append(res, inp.Get_str(prgrm)...)
+				res = append(res, inp.Get_str_bytes(prgrm)...)
 			case 'd':
 				switch inp.Type {
 				case types.I8:
-					res = append(res, []byte(strconv.FormatInt(int64(inp.Get_i8(prgrm)), 10))...)
+					res = strconv.AppendInt(res, int64(inp.Get_i8(prgrm)), 10)
 				case types.I16:
-					res = append(res, []byte(strconv.FormatInt(int64(inp.Get_i16(prgrm)), 10))...)
+					res = strconv.AppendInt(res, int64(inp.Get_i16(prgrm)), 10)
 				case types.I32:
-					res = append(res, []byte(strconv.FormatInt(int64(inp.Get_i32(prgrm)), 10))...)
+					res = strconv.AppendInt(res, int64(inp.Get_i32(prgrm)), 10)
 				case types.I64:
-					res = append(res, []byte(strconv.FormatInt(inp.Get_i64(prgrm), 10))...)
+					res = strconv.AppendInt(res, inp.Get_i64(prgrm), 10)
 				case types.UI8:
-					res = append(res, []byte(strconv.FormatUint(uint64(inp.Get_ui8(prgrm)), 10))...)
+					res = strconv.AppendUint(res, uint64(inp.Get_ui8(prgrm)), 10)
 				case types.UI16:
-					res = append(res, []byte(strconv.FormatUint(uint64(inp.Get_ui16(prgrm)), 10))...)
+					res = strconv.AppendUint(res, uint64(inp.Get_ui16(prgrm)), 10)
 				case types.UI32:
-					res = append(res, []byte(strconv.FormatUint(uint64(inp.Get_ui32(prgrm)), 10))...)
+					res = strconv.AppendUint(res, uint64(inp.Get_ui32(prgrm)), 10)
 				case types.UI64:
-					res = append(res, []byte(strconv.FormatUint(inp.Get_ui64(prgrm), 10))...)
+					res = strconv.AppendUint(res, inp.Get_ui64(prgrm), 10)
 				}
 			case 'f':
 				switch inp.Type {
 				case types.F32:
-					res = append(res, []byte(strconv.FormatFloat(float64(inp.Get_f32(prgrm)), 'f', 7, 32))...)
+					res = strconv.AppendFloat(res, float64(inp.Get_f32(prgrm)), 'f', 7, 32)
 				case types.F64:
-					res = append(res, []byte(strconv.FormatFloat(inp.Get_f64(prgrm), 'f', 16, 64))...)
+					res = strconv.AppendFloat(res, inp.Get_f64(prgrm), 'f', 16, 64)
 				}
 			case 'v':
-				res = append(res, []byte(ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature))...)
+				res = append(res, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature)...)
 			case 'b':
-				res = append(res, []byte(strconv.FormatBool(inp.Get_bool(prgrm)))...)
+				res = strconv.AppendBool(res, inp.Get_bool(prgrm))
 			}
 			c++
 			specifiersCounter++
@@ -84,34 +89,31 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	}
 
 	if specifiersCounter != len(inputs)-1 {
-		extra := "%!(EXTRA "
-		// for _, inp := range expr.ProgramInput[:specifiersCounter] {
+		res = append(res, "%!(EXTRA "...)
 		lInps := len(inputs[specifiersCounter+1:])
 		for c := 0; c < lInps; c++ {
 			inp := &inputs[specifiersCounter+1+c]
-			typ := inp.TypeSignature.GetValueTypeName(prgrm)
-			if c == lInps-1 {
-				extra += fmt.Sprintf("%s=%s", typ, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature))
-			} else {
-				extra += fmt.Sprintf("%s=%s, ", typ, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature))
+			res = append(res, inp.TypeSignature.GetValueTypeName(prgrm)...)
+			res = append(res, '=')
+			res = append(res, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature)...)
+			if c != lInps-1 {
+				res = append(res, ", "...)
 			}
-
 		}
-
-		extra += ")"
-
-		res = append(res, []byte(extra)...)
+		res = append(res, ')')
 	}
 
 	return res
 }
 
-// VIOLATION STRHOT-087: O, the opcode works on Go string copies of CX strs, #412.
 func opSprintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	outputs[0].Set_str(prgrm, string(buildString(prgrm, inputs, outputs)))
+	formatted := buildString(prgrm, inputs, formatBuffer(prgrm))
+	outputs[0].Set_str_bytes(prgrm, formatted)
+	formatBufferKeep(prgrm, formatted)
 }
 
-// VIOLATION STRHOT-088: O, the opcode works on Go string copies of CX strs, #412.
 func opPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	fmt.Print(string(buildString(prgrm, inputs, outputs)))
+	formatted := buildString(prgrm, inputs, formatBuffer(prgrm))
+	os.Stdout.Write(formatted)
+	formatBufferKeep(prgrm, formatted)
 }

@@ -1,7 +1,6 @@
 package opcodes
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"strconv"
@@ -12,10 +11,10 @@ import (
 )
 
 // The built-in str function returns the base 10 string representation of operand 1.
-// VIOLATION STRHOT-082: O, the opcode works on Go string copies of CX strs, #412.
 func opF32ToStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	outV0 := strconv.FormatFloat(float64(inputs[0].Get_f32(prgrm)), 'f', -1, 32)
-	outputs[0].Set_str(prgrm, outV0)
+	formatted := strconv.AppendFloat(formatBuffer(prgrm), float64(inputs[0].Get_f32(prgrm)), 'f', -1, 32)
+	outputs[0].Set_str_bytes(prgrm, formatted)
+	formatBufferKeep(prgrm, formatted)
 }
 
 // The built-in i8 function returns operand 1 casted from type f32 to type i8.
@@ -79,9 +78,8 @@ func opF32Isnan(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 }
 
 // The print built-in function formats its arguments and prints them.
-// VIOLATION STRHOT-083: O, the opcode works on Go string copies of CX strs, #412.
 func opF32Print(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	fmt.Println(inputs[0].Get_f32(prgrm))
+	printFormattedLine(prgrm, strconv.AppendFloat(formatBuffer(prgrm), float64(inputs[0].Get_f32(prgrm)), 'g', -1, 32))
 }
 
 // The built-in add function returns the sum of the two operands.

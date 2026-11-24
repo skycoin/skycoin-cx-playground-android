@@ -1,0 +1,61 @@
+package main
+
+import "sys/net"
+
+// Dials the echo server through sys/net, sends three lines one update
+// apart and prints every entry of every batch until all three came back.
+
+var buffer [256]ui8
+
+func main() { global buffer
+	var conn i32 = net.TCPDial("10.0.2.2", 7001)
+	var sent i32 = 0
+	var echoed i32 = 0
+	var count i32
+	var handle i32
+	var trigger i32
+	var message i32
+	var detail i32
+	var length i32
+	var i i32
+	for echoed < 30 {
+		count = net.Update(1000)
+		if count < 0 {
+			printf("record ended\n")
+			return
+		}
+		for i = 0; i < count; i++ {
+			handle, trigger, message, detail = net.ReadyNext()
+			if trigger == net.TriggerConnected {
+				printf("connected %d\n", handle)
+			}
+			if trigger == net.TriggerData {
+				length = net.Read(handle, message, buffer, 0)
+				echoed = echoed + length
+				printf("data %d bytes\n", length)
+			}
+			if trigger == net.TriggerError {
+				printf("error %d\n", detail)
+				return
+			}
+		}
+		if sent < 3 && echoed == sent * 10 {
+			buffer[0] = 108UB
+			buffer[1] = 105UB
+			buffer[2] = 110UB
+			buffer[3] = 101UB
+			buffer[4] = 32UB
+			buffer[5] = 48UB
+			buffer[6] = 32UB
+			buffer[7] = 111UB
+			buffer[8] = 107UB
+			buffer[9] = 10UB
+			if net.Write(conn, buffer, 10) == 10 {
+				sent = sent + 1
+			}
+		}
+	}
+	var closed bool = net.Close(conn)
+	printf("closed %v\n", closed)
+	printf("echoed %d bytes\n", echoed)
+}

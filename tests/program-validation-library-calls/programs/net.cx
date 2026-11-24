@@ -1,10 +1,8 @@
 package main
 
-import "sys/tcp"
+import "sys/net"
 
 func main() {
-	var err str
-	err = tcp.Dial("tcp", "127.0.0.1:47115")
-	printf("%s\n", err)
-	tcp.Close()
+	var conn i32 = net.TCPDial("127.0.0.1", 47115)
+	printf("%d\n", conn)
 }

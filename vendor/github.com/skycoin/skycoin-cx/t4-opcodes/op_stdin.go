@@ -13,6 +13,7 @@ import (
 // OpReadStdin returns the next line of the program's input without its line
 // ending. At the end of input it returns "", see LanguageGuide.md.
 // VIOLATION STRHOT-098: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: reads a line into Go memory, #407.
 func OpReadStdin(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var text string
 	if prgrm.ProgramStdin != nil {

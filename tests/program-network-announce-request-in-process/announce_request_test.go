@@ -260,17 +260,20 @@ func TestHaveNeverStartsADownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for deadline := time.Now().Add(5 * time.Second); super.Haves().Len() == 0 || medium.Haves().Len() == 0; time.Sleep(10 * time.Millisecond) {
+	for deadline := time.Now().Add(5 * time.Second); super.Haves().Pending() == 0 || medium.Haves().Pending() == 0; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
-			t.Fatalf("haves queued: super %d, medium %d", super.Haves().Len(), medium.Haves().Len())
+			t.Fatalf("haves queued: super %d, medium %d", super.Haves().Pending(), medium.Haves().Pending())
 		}
 	}
 	time.Sleep(300 * time.Millisecond)
 	if s := super.Stats(); s.Requests != 0 || s.Downloads != 0 || super.Holds(addr) {
 		t.Fatalf("a have started a download before the queue was read: %+v", s)
 	}
-	read := super.Update()
-	if len(read) != 1 || read[0].Address != addr || read[0].From != publisher.Addr().String() {
+	if count := super.Update(0); count != 1 {
+		t.Fatalf("super update has %d haves, want 1", count)
+	}
+	read, _ := super.Haves().ReadyNext()
+	if read.Address != addr || read.From != publisher.Addr().String() {
 		t.Fatalf("super read %+v, want the have of %s from %s", read, addr, publisher.Addr())
 	}
 	for deadline := time.Now().Add(5 * time.Second); !super.Holds(addr); time.Sleep(10 * time.Millisecond) {
@@ -281,8 +284,8 @@ func TestHaveNeverStartsADownload(t *testing.T) {
 	if s := super.Stats(); s.HavesRead != 1 || s.Requests != 1 || s.Downloads != 1 {
 		t.Errorf("super: %+v, want one have read, one request, one download", s)
 	}
-	if got := medium.Update(); len(got) != 1 {
-		t.Fatalf("medium read %d haves, want 1", len(got))
+	if got := medium.Update(0); got != 1 {
+		t.Fatalf("medium read %d haves, want 1", got)
 	}
 	time.Sleep(300 * time.Millisecond)
 	if s := medium.Stats(); s.HavesRead != 1 || s.Requests != 0 || s.Downloads != 0 || medium.Holds(addr) {

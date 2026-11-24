@@ -1,10 +1,8 @@
-//go:build cxfx && !mobile
+//go:build cxfx
 
 package cxfx
 
 import (
-	"strings"
-
 	"github.com/go-gl/gl/v3.2-compatibility/gl"
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t3-ast"
@@ -30,49 +28,8 @@ const (
 )
 
 // gogl
-func getCString(key string, value string) **uint8 {
-	if cstrings, ok := cSources[key]; ok {
-		return cstrings
-	} else {
-		cstrings, free := gl.Strs(value + string('\000'))
-		freeFns[key] = &free
-		cSources[key] = cstrings
-		return cstrings
-	}
-}
-
-// cxglCStringFind returns the C string cached under key, the text a program
-// passed, building it on first use like getCString. A hit does not allocate.
-func cxglCStringFind(key []byte) **uint8 {
-	if cstrings, found := cSources[string(key)]; found {
-		return cstrings
-	}
-	return getCString(string(key), string(key))
-}
-
-func freeCString(key string) {
-	(*freeFns[key])()
-	delete(freeFns, key)
-	delete(cSources, key)
-}
-
-// gogl
 func opGlInit(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	gl.Init()
-}
-
-func opGlDestroy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	for k := range cSources {
-		freeCString(k)
-	}
-}
-
-func opGlStrs(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	getCString(inputs[0].Get_str(prgrm), inputs[1].Get_str(prgrm))
-}
-
-func opGlFree(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	freeCString(inputs[0].Get_str(prgrm))
 }
 
 // cxgl_1_0
@@ -254,7 +211,7 @@ func cxglAttachShader(program uint32, shader uint32) {
 }
 
 func cxglBindAttribLocation(program uint32, index uint32, name []byte) {
-	gl.BindAttribLocation(program, index, *cxglCStringFind(name))
+	gl.BindAttribLocation(program, index, cxfxTextNulTerminated(name))
 }
 
 func cxglCompileShader(shader uint32) {
@@ -286,7 +243,7 @@ func cxglEnableVertexAttribArray(index uint32) {
 }
 
 func cxglGetAttribLocation(program uint32, name []byte) int32 {
-	return gl.GetAttribLocation(program, *cxglCStringFind(name))
+	return gl.GetAttribLocation(program, cxfxTextNulTerminated(name))
 }
 
 func cxglGetProgramiv(program uint32, pname uint32) int32 {
@@ -295,10 +252,13 @@ func cxglGetProgramiv(program uint32, pname uint32) int32 {
 	return params
 }
 
-func cxglGetProgramInfoLog(program uint32, maxLen int32) string {
-	log := strings.Repeat("\x00", int(maxLen+1))
-	gl.GetProgramInfoLog(program, maxLen, nil, gl.Str(log))
-	return log
+// cxglGetProgramInfoLog returns the info log in the text scratch, valid until
+// the next GL name or log is read.
+func cxglGetProgramInfoLog(program uint32, maxLen int32) []byte {
+	buffer := cxfxTextBufferEnsure(int(max(maxLen, 0)) + 1)
+	var length int32
+	gl.GetProgramInfoLog(program, max(maxLen, 0), &length, &buffer[0])
+	return buffer[:length]
 }
 
 func cxglGetShaderiv(shader uint32, pname uint32) int32 {
@@ -307,25 +267,44 @@ func cxglGetShaderiv(shader uint32, pname uint32) int32 {
 	return params
 }
 
-func cxglGetShaderInfoLog(shader uint32, maxLen int32) string {
-	log := strings.Repeat("\x00", int(maxLen+1))
-	gl.GetShaderInfoLog(shader, maxLen, nil, gl.Str(log))
-	return log
+// cxglGetShaderInfoLog returns the info log in the text scratch, valid until
+// the next GL name or log is read.
+func cxglGetShaderInfoLog(shader uint32, maxLen int32) []byte {
+	buffer := cxfxTextBufferEnsure(int(max(maxLen, 0)) + 1)
+	var length int32
+	gl.GetShaderInfoLog(shader, max(maxLen, 0), &length, &buffer[0])
+	return buffer[:length]
 }
 
 func cxglGetUniformLocation(program uint32, name []byte) int32 {
-	return gl.GetUniformLocation(program, *cxglCStringFind(name))
+	return gl.GetUniformLocation(program, cxfxTextNulTerminated(name))
 }
 
 func cxglLinkProgram(program uint32) {
 	gl.LinkProgram(program)
 }
 
+// cxglShaderSource hands GL the source where it is in program memory with its
+// length, so it is not copied. The memory stays pinned while GL reads it.
+// GCREACH: allocates the argument holder once, see docs/GarbageCollector.md.
 func cxglShaderSource(shader uint32, count int32, source []byte) {
 	if count > 1 {
 		panic(types.CX_RUNTIME_NOT_IMPLEMENTED)
 	}
-	gl.ShaderSource(shader, count, cxglCStringFind(source), nil)
+	if cxfxState.CxfxShaderSource == nil {
+		cxfxState.CxfxShaderSource = &CxfxShaderSourceArgument{}
+	}
+	argument := cxfxState.CxfxShaderSource
+	if len(source) == 0 {
+		argument.CxfxShaderSourcePointer = cxfxTextNulTerminated(source)
+	} else {
+		argument.CxfxShaderSourcePointer = &source[0]
+	}
+	argument.CxfxShaderSourceLength = int32(len(source))
+	cxfxState.CxfxShaderSourcePinner.Pin(argument.CxfxShaderSourcePointer)
+	gl.ShaderSource(shader, count, &argument.CxfxShaderSourcePointer, &argument.CxfxShaderSourceLength)
+	cxfxState.CxfxShaderSourcePinner.Unpin()
+	argument.CxfxShaderSourcePointer = nil
 }
 
 func cxglUseProgram(program uint32) {

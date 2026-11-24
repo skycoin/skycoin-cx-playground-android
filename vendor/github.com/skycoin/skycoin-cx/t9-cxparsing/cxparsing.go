@@ -3,8 +3,6 @@ package cxparsering
 import (
 	"bytes"
 	"errors"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
@@ -18,42 +16,13 @@ import (
 	cxpartialparsing "github.com/skycoin/skycoin-cx/t5-cxpartialparsing" // thin: only CurrentFile, Parse, Program; no depth gain
 )
 
-/*
-		ParseSourceCode takes a group of files representing CX `sourceCode` and
-	 	parses it into CX program structures for `AST`.
-
-		 ParseSourceCode performs the steps
-
-		 step 1 :  preliminarystage
-
-		 step 2 :  passone
-
-		 step 2 : passtwo
-*/
-func ParseSourceCode(sourceCode []*os.File, fileNames []string) {
-	/*
-		Copy the contents of the file pointers containing the CX source
-		code into sourceCodeStrings
-	*/
-	sourceCodeStrings := make([]string, len(sourceCode))
-	for i, source := range sourceCode {
-		tmp := bytes.NewBuffer(nil)
-		io.Copy(tmp, source)
-		sourceCodeStrings[i] = tmp.String()
-	}
-
-	if err := ParseSourceStrings(sourceCodeStrings, fileNames); err != nil {
-		profiling.CleanupAndExit(types.CX_COMPILATION_ERROR)
-	}
-}
-
 // ErrCompilation is returned by ParseSourceStrings when the source has
 // parse or compile errors. The errors themselves are printed to stdout.
 var ErrCompilation = errors.New("compilation error")
 
 // ParseSourceStrings parses CX source held in memory into actions.AST.
-// Unlike ParseSourceCode it returns on errors instead of exiting, so the
-// parser can be embedded in a long running process.
+// It returns on errors instead of exiting, so the parser can be embedded in
+// a long running process.
 func ParseSourceStrings(sourceCodeStrings []string, fileNames []string) error {
 	// The compile errors print on return, and before a panic of the compiler.
 	defer func() { printer.PrinterCompileErrorsPrint(actions.AST) }()

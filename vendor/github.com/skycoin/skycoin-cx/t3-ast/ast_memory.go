@@ -26,6 +26,7 @@ func MinHeapSize() types.Pointer {
 // allocated after the data segment, and starts the GC pressure from 0.
 // GCREACH: sets the GC pressure and its limit,
 // see docs/GarbageCollector.md.
+// VIOLATION VMALLOC-009: sizes the heap once, in RunPrepare before the run, #407.
 func (cxprogram *CXProgram) EnsureMinimumHeapSize() {
 	currHeapSize := types.Cast_int_to_ptr(len(cxprogram.Memory)) - cxprogram.Heap.StartsAt
 	minHeapSize := MinHeapSize()
@@ -38,6 +39,7 @@ func (cxprogram *CXProgram) EnsureMinimumHeapSize() {
 }
 
 // ResizeMemory ...
+// VIOLATION VMALLOC-010: grows program memory when the heap outgrows it, the cap is an owner decision, #407.
 func ResizeMemory(prgrm *CXProgram, newMemSize types.Pointer, isExpand bool) {
 	// We can't expand memory to a value greater than `memLimit`.
 	if newMemSize > constants.MAX_HEAP_SIZE {
@@ -92,11 +94,12 @@ func AllocateSeq(prgrm *CXProgram, size types.Pointer) types.Pointer {
 // after the allocation, which may give prgrm a new Memory.
 // GCREACH: allocates through AllocateSeq, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
-// VIOLATION STRHOT-281: O, the opcode works on Go string copies of CX strs, #412.
+// VIOLATION STRHOT-281: B, only the boundary opcodes use Go strings, #412.
 func AllocateStr(prgrm *CXProgram, data string) types.Pointer {
 	size := types.OBJECT_HEADER_SIZE + types.Cast_int_to_ptr(len(data))
 	object := AllocateSeq(prgrm, size)
-	types.Write_obj_data(prgrm.Memory, object, size, []byte(data))
+	types.Write_obj_size(prgrm.Memory, object, size)
+	copy(prgrm.Memory[object+types.OBJECT_HEADER_SIZE:object+size], data)
 	return object
 }
 
@@ -104,7 +107,21 @@ func AllocateStr(prgrm *CXProgram, data string) types.Pointer {
 // at address. Nothing collects inside it, so address stays valid.
 // GCREACH: allocates through AllocateSeq, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
-// VIOLATION STRHOT-282: O, the opcode works on Go string copies of CX strs, #412.
+// VIOLATION STRHOT-282: B, only the boundary opcodes use Go strings, #412.
 func AllocateStrAt(prgrm *CXProgram, address types.Pointer, data string) {
 	types.Write_ptr(prgrm.Memory, address, AllocateStr(prgrm, data))
+}
+
+// AllocateStrBytesAt writes a new str object holding first followed by second
+// and stores its address at address. Both may be views into prgrm.Memory: a
+// grown Memory leaves them on the old array, which still holds their bytes.
+// GCREACH: allocates through AllocateSeq, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+func AllocateStrBytesAt(prgrm *CXProgram, address types.Pointer, first []byte, second []byte) {
+	size := types.OBJECT_HEADER_SIZE + types.Cast_int_to_ptr(len(first)+len(second))
+	object := AllocateSeq(prgrm, size)
+	types.Write_obj_size(prgrm.Memory, object, size)
+	data := prgrm.Memory[object+types.OBJECT_HEADER_SIZE : object+size]
+	copy(data[copy(data, first):], second)
+	types.Write_ptr(prgrm.Memory, address, object)
 }

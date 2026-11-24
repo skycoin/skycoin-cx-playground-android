@@ -312,6 +312,7 @@ func SignatureStringOfFunction(prgrm *CXProgram, pkg *CXPackage, f *CXFunction) 
 // valueAt prints the value of type typ with dimensions dims at addr. A zero
 // dimension is a slice, which holds a pointer to its object.
 // VIOLATION STRHOT-215: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func valueAt(prgrm *CXProgram, addr types.Pointer, typ types.Code, size types.Pointer, structType *CXStruct, dims []types.Pointer, sep string) string {
 	if len(dims) == 0 {
 		if typ == types.POINTER {
@@ -355,6 +356,7 @@ func elementsAt(prgrm *CXProgram, addr, n, stride types.Pointer, typ types.Code,
 
 // structAt prints the fields of the struct instance at addr as {name: value, ...}.
 // VIOLATION STRHOT-217: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func structAt(prgrm *CXProgram, addr types.Pointer, strct *CXStruct) string {
 	val := "{"
 	off := types.Pointer(0)
@@ -373,6 +375,7 @@ func structAt(prgrm *CXProgram, addr types.Pointer, strct *CXStruct) string {
 
 // typeSignatureAt prints the value of the struct field typeSig at addr.
 // VIOLATION STRHOT-218: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func typeSignatureAt(prgrm *CXProgram, addr types.Pointer, typeSig *CXTypeSignature) string {
 	switch typeSig.Type {
 	case TYPE_ATOMIC:
@@ -400,6 +403,7 @@ func typeSignatureAt(prgrm *CXProgram, addr types.Pointer, typeSig *CXTypeSignat
 // printPointer prints the pointer p as Go does, in hexadecimal with 0x, or
 // as <nil> when it is nil.
 // VIOLATION STRHOT-314: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func printPointer(p types.Pointer) string {
 	if p == 0 {
 		return "<nil>"
@@ -410,6 +414,7 @@ func printPointer(p types.Pointer) string {
 // printStructPointer prints the pointer p to a struct strct as Go prints a
 // pointer to a struct that it is given, &{...}, or <nil>.
 // VIOLATION STRHOT-315: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func printStructPointer(prgrm *CXProgram, p types.Pointer, strct *CXStruct) string {
 	if p == 0 || strct == nil {
 		return printPointer(p)
@@ -422,6 +427,7 @@ func printStructPointer(prgrm *CXProgram, p types.Pointer, strct *CXStruct) stri
 
 // printSpecifiers returns the specifiers of the value elt reads, without
 // those its dereferences and indexes remove.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func printSpecifiers(elt *CXArgument) []int {
 	var specs []int
 	for _, spec := range elt.DeclarationSpecifiers {
@@ -449,6 +455,7 @@ func printSeparator(dims []types.Pointer) string {
 // readAtomic reads a value of the atomic type named typ at offset in memory.
 // It returns false when typ is not an atomic type.
 // VIOLATION STRHOT-220: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func readAtomic(memory []byte, typ string, offset types.Pointer) (string, bool) {
 	switch typ {
 	case "bool":
@@ -482,6 +489,7 @@ func readAtomic(memory []byte, typ string, offset types.Pointer) (string, bool) 
 // argValueAt prints the value that elt, the last element of an argument's
 // field path, names at addr after its indexes and dereferences.
 // VIOLATION STRHOT-221: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func argValueAt(prgrm *CXProgram, addr types.Pointer, elt *CXArgument) string {
 	typ := elt.Type
 	if elt.IsPointer() {
@@ -517,6 +525,7 @@ func argValueAt(prgrm *CXProgram, addr types.Pointer, elt *CXArgument) string {
 
 // GetPrintableValue prints the value of argTypeSig in the frame at fp.
 // VIOLATION STRHOT-222: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go string of a printed value, #407.
 func GetPrintableValue(prgrm *CXProgram, fp types.Pointer, argTypeSig *CXTypeSignature) string {
 	switch argTypeSig.Type {
 	case TYPE_CXARGUMENT_DEPRECATE:
@@ -905,4 +914,9 @@ func GetArgSizeFromTypeName(typeName string) int {
 		// return -1
 		// panic(CX_INTERNAL_ERROR)
 	}
+}
+
+// ArgumentFormattedType is the CX spelling of the type of arg.
+func ArgumentFormattedType(prgrm *CXProgram, arg *CXArgument) string {
+	return getFormattedType_CXArg(prgrm, arg)
 }

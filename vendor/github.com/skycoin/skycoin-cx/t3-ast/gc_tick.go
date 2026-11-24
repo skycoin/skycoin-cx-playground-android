@@ -20,6 +20,7 @@ func GarbageCollectorCheck(prgrm *CXProgram) bool {
 // keep MIN_HEAP_FREE_RATIO to MAX_HEAP_FREE_RATIO of it free.
 // GCREACH: builds the root table and runs the collector,
 // see docs/GarbageCollector.md.
+// VIOLATION VMALLOC-011: the CX collector builds its root table and type cache in Go memory, #407.
 func GarbageCollectorTrigger(prgrm *CXProgram) {
 	heap := &prgrm.Heap
 	roots := &heap.Roots

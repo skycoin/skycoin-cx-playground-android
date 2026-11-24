@@ -108,6 +108,10 @@ package constants
 // 2611230001  deprecated    207 tcp.Listen
 // 2611230001  deprecated    208 tcp.Accept
 // 2611230001  deprecated    209 tcp.Close
+// 2611240001  deprecated    592 gl.Destroy
+// 2611240001  deprecated    593 gl.Strs
+// 2611240001  deprecated    594 gl.Free
+// 2611240003  deprecated    134 cipher.GenerateKeyPair
 // 2711200001  reassignable  559 str.eq
 // 2711200001  reassignable  560 str.uneq
 // 2711200001  reassignable  582 str.lt
@@ -182,6 +186,10 @@ package constants
 // 2711230001  reassignable  207 tcp.Listen
 // 2711230001  reassignable  208 tcp.Accept
 // 2711230001  reassignable  209 tcp.Close
+// 2711240001  reassignable  134 cipher.GenerateKeyPair
+// 2711240001  reassignable  592 gl.Destroy
+// 2711240001  reassignable  593 gl.Strs
+// 2711240001  reassignable  594 gl.Free
 //
 // Interval format. A version is yymmddnnnn, so version / 100000000 is the
 // year since 2000, the next two digits the month, the next two the day and

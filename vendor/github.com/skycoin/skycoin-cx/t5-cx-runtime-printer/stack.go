@@ -12,6 +12,7 @@ import (
 const printerStackValueBadIndex = "<index out of range>"
 
 // VIOLATION STRHOT-266: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go strings of the stack dump, #407.
 func printerStackValueHeader(fileName string, fileLine int) string {
 	return fmt.Sprintf("%s:%d", fileName, fileLine)
 }
@@ -30,6 +31,7 @@ func printerStackValuePrintable(prgrm *ast.CXProgram, fp types.Pointer, argTypeS
 // PrinterStackPrint prints the CX call stack of cxprogram from the current
 // call down to the entry point, with the values of its arguments.
 // VIOLATION STRHOT-267: P, builds the text of a printed value, #412.
+// VIOLATION VMALLOC-015: builds the Go strings of the stack dump, #407.
 func PrinterStackPrint(cxprogram *ast.CXProgram) {
 	fmt.Println()
 	fmt.Println("===Callstack===")

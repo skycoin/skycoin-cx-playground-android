@@ -84,7 +84,8 @@ func subscribeProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, 
 	for {
 		select {
 		case <-node.Haves().Ready():
-			for _, q := range node.Update() {
+			node.Update(0)
+			for q, ok := node.Haves().ReadyNext(); ok; q, ok = node.Haves().ReadyNext() {
 				fmt.Fprintf(out, "read have %s from %s\n", q.Address.String()[:16], q.From)
 			}
 		case h := <-held:
@@ -102,7 +103,8 @@ func subscribeProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, 
 			for waiting := true; waiting; {
 				select {
 				case <-node.Haves().Ready():
-					for _, q := range node.Update() {
+					node.Update(0)
+					for q, ok := node.Haves().ReadyNext(); ok; q, ok = node.Haves().ReadyNext() {
 						fmt.Fprintf(out, "read have %s from %s\n", q.Address.String()[:16], q.From)
 					}
 				case <-deadline:

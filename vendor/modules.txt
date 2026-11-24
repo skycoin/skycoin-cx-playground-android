@@ -109,14 +109,17 @@ github.com/skycoin/skycoin/src/cipher/encoder
 github.com/skycoin/skycoin/src/cipher/ripemd160
 github.com/skycoin/skycoin/src/cipher/secp256k1-go
 github.com/skycoin/skycoin/src/cipher/secp256k1-go/secp256k1-go2
-# github.com/skycoin/skycoin-cx v0.0.0-20261124000345-d31a71b0e4b7
+# github.com/skycoin/skycoin-cx v0.0.0-20261124125939-d1a9862a4ae2
 ## explicit; go 1.27.3
 github.com/skycoin/skycoin-cx/t0-cx-core-assert
+github.com/skycoin/skycoin-cx/t0-cxhash
 github.com/skycoin/skycoin-cx/t0-packages
+github.com/skycoin/skycoin-cx/t0-textsections
 github.com/skycoin/skycoin-cx/t0-types
 github.com/skycoin/skycoin-cx/t0-util
 github.com/skycoin/skycoin-cx/t1-constants
 github.com/skycoin/skycoin-cx/t1-cx-core-objmodel
+github.com/skycoin/skycoin-cx/t1-netbatch
 github.com/skycoin/skycoin-cx/t1-profiling
 github.com/skycoin/skycoin-cx/t2-cx-core-stringpool
 github.com/skycoin/skycoin-cx/t2-cx-runtime-gc
@@ -130,11 +133,11 @@ github.com/skycoin/skycoin-cx/t4-execute
 github.com/skycoin/skycoin-cx/t4-opcodes
 github.com/skycoin/skycoin-cx/t5-cipher
 github.com/skycoin/skycoin-cx/t5-cx-runtime-printer
+github.com/skycoin/skycoin-cx/t5-cxnet
 github.com/skycoin/skycoin-cx/t5-cxos
 github.com/skycoin/skycoin-cx/t5-cxos-core
 github.com/skycoin/skycoin-cx/t5-cxpartialparsing
 github.com/skycoin/skycoin-cx/t5-regexp
-github.com/skycoin/skycoin-cx/t5-tcp
 github.com/skycoin/skycoin-cx/t6-cxfx
 github.com/skycoin/skycoin-cx/t7-init
 github.com/skycoin/skycoin-cx/t8-cxparsingcompletor
@@ -151,17 +154,9 @@ go.etcd.io/bbolt/internal/common
 go.etcd.io/bbolt/internal/freelist
 # golang.org/x/exp/shiny v0.0.0-20261121134650-e1094eeca1b5
 ## explicit; go 1.26.0
-golang.org/x/exp/shiny/driver/gldriver
-golang.org/x/exp/shiny/driver/internal/drawer
-golang.org/x/exp/shiny/driver/internal/errscreen
-golang.org/x/exp/shiny/driver/internal/event
-golang.org/x/exp/shiny/driver/internal/lifecycler
-golang.org/x/exp/shiny/driver/internal/win32
-golang.org/x/exp/shiny/driver/internal/x11key
 golang.org/x/exp/shiny/iconvg
 golang.org/x/exp/shiny/iconvg/internal/gradient
 golang.org/x/exp/shiny/materialdesign/icons
-golang.org/x/exp/shiny/screen
 # golang.org/x/image v0.48.0
 ## explicit; go 1.26.0
 golang.org/x/image/ccitt
@@ -187,16 +182,7 @@ golang.org/x/image/tiff/lzw
 golang.org/x/image/vector
 # golang.org/x/mobile v0.0.0-20261117202452-47699113848a
 ## explicit; go 1.26.0
-golang.org/x/mobile/app
-golang.org/x/mobile/app/internal/callfn
-golang.org/x/mobile/event/key
-golang.org/x/mobile/event/lifecycle
-golang.org/x/mobile/event/mouse
-golang.org/x/mobile/event/paint
-golang.org/x/mobile/event/size
-golang.org/x/mobile/event/touch
 golang.org/x/mobile/exp/audio/al
-golang.org/x/mobile/geom
 golang.org/x/mobile/gl
 golang.org/x/mobile/internal/mobileinit
 # golang.org/x/net v0.62.0

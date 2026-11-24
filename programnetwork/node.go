@@ -645,21 +645,23 @@ func (n *Node) onHave(h Have, from net.Addr) {
 	n.haves.push(QueuedHave{Have: h, From: from.String(), Received: time.Now()})
 }
 
-// Update reads every have in the queue, applies the node type's policy to
-// each, and returns them in arrival order so the program sees every one. A
-// medium node requests a program that is pinned or fits its budget, a super
-// node one that fits its capacity. A requested program is downloaded in the
-// background, held and relayed.
-func (n *Node) Update() []QueuedHave {
-	read := n.haves.Read()
-	for _, q := range read {
+// Update makes the haves that arrived since the last update the batch of
+// the have queue, waiting up to wait when none did, and applies the node
+// type's policy to each have of the batch, in batch order. It returns the
+// batch count, and the program reads the haves with the queue's ReadyNext.
+// A medium node requests a program that is pinned or fits its budget, a
+// super node one that fits its capacity. A requested program is downloaded
+// in the background, held and relayed.
+func (n *Node) Update(wait time.Duration) int {
+	count := n.haves.Update(wait)
+	for _, q := range n.haves.batch {
 		n.applyPolicy(q)
 	}
-	return read
+	return count
 }
 
-// RunUpdates calls Update whenever haves wait, and seen with each have
-// read, until the node is closed.
+// RunUpdates makes an update whenever haves arrived, and calls seen with
+// each have of its batch, until the node is closed.
 func (n *Node) RunUpdates(seen func(QueuedHave)) {
 	for {
 		select {
@@ -667,7 +669,8 @@ func (n *Node) RunUpdates(seen func(QueuedHave)) {
 			return
 		case <-n.haves.Ready():
 		}
-		for _, q := range n.Update() {
+		n.Update(0)
+		for q, ok := n.haves.ReadyNext(); ok; q, ok = n.haves.ReadyNext() {
 			if seen != nil {
 				seen(q)
 			}

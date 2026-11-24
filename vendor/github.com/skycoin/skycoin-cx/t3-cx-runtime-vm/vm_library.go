@@ -23,3 +23,10 @@ func LibraryFunctionVmHandler(library int, function int) LibraryFunctionVm {
 	}
 	return LibraryFunctionVmHandlers[library][function]
 }
+
+// LibraryStrView returns the bytes of the str whose pointer is at address,
+// as the vm form of a library function reads a str input, and false for a
+// str outside memory.
+func LibraryStrView(memory []byte, address uint32) ([]byte, bool) {
+	return memoryStrRead(memory, address, uint32(len(memory)))
+}

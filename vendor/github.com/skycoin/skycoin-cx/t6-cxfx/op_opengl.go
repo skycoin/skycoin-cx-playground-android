@@ -25,14 +25,6 @@ import (
 	"unsafe"
 )
 
-type Texture struct {
-	path   string
-	width  int32
-	height int32
-	level  uint32
-	pixels []float32
-}
-
 func Slice_ui8_ToPtr(value []uint8) unsafe.Pointer {
 	count := len(value)
 	if count == 0 {
@@ -65,12 +57,7 @@ func Slice_f32_ToPtr(value []float32) unsafe.Pointer {
 	return unsafe.Pointer(&value[0])
 }
 
-// VIOLATION: state outside State. Owner: t6-cxfx; moves to GIFMng in phase 1.
-var gifs map[string]*gif.GIF = make(map[string]*gif.GIF, 0)
-
-// VIOLATION: state outside State. Owner: t6-cxfx; moves to TextureMng in phase 1.
-var textures map[string]Texture = make(map[string]Texture, 0)
-
+// VIOLATION STRHOT-325: B, decodes an image file, whose format the decoder names, #432.
 func decodeImg(file *os.File, cpuCopy bool) (data []byte, width int32, height int32, pixels []float32) {
 	img, _, err := image.Decode(file)
 	if err != nil {
@@ -177,6 +164,7 @@ func unpack_(file *os.File, width types.Pointer, line []byte) bool {
 	return true
 }
 
+// VIOLATION STRHOT-197: B, parses the text header of an HDR file, #432.
 func decodeHdr(file *os.File) (data []byte, i32Width int32, i32Height int32) {
 	data = nil
 	i32Width = 0
@@ -262,10 +250,12 @@ func decodeHdr(file *os.File) (data []byte, i32Width int32, i32Height int32) {
 	return
 }
 
-// uploadTexture loads the program path in pathBytes from the sandbox. Textures
-// stay keyed by the path text the program passed.
-func uploadTexture(prgrm *ast.CXProgram, pathBytes []byte, target uint32, level uint32, cpuCopy bool) {
-	path := string(pathBytes)
+// uploadTexture loads the program path in pathBytes from the sandbox into the
+// bound texture. With cpuCopy it keeps the pixels and returns their handle
+// into CxfxState.CxfxTexturePixelsTable, otherwise -1.
+// VIOLATION STRHOT-198: B, reads the file at a program path and names it in the error text, #432.
+func uploadTexture(prgrm *ast.CXProgram, pathBytes []byte, target uint32, level uint32, cpuCopy bool) int32 {
+	path := util.ProgramTextStringView(pathBytes)
 	programPath, fileError := util.ProgramFileSystemPathFromBytes(pathBytes)
 	if fileError != nil {
 		panic(fmt.Sprintf("texture %q: %s\n", path, fileError.FileErrorMessage))
@@ -276,6 +266,7 @@ func uploadTexture(prgrm *ast.CXProgram, pathBytes []byte, target uint32, level 
 	}
 	defer file.Close()
 
+	pixelsHandle := int32(-1)
 	ext := filepath.Ext(path)
 	var data []byte
 	var internalFormat int32
@@ -289,16 +280,13 @@ func uploadTexture(prgrm *ast.CXProgram, pathBytes []byte, target uint32, level 
 		inputFormat = cxglRGBA
 		inputType = cxglUNSIGNED_BYTE
 		data, width, height, pixels = decodeImg(file, cpuCopy)
-		if cpuCopy {
-		}
 		if len(pixels) > 0 {
-			var texture Texture
-			texture.pixels = pixels
-			texture.width = width
-			texture.height = height
-			texture.path = path
-			texture.level = level
-			textures[path] = texture
+			pixelsHandle = cxfxTexturePixelsAdd(CxfxTexturePixels{
+				CxfxTexturePixelsWidth:  width,
+				CxfxTexturePixelsHeight: height,
+				CxfxTexturePixelsLevel:  level,
+				CxfxTexturePixelsData:   pixels,
+			})
 		}
 	} else if ext == ".hdr" {
 		internalFormat = cxglRGB16F
@@ -308,17 +296,9 @@ func uploadTexture(prgrm *ast.CXProgram, pathBytes []byte, target uint32, level 
 	}
 
 	if len(data) > 0 {
-		cxglTexImage2D(
-			target,
-			int32(level),
-			internalFormat,
-			width,
-			height,
-			0,
-			inputFormat,
-			inputType,
-			data)
+		cxglTexImage2D(target, int32(level), internalFormat, width, height, 0, inputFormat, inputType, data)
 	}
+	return pixelsHandle
 }
 
 // gogl
@@ -337,6 +317,10 @@ func opGlNewTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CX
 	outputs[0].Set_i32(prgrm, int32(texture))
 }
 
+// opGlNewTextureCube loads the six faces pattern+posx+extension to
+// pattern+negz+extension.
+// GCREACH: builds each face path in a new byte slice, once per face, see
+// docs/GarbageCollector.md.
 func opGlNewTextureCube(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var texture uint32
 	cxglEnable(cxglTEXTURE_CUBE_MAP)
@@ -348,102 +332,81 @@ func opGlNewTextureCube(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []as
 	cxglTexParameteri(cxglTEXTURE_CUBE_MAP, cxglTEXTURE_WRAP_T, cxglCLAMP_TO_EDGE)
 	cxglTexParameteri(cxglTEXTURE_CUBE_MAP, cxglTEXTURE_WRAP_R, cxglCLAMP_TO_EDGE)
 
-	var faces []string = []string{"posx", "negx", "posy", "negy", "posz", "negz"}
-	var pattern string = inputs[0].Get_str(prgrm)
-	var extension string = inputs[1].Get_str(prgrm)
+	var faces = [6][4]byte{{'p', 'o', 's', 'x'}, {'n', 'e', 'g', 'x'}, {'p', 'o', 's', 'y'}, {'n', 'e', 'g', 'y'}, {'p', 'o', 's', 'z'}, {'n', 'e', 'g', 'z'}}
+	pattern := ast.ProgramStringBytesRead(prgrm, &inputs[0])
+	extension := ast.ProgramStringBytesRead(prgrm, &inputs[1])
 	for i := 0; i < 6; i++ {
-		uploadTexture(prgrm, []byte(pattern+faces[i]+extension), uint32(cxglTEXTURE_CUBE_MAP_POSITIVE_X+i), 0, false)
+		path := make([]byte, 0, len(pattern)+len(faces[i])+len(extension))
+		path = append(append(append(path, pattern...), faces[i][:]...), extension...)
+		uploadTexture(prgrm, path, uint32(cxglTEXTURE_CUBE_MAP_POSITIVE_X+i), 0, false)
 	}
 	outputs[0].Set_i32(prgrm, int32(texture))
 }
 
 func opCxReleaseTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	// VIOLATION: created outside manager; phase 1.
-	textures[inputs[0].Get_str(prgrm)] = Texture{}
+	*cxfxTexturePixelsGet(inputs[0].Get_i32(prgrm)) = CxfxTexturePixels{}
 }
 
 func opCxTextureGetPixel(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	var r float32
-	var g float32
-	var b float32
-	var a float32
-
-	var x = inputs[1].Get_i32(prgrm)
-	var y = inputs[2].Get_i32(prgrm)
-
-	if texture, ok := textures[inputs[0].Get_str(prgrm)]; ok {
-		var yoffset = y * texture.width * 4
-		var xoffset = yoffset + x*4
-		pixels := texture.pixels
-		r = pixels[xoffset]
-		g = pixels[xoffset+1]
-		b = pixels[xoffset+2]
-		a = pixels[xoffset+3]
-	}
-	outputs[0].Set_f32(prgrm, r)
-	outputs[1].Set_f32(prgrm, g)
-	outputs[2].Set_f32(prgrm, b)
-	outputs[3].Set_f32(prgrm, a)
+	texture := cxfxTexturePixelsGet(inputs[0].Get_i32(prgrm))
+	x := inputs[1].Get_i32(prgrm)
+	y := inputs[2].Get_i32(prgrm)
+	offset := (y*texture.CxfxTexturePixelsWidth + x) * 4
+	pixels := texture.CxfxTexturePixelsData
+	outputs[0].Set_f32(prgrm, pixels[offset])
+	outputs[1].Set_f32(prgrm, pixels[offset+1])
+	outputs[2].Set_f32(prgrm, pixels[offset+2])
+	outputs[3].Set_f32(prgrm, pixels[offset+3])
 }
 
 func opGlUploadImageToTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	uploadTexture(prgrm, ast.ProgramStringBytesRead(prgrm, &inputs[0]), uint32(inputs[1].Get_i32(prgrm)), uint32(inputs[2].Get_i32(prgrm)), inputs[3].Get_bool(prgrm))
+	outputs[0].Set_i32(prgrm, uploadTexture(prgrm, ast.ProgramStringBytesRead(prgrm, &inputs[0]), uint32(inputs[1].Get_i32(prgrm)), uint32(inputs[2].Get_i32(prgrm)), inputs[3].Get_bool(prgrm)))
 }
 
+// opGlNewGIF decodes the gif at a program path and returns its handle into
+// CxfxState.CxfxGifTable with its frame count, loop count and size.
+// VIOLATION STRHOT-204: B, reads the file at a program path and names it in the error text, #432.
 func opGlNewGIF(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	path := inputs[0].Get_str(prgrm)
-
+	path := util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[0]))
 	file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0])
 	if fileError != nil {
 		panic(fmt.Sprintf("file not found %q, %s", path, fileError.FileErrorMessage))
 	}
 	defer file.Close()
 
-	reader := bufio.NewReader(file)
-	gif, err := gif.DecodeAll(reader)
+	animation, err := gif.DecodeAll(bufio.NewReader(file))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode file %q, %v", path, err))
 	}
 
-	gifs[path] = gif
-
-	outputs[0].Set_i32(prgrm, int32(len(gif.Image)))
-	outputs[1].Set_i32(prgrm, int32(gif.LoopCount))
-	outputs[2].Set_i32(prgrm, int32(gif.Config.Width))
-	outputs[3].Set_i32(prgrm, int32(gif.Config.Height))
+	outputs[0].Set_i32(prgrm, cxfxGifAdd(animation))
+	outputs[1].Set_i32(prgrm, int32(len(animation.Image)))
+	outputs[2].Set_i32(prgrm, int32(animation.LoopCount))
+	outputs[3].Set_i32(prgrm, int32(animation.Config.Width))
+	outputs[4].Set_i32(prgrm, int32(animation.Config.Height))
 }
 
 func opGlFreeGIF(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	gifs[inputs[0].Get_str(prgrm)] = nil
+	handle := inputs[0].Get_i32(prgrm)
+	cxfxGifGet(handle)
+	cxfxState.CxfxGifTable[handle] = nil
 }
 
+// GCREACH: draws the frame into a new RGBA image, see docs/GarbageCollector.md.
 func opGlGIFFrameToTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	path := inputs[0].Get_str(prgrm)
+	animation := cxfxGifGet(inputs[0].Get_i32(prgrm))
 	frame := inputs[1].Get_i32(prgrm)
 	texture := inputs[2].Get_i32(prgrm)
 
-	gif := gifs[path]
-	img := gif.Image[frame]
-	delay := int32(gif.Delay[frame])
-	disposal := int32(gif.Disposal[frame])
-
+	img := animation.Image[frame]
 	rgba := image.NewRGBA(img.Bounds())
 	draw.Draw(rgba, rgba.Bounds(), img, image.Point{0, 0}, draw.Src)
 
 	cxglBindTexture(cxglTEXTURE_2D, uint32(texture))
-	cxglTexImage2D(
-		cxglTEXTURE_2D,
-		0,
-		cxglRGBA,
-		int32(rgba.Rect.Size().X),
-		int32(rgba.Rect.Size().Y),
-		0,
-		cxglRGBA,
-		cxglUNSIGNED_BYTE,
-		rgba.Pix)
+	cxglTexImage2D(cxglTEXTURE_2D, 0, cxglRGBA, int32(rgba.Rect.Size().X), int32(rgba.Rect.Size().Y), 0, cxglRGBA, cxglUNSIGNED_BYTE, rgba.Pix)
 
-	outputs[0].Set_i32(prgrm, delay)
-	outputs[1].Set_i32(prgrm, disposal)
+	outputs[0].Set_i32(prgrm, int32(animation.Delay[frame]))
+	outputs[1].Set_i32(prgrm, int32(animation.Disposal[frame]))
 }
 
 // GCREACH: allocates on the heap, which adds to the GC pressure,
@@ -782,7 +745,7 @@ func opGlGetProgramInfoLog(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs [
 	outV0 := cxglGetProgramInfoLog(
 		uint32(inputs[0].Get_i32(prgrm)),
 		inputs[1].Get_i32(prgrm))
-	outputs[0].Set_str(prgrm, outV0)
+	outputs[0].Set_str_bytes(prgrm, outV0)
 }
 
 func opGlGetShaderiv(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
@@ -796,7 +759,7 @@ func opGlGetShaderInfoLog(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	outV0 := cxglGetShaderInfoLog(
 		uint32(inputs[0].Get_i32(prgrm)),
 		inputs[1].Get_i32(prgrm))
-	outputs[0].Set_str(prgrm, outV0)
+	outputs[0].Set_str_bytes(prgrm, outV0)
 }
 
 func opGlGetUniformLocation(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {

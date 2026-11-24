@@ -60,7 +60,7 @@ func FunctionHeader(prgrm *ast.CXProgram, fnName string, receiver []*ast.CXArgum
 	if isMethod {
 		receiver = MethodReceiver(prgrm, receiver)
 		if pkg, err := prgrm.GetCurrentPackage(); err == nil {
-			receiverName := receiver[0].StructType.Name
+			receiverName := MethodReceiverName(prgrm, receiver[0], CurrentFile, nameLine, nameColumn)
 			methodName := prgrm.CXProgramNameIntern(fnName)
 
 			if fnIdx, ok := pkg.Methods[ast.CXPackageMethodKey{CXPackageMethodKeyStruct: receiverName, CXPackageMethodKeyMethod: methodName}]; ok {
@@ -115,6 +115,20 @@ func MethodReceiver(prgrm *ast.CXProgram, receiver []*ast.CXArgument) []*ast.CXA
 		prgrm.ReleaseCXArgBuilder(extra)
 	}
 	return receiver[:1]
+}
+
+// MethodReceiverName is the struct name a method of receiver is declared
+// under. A receiver that is no struct gets a name of the method's position
+// that no identifier can spell, so its body still compiles and collides with
+// nothing. A type that is not a struct is an error, a missing one has its own.
+func MethodReceiverName(prgrm *ast.CXProgram, receiver *ast.CXArgument, file ast.SourceFileGid, line int, column int) stringpool.StringGid {
+	if receiver.StructType != nil {
+		return receiver.StructType.Name
+	}
+	if receiver.Type != types.INVALID {
+		prgrm.CXProgramCompileErrorAddDebug(ast.CompileErrorCodeMethodReceiverType, receiver.ArgDetails, ast.CompileErrorOperands{prgrm.CXProgramCompileErrorText(ast.ArgumentFormattedType(prgrm, receiver))})
+	}
+	return prgrm.CXProgramNameIntern(fmt.Sprintf("*receiver%d:%d:%d", file, line, column))
 }
 
 // literalElementTypeCode is the error code of a literal element of the wrong
@@ -372,6 +386,7 @@ func FunctionDeclaration(prgrm *ast.CXProgram, fnIdx ast.CXFunctionIndex, inputs
 			continue
 		}
 
+		functionReferenceInputsResolve(prgrm, exprAtomicOp)
 		if !CheckTypes(prgrm, fn.Expressions, i) {
 			symbolsScopeClose(symbolsData, expr)
 			continue
@@ -1502,6 +1517,10 @@ func checkMatchParamTypes(prgrm *ast.CXProgram, expr *ast.CXExpression, expected
 			expectedPointer = expectedArg.IsPointer()
 			expectedUndefined = expectedArg.Type == types.UNDEFINED
 			expectedSlice = expectedUndefined && hasDeclSpec(expectedArg, constants.DECL_SLICE)
+			if expectedArg.Type == types.FUNC {
+				// functionReferenceInputsResolve checked it and made it an i32.
+				continue
+			}
 		}
 		expectedType = ast.GetFormattedType(prgrm, expectedTypeSig)
 
@@ -1849,8 +1868,13 @@ func ProcessShortDeclaration(prgrm *ast.CXProgram, expr *ast.CXExpression, expre
 	// process short declaration
 	if len(expression.GetOutputs(prgrm)) > 0 && len(expression.GetInputs(prgrm)) > 0 && expressionOutputArgType == types.IDENTIFIER && !expr.IsStructLiteral() && !isParseOp(prgrm, expr) {
 		prevExpression, err := prgrm.GetPreviousCXAtomicOpFromExpressions(expressions, idx-1)
-		// An undeclared target has no declaration before it, and was reported already.
+		// An undeclared target, reported already, has no declaration of its name
+		// before it, though the expression before it may declare another name.
 		if err != nil || len(prevExpression.GetOutputs(prgrm)) == 0 {
+			return
+		}
+		prevName := prgrm.GetCXTypeSignatureFromArray(prevExpression.GetOutputs(prgrm)[0]).Name
+		if StripNameNumber(prgrm, prevName) != StripNameNumber(prgrm, prgrm.GetCXTypeSignatureFromArray(expression.GetOutputs(prgrm)[0]).Name) {
 			return
 		}
 

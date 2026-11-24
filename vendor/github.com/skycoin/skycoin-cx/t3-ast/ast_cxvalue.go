@@ -69,9 +69,17 @@ func (value *CXValue) Get_bytes(prgrm *CXProgram) []byte {
 	return types.GetSlice_byte(prgrm.Memory, value.Offset, value.Size)
 }
 
-// VIOLATION STRHOT-029: O, the opcode works on Go string copies of CX strs, #412.
+// VIOLATION STRHOT-029: B, only the boundary opcodes use Go strings, #412.
+// VIOLATION VMALLOC-003: a Go string copy of a str, for the boundary opcodes only, #407.
 func (value *CXValue) Get_str(prgrm *CXProgram) string {
 	return types.Read_str(prgrm.Memory, value.Offset)
+}
+
+// Get_str_bytes returns the bytes of the str value, a view into prgrm.Memory
+// without a copy. An allocation may give prgrm a new Memory, and the view then
+// still holds the bytes it had.
+func (value *CXValue) Get_str_bytes(prgrm *CXProgram) []byte {
+	return types.Read_str_bytes(prgrm.Memory, value.Offset)
 }
 
 func (value *CXValue) GetSlice_i8(prgrm *CXProgram) []int8 {
@@ -207,7 +215,23 @@ func (value *CXValue) Set_bytes(prgrm *CXProgram, data []byte) {
 
 // GCREACH: allocates a str object, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
-// VIOLATION STRHOT-030: O, the opcode works on Go string copies of CX strs, #412.
+// VIOLATION STRHOT-030: B, only the boundary opcodes use Go strings, #412.
 func (value *CXValue) Set_str(prgrm *CXProgram, data string) {
 	AllocateStrAt(prgrm, value.Offset, data)
+}
+
+// Set_str_bytes writes a new str holding data, which may be a view into
+// prgrm.Memory.
+// GCREACH: allocates a str object, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+func (value *CXValue) Set_str_bytes(prgrm *CXProgram, data []byte) {
+	AllocateStrBytesAt(prgrm, value.Offset, data, nil)
+}
+
+// Set_str_concat writes a new str holding first followed by second, either of
+// which may be a view into prgrm.Memory.
+// GCREACH: allocates a str object, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+func (value *CXValue) Set_str_concat(prgrm *CXProgram, first []byte, second []byte) {
+	AllocateStrBytesAt(prgrm, value.Offset, first, second)
 }

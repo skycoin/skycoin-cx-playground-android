@@ -16,7 +16,7 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 }
 
 // LibraryFileRegister registers the functions of the file library, the file
-// functions of sys/os, sys/json and the CPU profile.
+// functions of sys/os and the CPU profile.
 func LibraryFileRegister(prgrm *ast.CXProgram) {
 	// os
 	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "os.GetWorkingDirectory", opOsGetWorkingDirectory, nil, opcodes.Out(ast.ConstCxArg_STR))
@@ -113,18 +113,6 @@ func LibraryFileRegister(prgrm *ast.CXProgram) {
 
 	opcodes.RegisterLibraryFunctionVm(constants.LibraryNumberFile, "os.Close", libraryFileCloseVm)
 	opcodes.RegisterLibraryFunctionVm(constants.LibraryNumberFile, "os.Seek", libraryFileSeekVm)
-
-	// json
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Open", opJsonOpen, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Close", opJsonClose, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.More", opJsonTokenMore, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_BOOL, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Next", opJsonTokenNext, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Type", opJsonTokenType, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Delim", opJsonTokenDelim, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Bool", opJsonTokenBool, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_BOOL, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Float64", opJsonTokenF64, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_F64, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Int64", opJsonTokenI64, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I64, ast.ConstCxArg_BOOL))
-	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "json.Str", opJsonTokenStr, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_STR, ast.ConstCxArg_BOOL))
 
 	// profile
 	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberFile, "StartCPUProfile", opStartProfile, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32), nil)

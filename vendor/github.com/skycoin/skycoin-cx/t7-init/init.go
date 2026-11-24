@@ -6,9 +6,9 @@ import (
 	"github.com/skycoin/skycoin-cx/t3-ast"
 	"github.com/skycoin/skycoin-cx/t5-cipher"             // thin: only RegisterPackage; registration list, keep
 	"github.com/skycoin/skycoin-cx/t5-cx-runtime-printer" // thin: only PrinterCompileErrorsRegister, PrinterOpcodesRegister; registration list, keep
+	"github.com/skycoin/skycoin-cx/t5-cxnet"              // thin: only RegisterPackage; registration list, keep
 	"github.com/skycoin/skycoin-cx/t5-cxos"               // thin: only RegisterPackage; registration list, keep
 	cxoscore "github.com/skycoin/skycoin-cx/t5-cxos-core" // thin: only RegisterPackage; registration list, keep
-	"github.com/skycoin/skycoin-cx/t5-tcp"                // thin: only RegisterPackage; registration list, keep
 	"github.com/skycoin/skycoin-cx/t6-cxfx"               // thin: only RegisterPackage; registration list, keep
 
 	// "github.com/skycoin/cx/cx/packages/http"
@@ -27,7 +27,7 @@ func RegisterPackages(prgrm *ast.CXProgram) {
 	printer.PrinterCompileErrorsRegister(prgrm)
 	// http.RegisterPackage()
 	regexp.RegisterPackage(prgrm)
-	tcp.RegisterPackage(prgrm)
+	cxnet.RegisterPackage(prgrm)
 }
 
 // MakeProgram returns a new empty program. Call RegisterPackages on it to add

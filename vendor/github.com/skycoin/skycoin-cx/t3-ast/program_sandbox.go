@@ -3,14 +3,13 @@ package ast
 import (
 	"os"
 
-	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t0-util" // thin: only the program path and sandbox calls; no depth gain
 )
 
 // ProgramStringBytesRead returns the bytes of the str in value. They alias
 // program memory, so the caller copies them before the program runs on.
 func ProgramStringBytesRead(prgrm *CXProgram, value *CXValue) []byte {
-	return types.Read_obj(prgrm.Memory, value.Offset)
+	return value.Get_str_bytes(prgrm)
 }
 
 // ProgramFileSystemPathRead validates the str in value as a program path,

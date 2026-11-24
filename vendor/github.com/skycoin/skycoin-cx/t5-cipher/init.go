@@ -3,54 +3,36 @@
 package cipher
 
 import (
-	"github.com/skycoin/skycoin-cx/t0-types"     // thin: only Pointer, UI8; no depth gain
-	"github.com/skycoin/skycoin-cx/t1-constants" // thin: only DECL_ARRAY; no depth gain
+	"github.com/skycoin/skycoin-cx/t0-types"
+	"github.com/skycoin/skycoin-cx/t1-constants"
 	"github.com/skycoin/skycoin-cx/t3-ast"
-	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only Out, RegisterFunction; registration API, keep
+	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only In, Out, RegisterLibraryFunction, RegisterLibraryFunctionVm; registration API, keep
 )
 
+// RegisterPackage adds the cipher package to prgrm and registers the cipher
+// library, the functions of sys/cipher, see docs/CipherLibrary.md.
 func RegisterPackage(prgrm *ast.CXProgram) {
+	cipherStatePrepare()
+
 	// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
 	// Now a constructor call, site S1359.
 	cipherPkg := ast.MakePackage(prgrm.CXProgramNameIntern("cipher"))
-	// OBJMODEL: state.CXStructMng.CXStructAlloc(), phase 4 #336.
-	// Now a constructor call, site S1360.
-	pubkeyStrct := ast.MakeStruct(prgrm.CXProgramNameIntern("PubKey"))
-	// OBJMODEL: state.CXStructMng.CXStructAlloc(), phase 4 #336.
-	// Now a constructor call, site S1361.
-	seckeyStrct := ast.MakeStruct(prgrm.CXProgramNameIntern("SecKey"))
-
 	// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
 	// Now an arena insert, site S1362.
-	pkgIdx := prgrm.AddPackage(cipherPkg)
-	// OBJMODEL: state.CXPackageMng.CXPackageGet(gid), phase 5 #362.
-	// Now an arena getter, site S1363.
-	cPkg, _ := prgrm.GetPackageFromArray(pkgIdx)
+	prgrm.AddPackage(cipherPkg)
 
-	// PubKey
-	_, pubkeyFld := ast.MakeArgument(prgrm, prgrm.CXProgramNameIntern("PubKey"), ast.SourceFileGidNil, -1)
-	pubkeyFld.SetType(types.UI8).SetPackage(cPkg)
-	pubkeyFld.DeclarationSpecifiers = append(pubkeyFld.DeclarationSpecifiers, constants.DECL_ARRAY)
-	// pubkeyFld.IsArray = true
-	pubkeyFld.Lengths = []types.Pointer{33} // Yes, PubKey is 33 bytes long.
-	// pubkeyFld.TotalSize = 33                // 33 * 1 byte (ui8)
+	library := constants.LibraryNumberCipher
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.HashOfBytes", opCipherHashOfBytes, opcodes.In(ast.Slice(types.UI8)), opcodes.Out(ast.Slice(types.UI8)))
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.HashStateNew", opCipherHashStateNew, nil, opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.HashStateWrite", opCipherHashStateWrite, opcodes.In(ast.ConstCxArg_I32, ast.Slice(types.UI8)), nil)
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.HashStateSum", opCipherHashStateSum, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.Slice(types.UI8)))
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.HashStateRelease", opCipherHashStateRelease, opcodes.In(ast.ConstCxArg_I32), nil)
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.SignatureVerify", opCipherSignatureVerify, opcodes.In(ast.Slice(types.UI8), ast.Slice(types.UI8), ast.Slice(types.UI8)), opcodes.Out(ast.ConstCxArg_BOOL))
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.SignatureRecoverPubKey", opCipherSignatureRecoverPubKey, opcodes.In(ast.Slice(types.UI8), ast.Slice(types.UI8)), opcodes.Out(ast.Slice(types.UI8), ast.ConstCxArg_BOOL))
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.SignatureSign", opCipherSignatureSign, opcodes.In(ast.Slice(types.UI8), ast.Slice(types.UI8)), opcodes.Out(ast.Slice(types.UI8), ast.ConstCxArg_BOOL))
+	opcodes.RegisterLibraryFunction(prgrm, library, "cipher.KeyPairGenerate", opCipherKeyPairGenerate, nil, opcodes.Out(ast.Slice(types.UI8), ast.Slice(types.UI8)))
 
-	// SecKey
-	_, seckeyFld := ast.MakeArgument(prgrm, prgrm.CXProgramNameIntern("SecKey"), ast.SourceFileGidNil, -1)
-	seckeyFld.SetType(types.UI8).SetPackage(cPkg)
-	seckeyFld.DeclarationSpecifiers = append(seckeyFld.DeclarationSpecifiers, constants.DECL_ARRAY)
-	// seckeyFld.IsArray = true
-	seckeyFld.Lengths = []types.Pointer{32} // Yes, SecKey is 32 bytes long.
-	// seckeyFld.TotalSize = 33                // 33 * 1 byte (ui8)
-
-	pubkeyStrct.AddField(prgrm, pubkeyFld)
-	seckeyStrct.AddField(prgrm, seckeyFld)
-
-	cPkg.AddStruct(prgrm, pubkeyStrct)
-	cPkg.AddStruct(prgrm, seckeyStrct)
-
-	opcodes.RegisterFunction(prgrm, "cipher.GenerateKeyPair", opCipherGenerateKeyPair, nil,
-		// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
-		// Now a constructor call, site S1366 S1367.
-		opcodes.Out(ast.MakeStructParameter(prgrm, "cipher", "PubKey", "pubKey"), ast.MakeStructParameter(prgrm, "cipher", "SecKey", "sec")))
+	// The vm has no heap, so only the functions without a []ui8 have a vm form.
+	opcodes.RegisterLibraryFunctionVm(library, "cipher.HashStateNew", libraryCipherHashStateNewVm)
+	opcodes.RegisterLibraryFunctionVm(library, "cipher.HashStateRelease", libraryCipherHashStateReleaseVm)
 }

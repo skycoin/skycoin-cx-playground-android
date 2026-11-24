@@ -58,3 +58,9 @@ func libraryCall(prgrm *CXProgram, fn *CXFunction, inputs []CXValue, outputs []C
 	}
 	LibraryFunctionHandlers[fn.LibraryNumber][fn.LibraryFunctionNumber](prgrm, inputs, outputs)
 }
+
+// LibraryRunStarts holds what each linked library does before a run that
+// enables it, such as the net library starting its sockets and replay
+// record, nil for nothing. An error stops the run before it starts.
+// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
+var LibraryRunStarts [constants.LibraryCount]func() error

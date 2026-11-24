@@ -149,7 +149,7 @@ or loaded from its serialized form. It lists the system library calls
 the name is not a constant), the imports, the opcode sets (core, app from
 opcode 4096, library) and IR problems such as a call of a missing function.
 A policy says what is allowed. `PolicyFetched`, for programs from the
-network, blocks the `os` and `tcp` imports and every system library, and
+network, blocks the `os` and `net` imports and every system library, and
 `PolicyBundled` allows everything. The report is one monospaced line per
 check:
 
@@ -185,6 +185,18 @@ package with `import "sys/app"`.
 | `app.NetSend(conn i32, data str) (err str)` | writes data, one datagram for UDP |
 | `app.NetRecv(conn i32, timeoutMs i32) (data str, err str)` | what arrived, one datagram for UDP, `err` is `timeout` when nothing did |
 | `app.NetClose(conn i32)` | closes it, as the end of the program does |
+
+The `app.Net*` calls run on the batched runtime of the CX net library,
+skycoin-cx `t1-netbatch` (skycoin-cx#508, #37). Sockets are read in the
+background, and a call that waits makes net updates until an entry of its
+connection is in a batch. `app.NetRecv` times out through a net timeout,
+which is an entry of a batch too. A bundled app may also use `sys/net`
+directly, `net.Update` and `net.ReadyNext` as skycoin-cx
+docs/Networking.md describes. A program uses one or the other, since the
+updates of one take the entries of the other. The batches are the whole
+network input of a run, so `cxrun.Options.NetRecord` writes them to a
+replay record and `NetReplay` runs the program from the record with no
+socket, as `cx --net-record` and `--net-replay` do.
 
 Console output from `printf` and `string.PrintLine` is shown on screen, and so
 are compile and runtime errors.

@@ -16,6 +16,7 @@ var openProfiles = make(map[string]func() error)
 
 // opStartProfile writes a CPU profile to a program path in the sandbox.
 // VIOLATION STRHOT-139: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opStartProfile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	programPath, fileError := ast.ProgramFileSystemPathRead(prgrm, &inputs[0])
 	if fileError != nil {

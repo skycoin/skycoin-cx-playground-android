@@ -42,7 +42,11 @@ func Callback(cxprogram *ast.CXProgram, fn *ast.CXFunction, inputs [][]byte) (ou
 
 	var maxOps = 0
 
-	err := runLoop(cxprogram, true, maxOps, previousCall)
+	// The nested loop has its own operand buffers, as the outer loop is in the
+	// middle of an opcode with its own.
+	// VIOLATION VMALLOC-021: the nested buffers grow on the first opcodes, #407.
+	var nestedInputs, nestedOutputs []ast.CXValue
+	err := runLoop(cxprogram, true, maxOps, previousCall, &nestedInputs, &nestedOutputs)
 	if err != nil {
 		os.Exit(types.CX_INTERNAL_ERROR)
 	}

@@ -1,4 +1,4 @@
-//go:build cxfx && !mobile
+//go:build cxfx
 
 package cxfx
 
@@ -50,6 +50,7 @@ func opAlError(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue
 	outputs[0].Set_i32(prgrm, err)
 }
 
+// VIOLATION STRHOT-192: B, OpenAL returns text, #432.
 func opAlExtensions(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	extensions := al.Extensions()
 	outputs[0].Set_str(prgrm, extensions)
@@ -71,6 +72,7 @@ func opAlPlaySources(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 	al.PlaySources(sources...)
 }
 
+// VIOLATION STRHOT-193: B, OpenAL returns text, #432.
 func opAlRenderer(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	renderer := al.Renderer()
 	outputs[0].Set_str(prgrm, renderer)
@@ -86,11 +88,13 @@ func opAlStopSources(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 	al.StopSources(sources...)
 }
 
+// VIOLATION STRHOT-194: B, OpenAL returns text, #432.
 func opAlVendor(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	vendor := al.Vendor()
 	outputs[0].Set_str(prgrm, vendor)
 }
 
+// VIOLATION STRHOT-195: B, OpenAL returns text, #432.
 func opAlVersion(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	version := al.Version()
 	outputs[0].Set_str(prgrm, version)

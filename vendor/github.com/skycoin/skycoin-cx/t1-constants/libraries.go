@@ -4,7 +4,8 @@ package constants
 // LanguageGuide.md.
 //
 // A system library is a group of built-in functions that reach the operating
-// system, such as files or the network. A program calls one through the
+// system, such as files or the network, or that link a Go module outside the
+// standard library, such as cipher. A program calls one through the
 // single opcode OP_LIBRARY_CALL with a library number and a function number,
 // not through a row of OpcodeLifecycleTable. A library runs only when it is
 // enabled for the run, see LibraryPolicyEnabledWhenImported.
@@ -22,7 +23,8 @@ const (
 	LibraryNumberFile    = 1
 	LibraryNumberNet     = 2
 	LibraryNumberProcess = 3
-	LibraryCount         = 4
+	LibraryNumberCipher  = 4
+	LibraryCount         = 5
 )
 
 // LibraryPolicyEnabledWhenImported is the default policy for a library that
@@ -44,6 +46,7 @@ var LibraryTable = [...]Library{
 	{LibraryNumberFile, "file", 2611230001},
 	{LibraryNumberNet, "net", 2611230001},
 	{LibraryNumberProcess, "process", 2611230001},
+	{LibraryNumberCipher, "cipher", 2611240003},
 }
 
 // LibraryByName returns the library named name.
@@ -78,8 +81,11 @@ type LibraryFunctionLifecycle struct {
 
 // LibraryFunctionLifecycleTable is every function number ever assigned in a
 // system library, by library and then number. The name is the CX name the
-// program calls. Each function was an opcode before 2611230001, see the
-// deprecated rows of OpcodeLifecycleTable. Read only.
+// program calls. The file, net and process functions were opcodes before
+// 2611230001, and cipher.KeyPairGenerate was cipher.GenerateKeyPair before
+// 2611240003, see the deprecated rows of OpcodeLifecycleTable. The blocking
+// tcp functions 1 to 4 gave way to the batched net functions in 2611240004.
+// Read only.
 var LibraryFunctionLifecycleTable = [...]LibraryFunctionLifecycle{
 	// library, number, name, version added, version deprecated, version reassignable
 	{LibraryNumberFile, 1, "os.GetWorkingDirectory", 2611230001, 0, 0},
@@ -133,23 +139,47 @@ var LibraryFunctionLifecycleTable = [...]LibraryFunctionLifecycle{
 	{LibraryNumberFile, 49, "os.WriteI32Slice", 2611230001, 0, 0},
 	{LibraryNumberFile, 50, "os.WriteI16Slice", 2611230001, 0, 0},
 	{LibraryNumberFile, 51, "os.WriteI8Slice", 2611230001, 0, 0},
-	{LibraryNumberFile, 52, "json.Open", 2611230001, 0, 0},
-	{LibraryNumberFile, 53, "json.Close", 2611230001, 0, 0},
-	{LibraryNumberFile, 54, "json.More", 2611230001, 0, 0},
-	{LibraryNumberFile, 55, "json.Next", 2611230001, 0, 0},
-	{LibraryNumberFile, 56, "json.Type", 2611230001, 0, 0},
-	{LibraryNumberFile, 57, "json.Delim", 2611230001, 0, 0},
-	{LibraryNumberFile, 58, "json.Bool", 2611230001, 0, 0},
-	{LibraryNumberFile, 59, "json.Float64", 2611230001, 0, 0},
-	{LibraryNumberFile, 60, "json.Int64", 2611230001, 0, 0},
-	{LibraryNumberFile, 61, "json.Str", 2611230001, 0, 0},
+	{LibraryNumberFile, 52, "json.Open", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 53, "json.Close", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 54, "json.More", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 55, "json.Next", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 56, "json.Type", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 57, "json.Delim", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 58, "json.Bool", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 59, "json.Float64", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 60, "json.Int64", 2611230001, 2611240002, 2711240001},
+	{LibraryNumberFile, 61, "json.Str", 2611230001, 2611240002, 2711240001},
 	{LibraryNumberFile, 62, "StartCPUProfile", 2611230001, 0, 0},
 	{LibraryNumberFile, 63, "StopCPUProfile", 2611230001, 0, 0},
-	{LibraryNumberNet, 1, "tcp.Dial", 2611230001, 0, 0},
-	{LibraryNumberNet, 2, "tcp.Listen", 2611230001, 0, 0},
-	{LibraryNumberNet, 3, "tcp.Accept", 2611230001, 0, 0},
-	{LibraryNumberNet, 4, "tcp.Close", 2611230001, 0, 0},
+	{LibraryNumberNet, 1, "tcp.Dial", 2611230001, 2611240004, 2711240001},
+	{LibraryNumberNet, 2, "tcp.Listen", 2611230001, 2611240004, 2711240001},
+	{LibraryNumberNet, 3, "tcp.Accept", 2611230001, 2611240004, 2711240001},
+	{LibraryNumberNet, 4, "tcp.Close", 2611230001, 2611240004, 2711240001},
+	{LibraryNumberNet, 5, "net.Update", 2611240004, 0, 0},
+	{LibraryNumberNet, 6, "net.ReadyCount", 2611240004, 0, 0},
+	{LibraryNumberNet, 7, "net.ReadyNext", 2611240004, 0, 0},
+	{LibraryNumberNet, 8, "net.Clock", 2611240004, 0, 0},
+	{LibraryNumberNet, 9, "net.Read", 2611240004, 0, 0},
+	{LibraryNumberNet, 10, "net.Write", 2611240004, 0, 0},
+	{LibraryNumberNet, 11, "net.Close", 2611240004, 0, 0},
+	{LibraryNumberNet, 12, "net.TimeoutSet", 2611240004, 0, 0},
+	{LibraryNumberNet, 13, "net.TCPListen", 2611240004, 0, 0},
+	{LibraryNumberNet, 14, "net.TCPDial", 2611240004, 0, 0},
+	{LibraryNumberNet, 15, "net.UDPListen", 2611240004, 0, 0},
+	{LibraryNumberNet, 16, "net.UDPDial", 2611240004, 0, 0},
+	{LibraryNumberNet, 17, "net.UDPReadFrom", 2611240004, 0, 0},
+	{LibraryNumberNet, 18, "net.UDPWriteTo", 2611240004, 0, 0},
+	{LibraryNumberNet, 19, "net.UDPPeerResolve", 2611240004, 0, 0},
 	{LibraryNumberProcess, 1, "os.Run", 2611230001, 0, 0},
+	{LibraryNumberCipher, 1, "cipher.HashOfBytes", 2611240003, 0, 0},
+	{LibraryNumberCipher, 2, "cipher.HashStateNew", 2611240003, 0, 0},
+	{LibraryNumberCipher, 3, "cipher.HashStateWrite", 2611240003, 0, 0},
+	{LibraryNumberCipher, 4, "cipher.HashStateSum", 2611240003, 0, 0},
+	{LibraryNumberCipher, 5, "cipher.HashStateRelease", 2611240003, 0, 0},
+	{LibraryNumberCipher, 6, "cipher.SignatureVerify", 2611240003, 0, 0},
+	{LibraryNumberCipher, 7, "cipher.SignatureRecoverPubKey", 2611240003, 0, 0},
+	{LibraryNumberCipher, 8, "cipher.SignatureSign", 2611240003, 0, 0},
+	{LibraryNumberCipher, 9, "cipher.KeyPairGenerate", 2611240003, 0, 0},
 }
 
 // LibraryFunctionLiveByName returns the live function named name of library.

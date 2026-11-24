@@ -12,6 +12,7 @@ import (
 // []ui8. The affordance input does not narrow what is serialized yet.
 // GCREACH: allocates the output byte slice, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
+// VIOLATION VMALLOC-023: runs the serializer, compiler code, #407.
 func opSerialize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	byts, err := ast.SerializeCXProgram(prgrm, true, nil)
 	if err != nil {
@@ -28,6 +29,7 @@ func opSerialize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 
 // opDeserialize checks that a []ui8 holds a program this cx can load. Bytes
 // that do not are a runtime error. The program itself is not kept.
+// VIOLATION VMALLOC-023: runs the serializer, compiler code, #407.
 func opDeserialize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	byts := inputs[0].GetSlice_ui8(prgrm)
 	// OBJMODEL: state.CXProgramMng.CXProgramAlloc(), phase 4 #371.

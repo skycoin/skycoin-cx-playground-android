@@ -1,9 +1,6 @@
 package execute
 
 import (
-	"math/rand"
-	"time"
-
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
 	// GCREACH: t3-ast owns the heap and the GC roots. The old loop runs opcodes that
@@ -15,7 +12,7 @@ import (
 // in cxprogram.RuntimeError for the printer package, see #413.
 func RunCxAst(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall types.Pointer) error {
 	defer ast.RuntimeError(cxprogram)
-	return runLoop(cxprogram, untilEnd, maxOps, untilCall)
+	return runLoop(cxprogram, untilEnd, maxOps, untilCall, &cxprogram.ProgramInputValues, &cxprogram.ProgramOutputValues)
 }
 
 // runLoop is RunCxAst without the deferred RuntimeError. A panic goes up to
@@ -24,9 +21,7 @@ func RunCxAst(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall typ
 // opcode does not, so nothing moves under that opcode.
 // GCREACH: the GC tick, at a safe point where every root is in a slot,
 // see docs/GarbageCollector.md.
-func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall types.Pointer) error {
-	var inputs []ast.CXValue
-	var outputs []ast.CXValue
+func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall types.Pointer, inputs *[]ast.CXValue, outputs *[]ast.CXValue) error {
 	var opCount int = 0
 	gcTick := !untilCall.IsValid()
 	for !cxprogram.Terminated && (untilEnd || (opCount < maxOps)) && (!untilCall.IsValid() || cxprogram.CallCounter > untilCall) {
@@ -39,7 +34,7 @@ func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall type
 
 		opCount++
 
-		err := call.Call(cxprogram, &inputs, &outputs)
+		err := call.Call(cxprogram, inputs, outputs)
 		if err != nil {
 			return err
 		}
@@ -52,11 +47,10 @@ func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall type
 }
 
 // runSysInitFunc runs *init, ticking the GC after each step as runLoop does.
+// A runtime error ends it with nil and is left in cxprogram.RuntimeError, as in RunCxAst.
 // GCREACH: the GC tick of *init, see docs/GarbageCollector.md.
 func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
-	var inputs []ast.CXValue
-	var outputs []ast.CXValue
-
+	defer ast.RuntimeError(cxprogram)
 	fn, err := mod.SelectFunction(cxprogram, cxprogram.CxIrState.CxIrStateNameSysInit)
 	if err != nil {
 		return err
@@ -71,7 +65,7 @@ func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 
 	for !cxprogram.Terminated {
 		call := &cxprogram.CallStack[cxprogram.CallCounter]
-		err = call.Call(cxprogram, &inputs, &outputs)
+		err = call.Call(cxprogram, &cxprogram.ProgramInputValues, &cxprogram.ProgramOutputValues)
 		if err != nil {
 			return err
 		}
@@ -90,6 +84,10 @@ func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 // GCREACH: allocates the os.Args strs and slice, which adds to
 // the GC pressure, see docs/GarbageCollector.md.
 func feedOSArgs(cxprogram *ast.CXProgram, args []string) error {
+	// SelectPackage builds an error when os is not imported, so look first.
+	if _, imported := cxprogram.Packages[cxprogram.CxIrState.CxIrStateNameOs]; !imported {
+		return nil
+	}
 	if osPkg, err := cxprogram.SelectPackage(cxprogram.CxIrState.CxIrStateNameOs); err == nil {
 		argsOffset := types.Pointer(0)
 		if osGlbl, err := osPkg.GetGlobal(cxprogram, cxprogram.CxIrState.CxIrStateNameOsArgs); err == nil {
@@ -106,10 +104,18 @@ func feedOSArgs(cxprogram *ast.CXProgram, args []string) error {
 	return nil
 }
 
-// RunCompiled ...
-func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
+// RunPrepare sizes the heap and the buffers the old loop reuses, so a run of
+// cxprogram allocates no Go memory for them (#407). RunCompiled calls it too,
+// and it allocates nothing once cxprogram is prepared.
+func RunPrepare(cxprogram *ast.CXProgram) {
 	cxprogram.EnsureMinimumHeapSize()
-	rand.Seed(time.Now().UTC().UnixNano())
+	cxprogram.RunBuffersPrepare()
+}
+
+// RunCompiled runs cxprogram from *init and main, or goes on with the call
+// in progress, for at most maxOps steps when maxOps is not 0.
+func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
+	RunPrepare(cxprogram)
 
 	var untilEnd bool
 	if maxOps == 0 {
@@ -129,6 +135,9 @@ func RunCompiled(cxprogram *ast.CXProgram, maxOps int, args []string) error {
 		err = runSysInitFunc(cxprogram, mod)
 		if err != nil {
 			return err
+		}
+		if cxprogram.RuntimeError.RuntimeErrorRecordRaised {
+			return nil
 		}
 
 		fn, err := mod.SelectFunction(cxprogram, cxprogram.CxIrState.CxIrStateNameMain)

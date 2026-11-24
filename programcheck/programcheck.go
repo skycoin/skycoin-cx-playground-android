@@ -54,12 +54,12 @@ func PolicyBundled() Policy {
 
 // PolicyFetched is the policy of a program that came over the network. It
 // may draw and use the network through the app package, but not reach
-// files, processes or raw sockets: the os and tcp packages are blocked and
+// files, processes or raw sockets: the os and net packages are blocked and
 // so are the system libraries.
 func PolicyFetched() Policy {
 	return Policy{
 		OpcodeSets:     []OpcodeSet{OpcodeSetCore, OpcodeSetApp},
-		BlockedImports: []string{"os", "tcp"},
+		BlockedImports: []string{"os", "net"},
 	}
 }
 

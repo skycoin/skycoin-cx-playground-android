@@ -330,7 +330,7 @@ function_header:
                 {
 			receiver := actions.MethodReceiver(Program, $3)
 
-			receiverName := receiver[0].StructType.Name
+			receiverName := actions.MethodReceiverName(Program, receiver[0], CurrentFile, $<line>5, $<column>5)
 			methodName := Program.CXProgramNameIntern($5)
 
 			if pkg, err := Program.GetCurrentPackage(); err == nil {

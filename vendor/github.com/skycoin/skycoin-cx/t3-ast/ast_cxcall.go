@@ -106,6 +106,8 @@ func wipeDeclarationMemory(prgrm *CXProgram, cxAtomicOp *CXAtomicOperator) error
 func processBuiltInOperators(prgrm *CXProgram, expr *CXExpression, cxAtomicOp *CXAtomicOperator, cxAtomicOpOperator *CXFunction, globalInputs *[]CXValue, globalOutputs *[]CXValue, fp types.Pointer) error {
 	inputs := cxAtomicOp.GetInputs(prgrm)
 	inputCount := len(inputs)
+	// VIOLATION VMALLOC-002: grows the operand buffers in a Callback loop only,
+	// RunBuffersPrepare sizes those of the run, #407.
 	if inputCount > len(*globalInputs) {
 		*globalInputs = make([]CXValue, inputCount)
 	}
@@ -202,10 +204,7 @@ func processNonAtomicOperators(prgrm *CXProgram, cxAtomicOp *CXAtomicOperator, c
 	   with the current expression's operator
 	*/
 	newFP := prgrm.Stack.Pointer
-	if prgrm.CallCounter+1 >= constants.CALLSTACK_SIZE || newFP+cxAtomicOpOperator.Size > constants.STACK_SIZE {
-		// Pushes and panics, so RuntimeError pops the frame as before.
-		callPush(prgrm, cxAtomicOpOperator)
-	}
+	callPushCheck(prgrm, cxAtomicOpOperator)
 
 	// The inputs are copied before the push, so an error in one stops the
 	// caller, as it does on vm.
@@ -254,22 +253,24 @@ func processNonAtomicOperators(prgrm *CXProgram, cxAtomicOp *CXAtomicOperator, c
 	return nil
 }
 
-// callPush makes operator the current call, with its frame at the stack
-// pointer. It panics with STACK_OVERFLOW_ERROR when the call or stack is full.
-func callPush(prgrm *CXProgram, operator *CXFunction) {
-	prgrm.CallCounter++
-	if prgrm.CallCounter >= constants.CALLSTACK_SIZE {
+// callPushCheck panics with STACK_OVERFLOW_ERROR when a call of operator
+// does not fit in the call stack or the stack. The caller stays the current call.
+func callPushCheck(prgrm *CXProgram, operator *CXFunction) {
+	if prgrm.CallCounter+1 >= constants.CALLSTACK_SIZE || prgrm.Stack.Pointer+operator.Size > constants.STACK_SIZE {
 		panic(constants.STACK_OVERFLOW_ERROR)
 	}
+}
 
+// callPush makes operator the current call, with its frame at the stack
+// pointer, after callPushCheck.
+func callPush(prgrm *CXProgram, operator *CXFunction) {
+	callPushCheck(prgrm, operator)
+	prgrm.CallCounter++
 	newCall := &prgrm.CallStack[prgrm.CallCounter]
 	newCall.Operator = operator
 	newCall.Line = 0
 	newCall.FramePointer = prgrm.Stack.Pointer
 	prgrm.Stack.Pointer += operator.Size
-	if prgrm.Stack.Pointer > constants.STACK_SIZE {
-		panic(constants.STACK_OVERFLOW_ERROR)
-	}
 }
 
 func (call *CXCall) Call(prgrm *CXProgram, globalInputs *[]CXValue, globalOutputs *[]CXValue) error {

@@ -55,6 +55,15 @@ type CXProgram struct {
 	// in, opened once at run start, see #433. Nil means file opcodes fail.
 	ProgramSandboxRoot *os.Root
 
+	// ProgramInputValues and ProgramOutputValues hold the operands of the
+	// native opcode the old loop runs, sized by RunBuffersPrepare (#407).
+	ProgramInputValues  []CXValue
+	ProgramOutputValues []CXValue
+
+	// ProgramFormatBuffer is the scratch the print, printf and str conversion
+	// opcodes format into, kept between them so they do not allocate (#412).
+	ProgramFormatBuffer []byte
+
 	// ProgramStdin is the one reader read() takes lines from for the whole run,
 	// set by ProgramStdinInit, see skycoin/cx#110. Nil reads as end of input.
 	ProgramStdin *bufio.Reader

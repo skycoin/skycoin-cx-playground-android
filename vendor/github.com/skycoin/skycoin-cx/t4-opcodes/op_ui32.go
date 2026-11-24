@@ -1,7 +1,6 @@
 package opcodes
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 
@@ -11,10 +10,10 @@ import (
 )
 
 // The built-in str function returns the base 10 string representation of operand 1.
-// VIOLATION STRHOT-123: O, the opcode works on Go string copies of CX strs, #412.
 func opUI32ToStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	outV0 := strconv.FormatUint(uint64(inputs[0].Get_ui32(prgrm)), 10)
-	outputs[0].Set_str(prgrm, outV0)
+	formatted := strconv.AppendUint(formatBuffer(prgrm), uint64(inputs[0].Get_ui32(prgrm)), 10)
+	outputs[0].Set_str_bytes(prgrm, formatted)
+	formatBufferKeep(prgrm, formatted)
 }
 
 // The built-in i8 function returns operand 1 casted from type ui32 to type i8.
@@ -72,9 +71,8 @@ func opUI32ToF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 }
 
 // The print built-in function formats its arguments and prints them.
-// VIOLATION STRHOT-124: O, the opcode works on Go string copies of CX strs, #412.
 func opUI32Print(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	fmt.Println(inputs[0].Get_ui32(prgrm))
+	printFormattedLine(prgrm, strconv.AppendUint(formatBuffer(prgrm), uint64(inputs[0].Get_ui32(prgrm)), 10))
 }
 
 // The built-in add function returns the sum of two ui32 numbers.

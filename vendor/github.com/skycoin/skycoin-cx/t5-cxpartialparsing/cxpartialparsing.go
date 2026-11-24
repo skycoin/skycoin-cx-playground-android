@@ -1437,7 +1437,7 @@ yydefault:
 		{
 			receiver := actions.MethodReceiver(Program, yyDollar[3].arguments)
 
-			receiverName := receiver[0].StructType.Name
+			receiverName := actions.MethodReceiverName(Program, receiver[0], CurrentFile, yyDollar[5].line, yyDollar[5].column)
 			methodName := Program.CXProgramNameIntern(yyDollar[5].tok)
 
 			if pkg, err := Program.GetCurrentPackage(); err == nil {

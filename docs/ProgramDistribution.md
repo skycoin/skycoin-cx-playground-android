@@ -942,13 +942,17 @@ When a node receives a have, it acknowledges it, records the sender as a
 node that holds the program, and puts the have in its have queue
 (`programnetwork.HaveQueue`) with the sender and the time. No have is
 ignored or dropped: every one goes in the queue, duplicates too, and the
-program reads every one. `Node.Update` is the one step that reads the
-queue. It returns the haves in arrival order and applies the node type's
-policy to each: a medium node requests a pinned program or one that fits
-its budget, a super node one that fits its capacity, and neither requests a
-program it holds or already requested. `Node.RunUpdates` calls Update
-whenever haves wait. Because reading is a single step, the deterministic
-update of skycoin-cx #508 can take its place later (#37).
+program reads every one. The queue follows the update model of the CX net
+library (skycoin-cx #508, #37). Haves that arrive between two updates wait
+and nothing the program sees changes between updates. `Node.Update` makes
+them one batch, sorted by sender and in arrival order within a sender as
+`net.Update` sorts by socket handle, and applies the node type's policy to
+each have of the batch: a medium node requests a pinned program or one
+that fits its budget, a super node one that fits its capacity, and neither
+requests a program it holds or already requested. The program then reads
+the batch with `HaveQueue.ReadyCount` and `ReadyNext`, and `Pending` counts
+the haves waiting for the next update. `Node.RunUpdates` makes an update
+whenever haves arrive.
 
 A requested program is downloaded from a node that announced it. The node
 fetches the manifest, checks the signer against its trusted keys and the

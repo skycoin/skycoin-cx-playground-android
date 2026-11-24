@@ -32,7 +32,7 @@ func TestOneProgramPerLibrary(t *testing.T) {
 		function string
 	}{
 		{"file", "file", "os.ReadAllText"},
-		{"net", "net", "tcp.Dial"},
+		{"net", "net", "net.TCPDial"},
 		{"process", "process", "os.Run"},
 	} {
 		t.Run(c.program, func(t *testing.T) {

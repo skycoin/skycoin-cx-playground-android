@@ -105,6 +105,7 @@ type gcCollection struct {
 // recording each reference it reads, then gives each live object its new
 // address, moves the recorded references to the new addresses and slides
 // the objects down. It returns the new heap pointer.
+// VIOLATION VMALLOC-011: the CX collector grows its Go scratch to the largest heap so far, #407.
 func GarbageCollectorCollect(memory []byte, heapStartsAt types.Pointer, heapPointer types.Pointer, roots *GCRootTable, state *GCState) types.Pointer {
 	collection := gcCollection{memory: memory, heapStartsAt: heapStartsAt, heapPointer: heapPointer, state: state}
 	collection.gcObjectStartsBuild()
@@ -176,6 +177,7 @@ func (collection *gcCollection) gcMarkValue(address types.Pointer, t *GCType) {
 
 // gcMarkReference marks the object the pointer, slice or str at slot points
 // into, records slot for the update, and queues what the object holds.
+// VIOLATION VMALLOC-011: the CX collector grows its Go scratch to the largest heap so far, #407.
 func (collection *gcCollection) gcMarkReference(slot types.Pointer, t *GCType) {
 	if uint64(slot)+uint64(types.POINTER_SIZE) > uint64(len(collection.memory)) {
 		return
@@ -247,6 +249,7 @@ func (collection *gcCollection) gcFrameAddress(roots *GCRootTable, framePointer 
 
 // gcObjectStartsBuild lists the address of each heap object in
 // GCStateObjectStarts and clears its mark, which a new object may not.
+// VIOLATION VMALLOC-011: the CX collector grows its Go scratch to the largest heap so far, #407.
 func (collection *gcCollection) gcObjectStartsBuild() {
 	starts := collection.state.GCStateObjectStarts[:0]
 	end := collection.heapStartsAt + collection.heapPointer

@@ -81,15 +81,10 @@ func RuntimeError(prgrm *CXProgram) {
 	if r := recover(); r != nil {
 		switch r {
 		case constants.STACK_OVERFLOW_ERROR:
-			call := prgrm.CallStack[prgrm.CallCounter]
-			if prgrm.CallCounter > 0 {
-				prgrm.CallCounter--
-				prgrm.Stack.Pointer = call.FramePointer
-				runtimeErrorRecordSet(prgrm, r, true, types.CX_RUNTIME_STACK_OVERFLOW_ERROR)
-			} else {
-				// error at entry point
-				runtimeErrorRecordSet(prgrm, r, false, types.CX_RUNTIME_STACK_OVERFLOW_ERROR)
-			}
+			// callPush never pushes a frame that does not fit, so the caller is
+			// the current call. Only the entry frame leaves the pointer past the stack.
+			stackPrint := prgrm.Stack.Pointer <= constants.STACK_SIZE
+			runtimeErrorRecordSet(prgrm, r, stackPrint, types.CX_RUNTIME_STACK_OVERFLOW_ERROR)
 		case constants.HEAP_EXHAUSTED_ERROR:
 			runtimeErrorRecordSet(prgrm, r, true, types.CX_RUNTIME_HEAP_EXHAUSTED_ERROR)
 		default:

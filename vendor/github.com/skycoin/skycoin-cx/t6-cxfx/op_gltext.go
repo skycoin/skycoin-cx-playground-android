@@ -13,17 +13,18 @@ import (
 	"github.com/skycoin/skycoin-cx/t5-cxos" // thin: only ValidFile; could move ValidFile to t0-util or t3-ast, max tier 11 to 10
 )
 
-// VIOLATION: state outside State. Owner: t6-cxfx; moves to FontMng in phase 1.
-var fonts map[string]*gltext.Font = make(map[string]*gltext.Font, 0)
-
+// A font is an i32 handle into CxfxState.CxfxFontTable, returned by
+// gltext.LoadTrueType, see #432. A file that does not load returns -1.
 func loadTrueType(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue, fixedPipeline bool) {
+	handle := int32(-1)
 	if file := cxos.ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
-		if theFont, err := gltext.LoadTruetype(file,
-			inputs[2].Get_i32(prgrm), rune(inputs[3].Get_i32(prgrm)), rune(inputs[4].Get_i32(prgrm)),
-			gltext.Direction(inputs[5].Get_i32(prgrm)), fixedPipeline); err == nil {
-			fonts[inputs[1].Get_str(prgrm)] = theFont
+		if font, err := gltext.LoadTruetype(file,
+			inputs[1].Get_i32(prgrm), rune(inputs[2].Get_i32(prgrm)), rune(inputs[3].Get_i32(prgrm)),
+			gltext.Direction(inputs[4].Get_i32(prgrm)), fixedPipeline); err == nil {
+			handle = cxfxFontAdd(font)
 		}
 	}
+	outputs[0].Set_i32(prgrm, handle)
 }
 
 func opGltextLoadTrueType(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
@@ -34,44 +35,36 @@ func opGltextLoadTrueTypeCore(prgrm *ast.CXProgram, inputs []ast.CXValue, output
 	loadTrueType(prgrm, inputs, outputs, false)
 }
 
+// VIOLATION STRHOT-185: B, hands the text to gltext as a view of program memory, #432.
 func opGltextPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	if err := fonts[inputs[0].Get_str(prgrm)].Printf(inputs[1].Get_f32(prgrm), inputs[2].Get_f32(prgrm), "%s", util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[3]))); err != nil {
+	if err := cxfxFontGet(inputs[0].Get_i32(prgrm)).Printf(inputs[1].Get_f32(prgrm), inputs[2].Get_f32(prgrm), "%s", util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[3]))); err != nil {
 		panic(err)
 	}
 }
 
+// VIOLATION STRHOT-186: B, hands the text to gltext as a view of program memory, #432.
 func opGltextMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	width, height := fonts[inputs[0].Get_str(prgrm)].Metrics(util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[1])))
-
+	width, height := cxfxFontGet(inputs[0].Get_i32(prgrm)).Metrics(util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[1])))
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
 }
 
 func opGltextTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	outputs[0].Set_i32(prgrm, int32(fonts[inputs[0].Get_str(prgrm)].Texture()))
+	outputs[0].Set_i32(prgrm, int32(cxfxFontGet(inputs[0].Get_i32(prgrm)).Texture()))
 }
 
-func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // refactor
-	font := fonts[inputs[0].Get_str(prgrm)]
+func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+	font := cxfxFontGet(inputs[0].Get_i32(prgrm))
 	text := ast.ProgramStringBytesRead(prgrm, &inputs[1])
-	var index int = int(inputs[2].Get_i32(prgrm))
+	index := int(inputs[2].Get_i32(prgrm))
 	var runeValue rune = -1
 	var width int = -1
-	var x int = 0
-	var y int = 0
-	var w int = 0
-	var h int = 0
-	var advance int = 0
+	var x, y, w, h, advance int
 	if index < len(text) {
 		runeValue, width = utf8.DecodeRune(text[index:])
 		g := font.Glyphs()[runeValue-font.Low()]
-		x = g.X
-		y = g.Y
-		w = g.Width
-		h = g.Height
-		advance = g.Advance
+		x, y, w, h, advance = g.X, g.Y, g.Width, g.Height, g.Advance
 	}
-
 	outputs[0].Set_i32(prgrm, int32(runeValue-font.Low()))
 	outputs[1].Set_i32(prgrm, int32(width))
 	outputs[2].Set_i32(prgrm, int32(x))
@@ -82,37 +75,22 @@ func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 }
 
 func opGltextGlyphBounds(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	font := fonts[inputs[0].Get_str(prgrm)]
-	var maxGlyphWidth, maxGlyphHeight int = font.GlyphBounds()
+	maxGlyphWidth, maxGlyphHeight := cxfxFontGet(inputs[0].Get_i32(prgrm)).GlyphBounds()
 	outputs[0].Set_i32(prgrm, int32(maxGlyphWidth))
 	outputs[1].Set_i32(prgrm, int32(maxGlyphHeight))
 }
 
-func opGltextGlyphMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // refactor
-	width, height := fonts[inputs[0].Get_str(prgrm)].GlyphMetrics(uint32(inputs[1].Get_i32(prgrm)))
-
+func opGltextGlyphMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+	width, height := cxfxFontGet(inputs[0].Get_i32(prgrm)).GlyphMetrics(uint32(inputs[1].Get_i32(prgrm)))
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
 }
 
-func opGltextGlyphInfo(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // refactor
-	font := fonts[inputs[0].Get_str(prgrm)]
-	glyph := inputs[1].Get_i32(prgrm)
-	var x int = 0
-	var y int = 0
-	var w int = 0
-	var h int = 0
-	var advance int = 0
-	g := font.Glyphs()[glyph]
-	x = g.X
-	y = g.Y
-	w = g.Width
-	h = g.Height
-	advance = g.Advance
-
-	outputs[0].Set_i32(prgrm, int32(x))
-	outputs[1].Set_i32(prgrm, int32(y))
-	outputs[2].Set_i32(prgrm, int32(w))
-	outputs[3].Set_i32(prgrm, int32(h))
-	outputs[4].Set_i32(prgrm, int32(advance))
+func opGltextGlyphInfo(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+	g := cxfxFontGet(inputs[0].Get_i32(prgrm)).Glyphs()[inputs[1].Get_i32(prgrm)]
+	outputs[0].Set_i32(prgrm, int32(g.X))
+	outputs[1].Set_i32(prgrm, int32(g.Y))
+	outputs[2].Set_i32(prgrm, int32(g.Width))
+	outputs[3].Set_i32(prgrm, int32(g.Height))
+	outputs[4].Set_i32(prgrm, int32(g.Advance))
 }

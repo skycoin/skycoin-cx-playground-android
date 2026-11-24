@@ -49,6 +49,7 @@ func GetInferActions(prgrm *ast.CXProgram, inp *ast.CXTypeSignature, fp types.Po
 }
 
 // VIOLATION STRHOT-071: B, an affordance query runs compiler code by name, #412.
+// VIOLATION VMALLOC-019: an affordance query runs compiler code, #407.
 func opAffPrint(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	inp1 := inputs[0]
 
@@ -1278,6 +1279,7 @@ func readArgAff(prgrm *ast.CXProgram, aff string, tgtFn *ast.CXFunction) *ast.CX
 // GCREACH: allocates query strs and objects, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
 // VIOLATION STRHOT-080: B, an affordance query runs compiler code by name, #412.
+// VIOLATION VMALLOC-019: an affordance query runs compiler code, #407.
 func opAffQuery(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call := prgrm.GetCurrentCall()
 	expr := call.Operator.Expressions[call.Line]

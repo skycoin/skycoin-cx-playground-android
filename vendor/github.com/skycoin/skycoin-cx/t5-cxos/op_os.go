@@ -54,6 +54,7 @@ func opOsReadAllText(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func getFileHandle(file *os.File) int32 {
 	handle := int32(-1)
 	freeCount := len(freeFiles)
@@ -74,6 +75,7 @@ func getFileHandle(file *os.File) int32 {
 	return handle
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsOpen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	handle := int32(-1)
 	if file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0]); fileError == nil {
@@ -83,6 +85,7 @@ func opOsOpen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 	outputs[0].Set_i32(prgrm, int32(handle))
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsCreate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	handle := int32(-1)
 	if file, fileError := ast.ProgramSandboxFileCreate(prgrm, &inputs[0]); fileError == nil {
@@ -98,6 +101,7 @@ func opOsClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue
 
 // fileClose closes the file of handle and frees the handle. It returns
 // false for a handle that is not open or a failed close.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func fileClose(handle int32) bool {
 	success := false
 	if file := ValidFile(handle); file != nil {
@@ -143,6 +147,7 @@ func libraryFileSeekVm(memory []byte, block uint32) {
 }
 
 // VIOLATION STRHOT-134: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var len uint64
 	var value string
@@ -160,6 +165,7 @@ func opOsReadStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value float64
 	success := false
@@ -173,6 +179,7 @@ func opOsReadF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadF32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value float32
 	success := false
@@ -186,6 +193,7 @@ func opOsReadF32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value uint64
 	success := false
@@ -199,6 +207,7 @@ func opOsReadUI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value uint32
 	success := false
@@ -212,6 +221,7 @@ func opOsReadUI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value uint16
 	success := false
@@ -225,6 +235,7 @@ func opOsReadUI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value uint8
 	success := false
@@ -238,6 +249,7 @@ func opOsReadUI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value int64
 	success := false
@@ -251,6 +263,7 @@ func opOsReadI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value int32
 	success := false
@@ -264,6 +277,7 @@ func opOsReadI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value int16
 	success := false
@@ -277,6 +291,7 @@ func opOsReadI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value int8
 	success := false
@@ -290,6 +305,7 @@ func opOsReadI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadBOOL(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var value bool
 	success := false
@@ -304,6 +320,7 @@ func opOsReadBOOL(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 }
 
 // VIOLATION STRHOT-135: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -319,6 +336,7 @@ func opOsWriteStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -330,6 +348,7 @@ func opOsWriteF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteF32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -341,6 +360,7 @@ func opOsWriteF32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -352,6 +372,7 @@ func opOsWriteUI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -363,6 +384,7 @@ func opOsWriteUI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -374,6 +396,7 @@ func opOsWriteUI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -385,6 +408,7 @@ func opOsWriteUI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -396,6 +420,7 @@ func opOsWriteI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -407,6 +432,7 @@ func opOsWriteI32(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -418,6 +444,7 @@ func opOsWriteI16(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -429,6 +456,7 @@ func opOsWriteI8(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteBOOL(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -500,6 +528,7 @@ func getSlice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 	return
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadF64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -520,6 +549,7 @@ func opOsReadF64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadF32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -540,6 +570,7 @@ func opOsReadF32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -560,6 +591,7 @@ func opOsReadUI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -580,6 +612,7 @@ func opOsReadUI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -600,6 +633,7 @@ func opOsReadUI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadUI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -620,6 +654,7 @@ func opOsReadUI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -640,6 +675,7 @@ func opOsReadI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -660,6 +696,7 @@ func opOsReadI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -680,6 +717,7 @@ func opOsReadI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsReadI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	_, outputSliceOffset, sizeofElement, count := getSlice(prgrm, inputs, outputs)
@@ -700,6 +738,7 @@ func opOsReadI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteF64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -712,6 +751,7 @@ func opOsWriteF64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteF32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -724,6 +764,7 @@ func opOsWriteF32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -736,6 +777,7 @@ func opOsWriteUI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []as
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -748,6 +790,7 @@ func opOsWriteUI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []as
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -760,6 +803,7 @@ func opOsWriteUI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []as
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteUI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -772,6 +816,7 @@ func opOsWriteUI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -784,6 +829,7 @@ func opOsWriteI64Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -796,6 +842,7 @@ func opOsWriteI32Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -808,6 +855,7 @@ func opOsWriteI16Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsWriteI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -830,6 +878,7 @@ func opOsGetWorkingDirectory(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs
 }
 
 // VIOLATION STRHOT-137: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func opOsRun(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var runError int32 = OS_RUN_SUCCESS
 
@@ -905,6 +954,7 @@ func opOsRun(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) 
 // Single or double quotes group a word. Backslashes are literal, so
 // Windows paths need no escaping.
 // VIOLATION STRHOT-138: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-018: a system library call allocates in Go and the OS, #407.
 func splitCommand(command string) ([]string, error) {
 	var args []string
 	var word strings.Builder

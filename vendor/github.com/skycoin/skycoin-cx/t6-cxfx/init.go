@@ -11,17 +11,14 @@ import (
 func RegisterPackage(prgrm *ast.CXProgram) {
 	// gogl
 	opcodes.RegisterFunction(prgrm, "gl.Init", opGlInit, nil, nil)
-	opcodes.RegisterFunction(prgrm, "gl.Destroy", opGlDestroy, nil, nil)
-	opcodes.RegisterFunction(prgrm, "gl.Strs", opGlStrs, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "gl.Free", opGlFree, opcodes.In(ast.ConstCxArg_STR), nil)
 	opcodes.RegisterFunction(prgrm, "gl.NewTexture", opGlNewTexture, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "gl.NewTextureCube", opGlNewTextureCube, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gl.NewGIF", opGlNewGIF, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gl.FreeGIF", opGlFreeGIF, opcodes.In(ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "gl.GIFFrameToTexture", opGlGIFFrameToTexture, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gl.UploadImageToTexture", opGlUploadImageToTexture, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL), nil)
-	opcodes.RegisterFunction(prgrm, "gl.CxReleaseTexture", opCxReleaseTexture, opcodes.In(ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "gl.CxTextureGetPixel", opCxTextureGetPixel, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32))
+	opcodes.RegisterFunction(prgrm, "gl.NewGIF", opGlNewGIF, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gl.FreeGIF", opGlFreeGIF, opcodes.In(ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "gl.GIFFrameToTexture", opGlGIFFrameToTexture, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gl.UploadImageToTexture", opGlUploadImageToTexture, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_BOOL), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gl.CxReleaseTexture", opCxReleaseTexture, opcodes.In(ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "gl.CxTextureGetPixel", opCxTextureGetPixel, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_F32))
 
 	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
 	// Now a constructor call, site S1431.
@@ -204,51 +201,51 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	opcodes.RegisterFunction(prgrm, "gl.GenVertexArraysCore", opGlGenVertexArraysCore, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
 
 	// goglfw
-	opcodes.RegisterFunction(prgrm, "glfw.Fullscreen", opGlfwFullscreen, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_BOOL, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.Fullscreen", opGlfwFullscreen, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
 
 	// glfw
 	opcodes.RegisterFunction(prgrm, "glfw.Init", opGlfwInit, nil, nil)
 	opcodes.RegisterFunction(prgrm, "glfw.WindowHint", opGlfwWindowHint, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.CreateWindow", opGlfwCreateWindow, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.MakeContextCurrent", opGlfwMakeContextCurrent, opcodes.In(ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.ShouldClose", opGlfwShouldClose, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_BOOL))
-	opcodes.RegisterFunction(prgrm, "glfw.SetShouldClose", opGlfwSetShouldClose, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_BOOL), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.CreateWindow", opGlfwCreateWindow, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.MakeContextCurrent", opGlfwMakeContextCurrent, opcodes.In(ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.ShouldClose", opGlfwShouldClose, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_BOOL))
+	opcodes.RegisterFunction(prgrm, "glfw.SetShouldClose", opGlfwSetShouldClose, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_BOOL), nil)
 	opcodes.RegisterFunction(prgrm, "glfw.PollEvents", opGlfwPollEvents, nil, nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SwapBuffers", opGlfwSwapBuffers, opcodes.In(ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.GetFramebufferSize", opGlfwGetFramebufferSize, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "glfw.GetWindowPos", opGlfwGetWindowPos, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "glfw.GetWindowSize", opGlfwGetWindowSize, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.SwapBuffers", opGlfwSwapBuffers, opcodes.In(ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.GetFramebufferSize", opGlfwGetFramebufferSize, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.GetWindowPos", opGlfwGetWindowPos, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.GetWindowSize", opGlfwGetWindowSize, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "glfw.GetTime", opGlfwGetTime, nil, opcodes.Out(ast.ConstCxArg_F64))
 	opcodes.RegisterFunction(prgrm, "glfw.SwapInterval", opGlfwSwapInterval, opcodes.In(ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetStartCallback", opGlfwSetStartCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetStopCallback", opGlfwSetStopCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetKeyboardCallback", opGlfwSetKeyboardCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetMouseCallback", opGlfwSetMouseCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetFramebufferSizeCallback", opGlfwSetFramebufferSizeCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetWindowPosCallback", opGlfwSetWindowPosCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetWindowSizeCallback", opGlfwSetWindowSizeCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetKeyCallback", opGlfwSetKeyCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)                 // TODO : to deprecate
-	opcodes.RegisterFunction(prgrm, "glfw.SetMouseButtonCallback", opGlfwSetMouseButtonCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil) // TODO : to deprecate
-	opcodes.RegisterFunction(prgrm, "glfw.SetCursorPosCallback", opGlfwSetCursorPosCallback, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), nil)     // TODO : to deprecate
-	opcodes.RegisterFunction(prgrm, "glfw.GetCursorPos", opGlfwGetCursorPos, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_F64, ast.ConstCxArg_F64))
-	opcodes.RegisterFunction(prgrm, "glfw.SetInputMode", opGlfwSetInputMode, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.SetWindowPos", opGlfwSetWindowPos, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.GetKey", opGlfwGetKey, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "glfw.RegisterCallbackI32I32", opGlfwFuncI32I32, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.SetStartCallback", opGlfwSetStartCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetStopCallback", opGlfwSetStopCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetKeyboardCallback", opGlfwSetKeyboardCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetMouseCallback", opGlfwSetMouseCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetFramebufferSizeCallback", opGlfwSetFramebufferSizeCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetWindowPosCallback", opGlfwSetWindowPosCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetWindowSizeCallback", opGlfwSetWindowSizeCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetKeyCallback", opGlfwSetKeyCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)                 // TODO : to deprecate
+	opcodes.RegisterFunction(prgrm, "glfw.SetMouseButtonCallback", opGlfwSetMouseButtonCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil) // TODO : to deprecate
+	opcodes.RegisterFunction(prgrm, "glfw.SetCursorPosCallback", opGlfwSetCursorPosCallback, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_FUNC), nil)     // TODO : to deprecate
+	opcodes.RegisterFunction(prgrm, "glfw.GetCursorPos", opGlfwGetCursorPos, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_F64, ast.ConstCxArg_F64))
+	opcodes.RegisterFunction(prgrm, "glfw.SetInputMode", opGlfwSetInputMode, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.SetWindowPos", opGlfwSetWindowPos, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
+	opcodes.RegisterFunction(prgrm, "glfw.GetKey", opGlfwGetKey, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.RegisterCallbackI32I32", opGlfwFuncI32I32, opcodes.In(ast.ConstCxArg_FUNC), opcodes.Out(ast.ConstCxArg_I32))
 	opcodes.RegisterFunction(prgrm, "glfw.InvokeCallbackI32I32", opGlfwCallI32I32, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "glfw.GetWindowContentScale", opGlfwGetWindowContentScale, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "glfw.GetWindowContentScale", opGlfwGetWindowContentScale, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_F32, ast.ConstCxArg_F32))
 	opcodes.RegisterFunction(prgrm, "glfw.GetMonitorContentScale", opGlfwGetMonitorContentScale, nil, opcodes.Out(ast.ConstCxArg_F32, ast.ConstCxArg_F32))
 
 	// gltext
-	opcodes.RegisterFunction(prgrm, "gltext.LoadTrueType", opGltextLoadTrueType, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "gltext.LoadTrueTypeCore", opGltextLoadTrueTypeCore, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_STR, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), nil)
-	opcodes.RegisterFunction(prgrm, "gltext.Printf", opGltextPrintf, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_STR), nil)
-	opcodes.RegisterFunction(prgrm, "gltext.Metrics", opGltextMetrics, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gltext.Texture", opGltextTexture, opcodes.In(ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gltext.NextGlyph", opGltextNextGlyph, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gltext.GlyphBounds", opGltextGlyphBounds, nil, opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gltext.GlyphMetrics", opGltextGlyphMetrics, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
-	opcodes.RegisterFunction(prgrm, "gltext.GlyphInfo", opGltextGlyphInfo, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.LoadTrueType", opGltextLoadTrueType, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.LoadTrueTypeCore", opGltextLoadTrueTypeCore, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.Printf", opGltextPrintf, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_F32, ast.ConstCxArg_F32, ast.ConstCxArg_STR), nil)
+	opcodes.RegisterFunction(prgrm, "gltext.Metrics", opGltextMetrics, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.Texture", opGltextTexture, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.NextGlyph", opGltextNextGlyph, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_STR, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.GlyphBounds", opGltextGlyphBounds, opcodes.In(ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.GlyphMetrics", opGltextGlyphMetrics, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32))
+	opcodes.RegisterFunction(prgrm, "gltext.GlyphInfo", opGltextGlyphInfo, opcodes.In(ast.ConstCxArg_I32, ast.ConstCxArg_I32), opcodes.Out(ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32, ast.ConstCxArg_I32))
 
 	// goal
 	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.

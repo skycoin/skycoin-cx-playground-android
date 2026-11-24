@@ -25,6 +25,7 @@ func expOffset(value ast.CXValue) types.Pointer {
 // GCREACH: allocates the expression str, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
 // VIOLATION STRHOT-142: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-017: compiles and matches with the Go regexp package, #407.
 func regexpCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) error {
 	exp := inputs[0].Get_str(prgrm)
 
@@ -69,6 +70,7 @@ func opRegexpCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 
 // opRegexpFind is a wrapper for golang's `regexp`'s `Find`.
 // VIOLATION STRHOT-144: B, hands a path or text to Go or the OS, #412.
+// VIOLATION VMALLOC-017: compiles and matches with the Go regexp package, #407.
 func opRegexpFind(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	exp := types.Read_str(prgrm.Memory, expOffset(inputs[0]))
 	r, ok := regexps[exp]
