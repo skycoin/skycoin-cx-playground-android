@@ -277,6 +277,9 @@ suite at once with that many runs.
 | `program-validation-blocked-import` (go) | a fetched program importing `os` is refused |
 | `program-validation-opcode-sets` (go) | an app opcode in a core-only program fails, and the serialized form checks the same as the source |
 | `program-validation-report-text` (go) | the report text of two programs matches the expected lines |
+| `program-loader-store-resume` (go) | a download stopped part way resumes from the kept blocks, asking only for the missing ones; an untrusted list is refused |
+| `program-loader-lister` (go) | `index.txt` of 10 and 1000 programs reads back row for row with the same number of allocations |
+| `program-loader-memory` (go) | load, unload and reload from RAM give the same files, a limit of one keeps the last program |
 
 ## Benchmark suite
 

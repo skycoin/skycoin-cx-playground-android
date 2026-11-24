@@ -537,18 +537,33 @@ its length. Selecting a row offers download (or cache), validate and run.
 
 ### Storage layout
 
-The SD card (or the app's files directory on the phone) holds:
+The SD card (or the app's files directory on the phone) holds, as package
+`programstore` writes it:
 
 - `programs/list.bin`, the last verified manifest list;
 - `programs/m/<address>.bin`, one verified manifest per program;
 - `programs/p/<address>.pack`, the program's linear packing, written block
   by block as blocks are verified, so a stopped download resumes;
-- `programs/index.txt`, one line per program with its address, name, state
-  and length, which the lister reads without opening any manifest.
+- `programs/index.txt`, one line per program with its number, address,
+  state (`remote`, `partial` or `cached`), length and name, in that order so
+  the name may hold spaces, which the lister reads without opening any
+  manifest, for example
+  `1 <address in 64 hex digits> cached 9216 benchmarks`;
+- `programs/trusted.txt`, the trusted signer keys of D27, one key in hex
+  per line with an optional comment after it.
 
-The lister reads `index.txt` with one sequential read and no allocation per
-line beyond the row. The loader reads the manifest and the packing into RAM.
-The unloader drops them. The runner runs what the loader holds.
+A packing file has no record of which blocks it holds. Opening it reads
+every block back and keeps the ones whose hash matches, and a block never
+written reads as zeros and fails, so the store needs no second file that
+could disagree with the packing. Blocks are synced every 32 writes and at
+the end, so a crash loses at most those, and they are fetched again.
+
+The lister reads `index.txt` with one sequential read, and every row's
+strings share the one copy of the file, so the allocations of a read do not
+grow with the number of rows. The loader (`programstore.Memory`) reads the
+manifest and the packing into RAM, verifying every block and file, and
+keeps at most a set number of programs. The unloader drops them. The runner
+runs what the loader holds.
 
 ### Memory budget
 

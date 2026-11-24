@@ -11,6 +11,9 @@ type Assembly struct {
 	pack     []byte
 	received []bool // per block, in block ID order
 	missing  int
+	// BlockStored, when set, is called with each new block after its hash
+	// matched, before it counts as received, so a store can write it out.
+	BlockStored func(packOffset uint64, block []byte) error
 }
 
 // NewAssembly starts the assembly of the linear packing of m, which must
@@ -43,6 +46,11 @@ func (a *Assembly) Accept(offset uint64, data []byte) (int, error) {
 			return stored, fmt.Errorf("%w: block %d at offset %d", ErrBlockHash, p.BlockID, p.PackOffset)
 		}
 		if !a.received[i] {
+			if a.BlockStored != nil {
+				if err := a.BlockStored(p.PackOffset, block); err != nil {
+					return stored, err
+				}
+			}
 			copy(a.pack[p.PackOffset:], block)
 			a.received[i] = true
 			a.missing--
@@ -54,6 +62,9 @@ func (a *Assembly) Accept(offset uint64, data []byte) (int, error) {
 
 // Complete reports whether every block is in.
 func (a *Assembly) Complete() bool { return a.missing == 0 }
+
+// MissingBlocks returns the number of blocks not in yet.
+func (a *Assembly) MissingBlocks() int { return a.missing }
 
 // MissingRanges returns the ranges of the linear packing still missing, as
 // offset and length pairs of whole blocks, each at most maxLength bytes

@@ -254,10 +254,21 @@ func allTrue(b []bool) bool {
 // blocks per packet, verifies every block and file and returns the files.
 func (c *Client) FetchFiles(addr Hash, m *Manifest) (map[string][]byte, error) {
 	a := NewAssembly(m)
+	if err := c.FetchInto(addr, a); err != nil {
+		return nil, err
+	}
+	return a.Files()
+}
+
+// FetchInto fetches the blocks a, the assembly of the manifest at addr,
+// still misses, two blocks per packet, and verifies each one. A store
+// resumes a stopped download by giving an assembly that holds the blocks
+// it kept.
+func (c *Client) FetchInto(addr Hash, a *Assembly) error {
 	badReplies := map[uint64]int{}
 	for round := 0; !a.Complete(); round++ {
 		if round == maxBlockRounds {
-			return nil, errors.New("blocks still missing after the retries")
+			return errors.New("blocks still missing after the retries")
 		}
 		var requests []Request
 		for _, r := range a.MissingRanges(MaxBlocksPayload(c.PacketSize)) {
@@ -281,10 +292,10 @@ func (c *Client) FetchFiles(addr Hash, m *Manifest) (map[string][]byte, error) {
 			return nil, nil
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return a.Files()
+	return nil
 }
 
 // ProgramNames returns the program names of the manifest list m.
