@@ -59,6 +59,43 @@ func (c *Catalog) add(build func() (*Manifest, []byte, error), secret cipher.Sec
 	return addr, b, nil
 }
 
+// EmptyCatalog returns a catalog with no manifest and no manifest list, for
+// a node that adds the programs it holds with AddVerified.
+func EmptyCatalog() *Catalog { return &Catalog{manifests: map[Hash]catalogManifest{}} }
+
+// AddVerified adds an encoded manifest and its linear packing, after
+// checking the manifest and every block and file of the packing.
+func (c *Catalog) AddVerified(encoded, pack []byte) (Hash, error) {
+	m, addr, err := Decode(encoded, Hash{})
+	if err != nil {
+		return addr, err
+	}
+	if uint64(len(pack)) != m.PackLength {
+		return addr, fmt.Errorf("packing of %d bytes, manifest says %d", len(pack), m.PackLength)
+	}
+	a := NewAssembly(m)
+	if _, err := a.Accept(0, pack); err != nil {
+		return addr, err
+	}
+	if _, err := a.Files(); err != nil {
+		return addr, err
+	}
+	c.manifests[addr] = catalogManifest{encoded: encoded, manifest: m, pack: pack}
+	return addr, nil
+}
+
+// Holds reports whether the catalog holds the manifest at addr.
+func (c *Catalog) Holds(addr Hash) bool {
+	_, ok := c.manifests[addr]
+	return ok
+}
+
+// Item returns the encoded manifest and the linear packing held at addr.
+func (c *Catalog) Item(addr Hash) (encoded, pack []byte, ok bool) {
+	cm, ok := c.manifests[addr]
+	return cm.encoded, cm.pack, ok
+}
+
 // CatalogFromDirectory serves every subdirectory of dir as a program named
 // after the subdirectory, read with ReadProgramDirectory.
 func CatalogFromDirectory(dir string, secret cipher.SecKey, date time.Time) (*Catalog, error) {

@@ -648,49 +648,172 @@ load is timed and reported.
 ## DHT prototype (#18)
 
 This section describes the prototype network that spreads programs between
-nodes. It is not part of this batch.
+nodes. The `programnetwork` package holds the node and the peer list, and
+`cmd/programnetwork` runs a node and manages its peer list file. A node
+keeps the programs it holds in a `programstore` store and serves them with
+the operations of #15, so any node that sent a have is a server.
 
 ### Packets
 
-The DHT reuses the common packet header and adds four operations:
+The DHT reuses the six-byte packet header of #15 and adds three operations.
+Every packet is at most the packet size, 1200 bytes or 1024 by setting.
 
-- *Have* (0x10): a node announces that it holds data with a hash and a
-  length. For a program, the hash is the manifest address.
-- *Subscribe* (0x11): a node asks a peer to send it have packets.
-- *Get peers* (0x12): a node asks for peers, and the reply lists peers with
-  their address and group, within one packet.
-- The download uses the operations of #15 against any node that sent a
-  have.
+Have (0x10) announces that the sender holds a program. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 4 | u32 | manifest length |
+| 42 | 8 | u64 | linear packing length |
+
+The request is 50 bytes. The reply (0x90) acknowledges it with the 32-byte
+manifest address, 38 bytes in all. The sender sends the have again until the
+reply arrives, with the waits of #15, so a lost have does not end a flood.
+
+Subscribe (0x11) asks the receiver to send have packets to the sender's
+address. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 4 | u32 | lease wanted in seconds, 0 ends the subscription |
+
+The reply (0x91) has the same body with the lease granted, at most 600
+seconds by default. The subscriber renews at half the lease. Both packets
+are 10 bytes.
+
+Get peers (0x12) asks for the peers the receiver shares with the sender.
+Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 2 | u16 | index of the first peer wanted |
+
+Reply (0x92) body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 2 | u16 | number of peers shared with the asker |
+| 8 | 2 | u16 | index of the first entry |
+| 10 | 1 | u8 | entry count |
+| 11 | n | entries | peer entries |
+
+A peer entry is a u8 address scope (1 LAN, 2 internal, 3 global), a u8
+address length, the address as `host:port` text of at most 64 bytes, a u8
+group name length and the group name of at most 32 bytes. An entry is at
+most 99 bytes, so a reply always holds at least 12 entries at 1200 bytes and
+10 at 1024. The reply holds as many entries as fit, and the asker asks again
+from the next index until it has them all.
+
+A malformed request gets the error reply (0xFF) of #15. The download uses
+get manifest and get blocks of #15 against the node that sent the have.
 
 ### Flood replication
 
-When a node receives a have for a hash it does not hold, it downloads and
-verifies the data, then sends its own have to all its subscribers. A node
-sends a have for a hash at most once, which ends the flood. Only manifests
-from trusted signers are fetched and forwarded.
+When a node receives a have for a manifest address it has not seen, it
+records the address as seen, acknowledges the have and downloads the
+program from the node that sent it. It fetches the manifest, checks the
+signer against its trusted keys and the lengths against the have, keeps the
+manifest and the blocks in its store as each is verified, and checks every
+file. Then it holds the program and sends its own have to every subscriber.
 
-### Peer lists
+A node announces a program at most once, and a have for a seen address only
+counts as a duplicate, so a flood over any graph ends after one have per
+subscription and program. A download that fails is tried again from the
+other nodes that announced the program, three times in all, and then the
+address is no longer seen, so a later have starts over. A program from an
+untrusted signer, or one whose lengths differ from its have, is dropped and
+never forwarded.
 
-Each peer record holds an address, a group and a sharing class:
+A new subscriber gets a have for every program the node already holds
+(D34), so a node that joins late, such as a phone, catches up.
 
-1. private, not shared;
-2. private own infrastructure, shared only with the owner's own nodes;
-3. LAN group, shared only within that LAN group;
-4. user-selected shareable;
-5. public shareable.
+Measured by `tests/program-network-flood-in-process` on the host, with each
+node subscribed to its two ring neighbours and the node three places on,
+and three programs published at node 0:
 
-A get-peers reply includes a peer only when its class allows sharing with
-the asking node.
+| Nodes | All held after | Downloads | Haves received | Duplicates |
+|---|---|---|---|---|
+| 3 | 88 ms | 6 | 18 | 12 |
+| 8 | 389 ms | 21 | 72 | 51 |
+| 16 | 673 ms | 45 | 144 | 99 |
 
-### Address scopes and groups
+Every node downloads every program once, and the haves received are exactly
+one per subscription and program. `tests/program-network-flood-loss-tolerance`
+runs eight nodes whose sockets drop a share of every read and every write
+and send a tenth of the rest twice. With 20% dropped, which loses 59% of the
+have and subscribe round trips, every node held both programs after 12.8 s.
+With 30%, which loses 76% of them, it took 28.0 s. Each node still
+downloaded each program once.
 
-An address scope says where an address is reachable: LAN, internal (a
-private network such as one inside a country) or global. A group has a
-name, such as `lan1`, `china1`, `china-internal` or `global`, an owner, an
-operator and a security group. A node only hands out an address to peers in
-a group that can reach its scope.
+### Peer list file
 
-The peer list is managed with a command-line tool first.
+A node's peer list is a text file, `peers.txt` by default. Each line is a
+group, a peer, a comment starting with `#`, or empty:
+
+```
+# group NAME SCOPE OWNER OPERATOR SECURITY-GROUP
+group china-internal internal lab isp-b china
+group china1 internal lab isp-a china
+group global global - - global
+group lan1 lan moe moe home
+# peer ADDRESS GROUP CLASS [COMMENT]
+peer 10.1.0.1:7010 china1 own-infrastructure
+peer 192.168.1.5:7010 lan1 lan-group laptop in the office
+peer 203.0.113.5:7010 global public
+```
+
+A group has a name of at most 32 characters, an address scope (`lan`,
+`internal` or `global`), an owner, an operator and a security group, each a
+single word with `-` for none. A peer has its node's address, its group and
+one of the five sharing classes:
+
+1. `private`: never shared;
+2. `own-infrastructure`: shared only with peers that are themselves
+   `own-infrastructure` records, the owner's own nodes;
+3. `lan-group`: shared only with peers of the same group;
+4. `user-shareable`: shared with every peer in the list (D31);
+5. `public`: shared with anyone, also a node not in the list.
+
+The rest of a peer line is a comment. A tool writes the groups and then the
+peers, each sorted, so the file round trips byte for byte.
+
+### Sharing rules
+
+A get peers reply holds a peer only when both its class and its group's
+scope allow the asker. The asker's record is the one whose address is the
+packet's source address, or else the only record on the same host (D32). An
+asker with no record is a stranger in the `global` group.
+
+- A LAN address goes only to an asker of the same group.
+- An internal address goes only to an asker whose group has the same
+  security group, such as `china1` and `china-internal` (D33).
+- A global address goes to anyone.
+
+The asker's own record is never returned to it.
+`tests/program-network-get-peers-share-classes` and
+`tests/program-network-get-peers-groups-scopes` check each class and scope
+over UDP.
+
+### Command
+
+`programnetwork peers` manages the file, one change per run:
+
+```
+programnetwork peers -file peers.txt group-add lan1 lan moe moe home
+programnetwork peers -file peers.txt add 192.168.1.5:7010 lan1 lan-group laptop
+programnetwork peers -file peers.txt set-class 192.168.1.5:7010 user-shareable
+programnetwork peers -file peers.txt set-group 192.168.1.5:7010 global
+programnetwork peers -file peers.txt remove 192.168.1.5:7010
+programnetwork peers -file peers.txt group-remove lan1
+programnetwork peers -file peers.txt list
+programnetwork peers -file peers.txt shared-with 203.0.113.9:7010
+```
+
+`programnetwork node` runs a node: `-store` names its store, `-peers` its
+peer list, `-signer` the trusted keys, `-subscribe` the nodes it subscribes
+to, and `-publish DIR` with `-seed` or `-secret` publishes every program
+directory in DIR and floods it. `programnetwork getpeers HOST:PORT` prints
+what a node shares with the caller.
 
 ## Test programs (#19 and skycoin-cx-forth #11)
 
@@ -867,6 +990,68 @@ D30 ProgramManifestCanonicalFormDecision
   allocations, and its signed bytes cannot change with whitespace. Tools
   keep the text form for reading, writing and tests, and convert it with
   `DecodeText`.
+
+D31 PeerUserShareableClassDecision
+- What exists now: the issue lists five sharing classes. Private, own
+  infrastructure, LAN group and public have a clear audience. User-selected
+  shareable does not say who it is shared with.
+- Question: who receives a `user-shareable` peer in a get peers reply?
+- Option a: every asker that has a record in the peer list, whatever its
+  class or group. A stranger does not get it, which is what sets it apart
+  from `public`.
+- Option b: only askers the user names for that peer, a share list kept on
+  the peer line.
+- Option c: anyone, the same as `public`, with the class kept only as a
+  label of who chose to share it.
+- Recommendation: option a, because it needs no extra field, it differs
+  from `public` in a way a node can check, and it matches "the user chose to
+  share this with the peers the user knows". Built: `classAllows` in
+  `programnetwork/peers.go`.
+
+D32 PeerAskerGroupSourceDecision
+- What exists now: the sharing rules need the asker's group, and a get peers
+  packet carries no identity.
+- Question: how does a node learn the group of the node asking it?
+- Option a: from its own peer list, by the packet's source address, or the
+  only record on the same host. An asker with no record is a stranger in
+  `global`.
+- Option b: the asker names its group in the request, and the node believes
+  it.
+- Option c: the asker signs the request with its node key, and the node
+  looks the key up in its peer list, which then holds keys.
+- Recommendation: option a for the prototype, because a claimed group lets
+  anyone read a LAN group's peers, and the source address is what a UDP
+  node already has. Option c is the step after, when peer records gain
+  keys. Built: `PeerList.Asker` in `programnetwork/peers.go`.
+
+D33 PeerInternalScopeReachDecision
+- What exists now: the issue names LAN, internal and other scopes, and
+  groups such as `china1` and `china-internal` with a security group.
+- Question: which askers may receive an address of internal scope?
+- Option a: askers whose group has the same security group, so `china1`
+  and `china-internal` share addresses when both have security group
+  `china`.
+- Option b: askers of the same group only, the same as a LAN address.
+- Option c: any asker that is not a stranger.
+- Recommendation: option a, because it gives the security group a job and
+  lets one private network hold several groups with different operators.
+  LAN addresses stay within their group. Built: `scopeAllows` in
+  `programnetwork/peers.go`.
+
+D34 FloodSubscribeCatchUpDecision
+- What exists now: a have is sent when a node starts to hold a program, so
+  a node that subscribes later hears nothing about programs already spread.
+- Question: does a node send haves for what it holds when a peer
+  subscribes?
+- Option a: yes, one have per held program to each new subscriber, once,
+  not on a renewal.
+- Option b: no, a late node asks for a list of held programs with a new
+  operation.
+- Option c: no, a late node waits for the next new program.
+- Recommendation: option a, because it reuses the have and its download
+  path, a phone that starts the app after the flood still gets the
+  programs, and it costs one 50-byte packet per program per new subscriber.
+  Built: `Node.subscribe` in `programnetwork/node.go`.
 
 ## Task breakdown
 

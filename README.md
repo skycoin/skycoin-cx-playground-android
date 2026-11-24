@@ -120,6 +120,23 @@ a stop. Validate shows the `programcheck` report, and run starts only a
 program the report allows, with the system libraries it allows. A `fetch`
 app shows the same report and refuses the same programs.
 
+### Programs by flood
+
+`programnetwork` is the DHT prototype of #18. Nodes subscribe to each other,
+announce each program they hold with a have packet, and download and
+announce in turn what they lack, once per program, so a published program
+floods to every node. Each node keeps a peer list of groups and peers with
+sharing classes, and answers get peers with only the peers it may share.
+`cmd/programnetwork` runs a node and edits the peer list file.
+
+```
+programnetwork node -addr :7010 -store DIR -publish PROGRAMS -seed "a test seed"
+programnetwork node -addr :7011 -store DIR -signer PUBKEY -subscribe HOST:7010
+programnetwork peers -file peers.txt group-add lan1 lan moe moe home
+programnetwork peers -file peers.txt add 192.168.1.5:7010 lan1 lan-group
+programnetwork getpeers HOST:7010
+```
+
 ### Checking a program before it runs
 
 `programcheck` reads a CX program without running it, compiled from source
