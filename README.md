@@ -89,6 +89,22 @@ Fetching apps over the network is deferred. `store.Source` is the seam: a
 loader that can return an index, a manifest and a chunk by hash plugs in
 without changes to verification or the UI.
 
+### Programs over UDP
+
+A program can also come from a server over UDP as a signed manifest and
+512-byte blocks, as docs/ProgramDistribution.md describes. `programblocks`
+holds the format, the server and the client, and `cmd/programblocks` serves a
+directory of programs and fetches one. An app of kind `fetch` holds no
+program: its `args` are the server address, the trusted signer key and the
+program name, and the app fetches, verifies and runs that program.
+
+```
+programblocks signer -seed "a test seed"
+programblocks serve -addr :7002 -seed "a test seed" DIR
+programblocks list -addr HOST:7002 -signer PUBKEY
+programblocks fetch -addr HOST:7002 -signer PUBKEY -out OUT -text PROGRAM
+```
+
 ## The `app` package for CX
 
 Programs draw a display list that the host renders with Gio's GPU renderer
@@ -176,6 +192,7 @@ the comparison. `suite -update-references` writes the captured regions to
 | `before <command>`, `after <command>` | device shell commands around the test |
 | `timeout <seconds>` | for `wait-for` and the checks, 10 by default |
 | `echo-server <port>` | runs `net-echo-server` on that TCP and UDP port in the rig container, which the emulator reaches as 10.0.2.2 |
+| `program-server <port> <dir> <seed>` | runs `programblocks serve` on that UDP port in the rig container for the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>` |
 | `netem <args>` | `tc qdisc ... netem <args>` on the packets of that port in both directions, for example `delay 200ms loss 30%` |
 | `capture <file>` | `tcpdump` of the packets of that port, pulled as `<file>` for the `file-` checks |
 

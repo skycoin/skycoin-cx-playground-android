@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "name": "Programs: fetch over UDP with loss",
+  "description": "Test demo: the fetch with 40% of the packets dropped and 50 ms delay",
+  "kind": "fetch",
+  "entry": "fetch.txt",
+  "args": [
+    "10.0.2.2:7003",
+    "03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d",
+    "fib-and-primes"
+  ],
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "fetch.txt",
+      "size": 248,
+      "sha256": "fe36d48863708697a6a7a2c91bd9e9c31f0feee9015c16d85921e59b39ec7293",
+      "chunks": [
+        "fe36d48863708697a6a7a2c91bd9e9c31f0feee9015c16d85921e59b39ec7293"
+      ]
+    }
+  ]
+}

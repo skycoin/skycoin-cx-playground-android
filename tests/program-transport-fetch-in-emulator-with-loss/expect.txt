@@ -1,0 +1,6 @@
+out fetched fib-and-primes from 10.0.2.2:7003
+out signer 03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d verified
+out 2 files, 3 blocks, 798 bytes, every block verified
+out downloaded program running
+finished app="Programs: fetch over UDP with loss" err=<nil>
+file-equals stdout.txt ../program-manifest-round-trip/expected/stdout.txt

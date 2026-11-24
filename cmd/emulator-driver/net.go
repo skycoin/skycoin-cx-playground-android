@@ -18,15 +18,24 @@ import (
 // container's loopback, where tc and tcpdump act on it.
 //
 //	echo-server <port>   runs net-echo-server on the TCP and UDP port
+//	program-server <port> <dir> <seed>
+//	                     runs programblocks serve on the UDP port for the program
+//	                     directories under <dir>, relative to the test folder,
+//	                     signed with the key derived from <seed>
 //	netem <args>         tc netem on the port's packets, e.g. delay 200ms loss 30%
 //	capture <file>       tcpdump of the port's packets, pulled as <file>
 type netSettings struct {
-	echoPort string
-	netem    string
-	capture  string
+	echoPort    string
+	programPort string
+	programDir  string
+	programSeed string
+	netem       string
+	capture     string
 }
 
-func (n netSettings) used() bool { return n.echoPort != "" || n.netem != "" || n.capture != "" }
+func (n netSettings) used() bool {
+	return n.echoPort != "" || n.programPort != "" || n.netem != "" || n.capture != ""
+}
 
 // dockerExec runs a command in the rig container.
 func (s *session) dockerExec(ctx context.Context, detach bool, args ...string) (string, error) {
@@ -42,9 +51,9 @@ func (s *session) dockerExec(ctx context.Context, detach bool, args ...string) (
 	return string(out), nil
 }
 
-// echoServerBinary builds net-echo-server for the container once per run.
-func (s *session) echoServerBinary(ctx context.Context) (string, error) {
-	path := filepath.Join(s.results, "net-echo-server")
+// hostBinary builds ./cmd/<name> for the container once per run.
+func (s *session) hostBinary(ctx context.Context, name string) (string, error) {
+	path := filepath.Join(s.results, name)
 	if _, err := os.Stat(path); err == nil {
 		return path, nil
 	}
@@ -52,11 +61,11 @@ func (s *session) echoServerBinary(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", abs, "./cmd/net-echo-server")
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", abs, "./cmd/"+name)
 	cmd.Dir = s.repo
 	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH, "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("build net-echo-server: %v: %s", err, out)
+		return "", fmt.Errorf("build %s: %v: %s", name, err, out)
 	}
 	return abs, nil
 }
@@ -70,7 +79,10 @@ func (s *session) netSetup(ctx context.Context, t testFolder, out string) (func(
 	}
 	port := n.echoPort
 	if port == "" {
-		return nil, errors.New("netem and capture need echo-server <port>")
+		port = n.programPort
+	}
+	if port == "" {
+		return nil, errors.New("netem and capture need echo-server <port> or program-server")
 	}
 	var undo []func() error
 	stop := func() (string, error) {
@@ -89,19 +101,27 @@ func (s *session) netSetup(ctx context.Context, t testFolder, out string) (func(
 		return path, errors.Join(errs...)
 	}
 
-	bin, err := s.echoServerBinary(ctx)
-	if err != nil {
-		return nil, err
+	if n.echoPort != "" {
+		bin, err := s.hostBinary(ctx, "net-echo-server")
+		if err != nil {
+			return nil, err
+		}
+		if b, err := exec.CommandContext(ctx, "docker", "cp", bin, s.rig.name+":/tmp/net-echo-server").CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("docker cp net-echo-server: %v: %s", err, b)
+		}
+		// A server from an earlier test may hold the port already, then this one exits.
+		if _, err := s.dockerExec(ctx, true, "/tmp/net-echo-server", "-addr", "0.0.0.0:"+n.echoPort); err != nil {
+			return nil, err
+		}
+		if err := s.waitContainer(ctx, "ss -ltn | grep -q ':"+n.echoPort+" '"); err != nil {
+			return nil, fmt.Errorf("echo server not listening on %s: %v", n.echoPort, err)
+		}
 	}
-	if b, err := exec.CommandContext(ctx, "docker", "cp", bin, s.rig.name+":/tmp/net-echo-server").CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("docker cp net-echo-server: %v: %s", err, b)
-	}
-	// A server from an earlier test may hold the port already, then this one exits.
-	if _, err := s.dockerExec(ctx, true, "/tmp/net-echo-server", "-addr", "0.0.0.0:"+port); err != nil {
-		return nil, err
-	}
-	if err := s.waitContainer(ctx, "ss -ltn | grep -q ':"+port+" '"); err != nil {
-		return nil, fmt.Errorf("echo server not listening on %s: %v", port, err)
+	if n.programPort != "" {
+		if err := s.startProgramServer(ctx, n, &undo); err != nil {
+			stop()
+			return nil, err
+		}
 	}
 
 	if n.netem != "" {
@@ -152,4 +172,38 @@ func (s *session) waitContainer(ctx context.Context, cond string) error {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+// startProgramServer copies programblocks and the test's program
+// directories into the container and serves them on the program port. The
+// server is stopped when the test's network settings are undone.
+func (s *session) startProgramServer(ctx context.Context, n netSettings, undo *[]func() error) error {
+	bin, err := s.hostBinary(ctx, "programblocks")
+	if err != nil {
+		return err
+	}
+	dir := "/tmp/programs-" + n.programPort
+	if _, err := s.dockerExec(ctx, false, "rm", "-rf", dir); err != nil {
+		return err
+	}
+	for _, c := range [][2]string{{bin, "/tmp/programblocks"}, {n.programDir, dir}} {
+		if b, err := exec.CommandContext(ctx, "docker", "cp", c[0], s.rig.name+":"+c[1]).CombinedOutput(); err != nil {
+			return fmt.Errorf("docker cp %s: %v: %s", c[0], err, b)
+		}
+	}
+	pid := dir + ".pid"
+	script := fmt.Sprintf("/tmp/programblocks serve -addr 0.0.0.0:%s -seed %s %s > %s.log 2>&1 & echo $! > %s; wait",
+		n.programPort, shellQuote(n.programSeed), dir, dir, pid)
+	if _, err := s.dockerExec(ctx, true, "sh", "-c", script); err != nil {
+		return err
+	}
+	if err := s.waitContainer(ctx, "grep -q serving "+dir+".log"); err != nil {
+		log, _ := s.dockerExec(ctx, false, "cat", dir+".log")
+		return fmt.Errorf("program server did not start: %v: %s", err, log)
+	}
+	*undo = append(*undo, func() error {
+		_, err := s.dockerExec(ctx, false, "sh", "-c", "kill $(cat "+pid+")")
+		return err
+	})
+	return nil
 }

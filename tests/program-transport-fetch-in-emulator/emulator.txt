@@ -1,0 +1,5 @@
+# The app fetches fib-and-primes from programblocks serve in the rig
+# container, which the emulator reaches as 10.0.2.2, verifies it and runs it.
+ready start app="Programs: fetch over UDP"
+program-server 7002 served cx playground test signer
+timeout 60

@@ -488,8 +488,10 @@ program, so it never holds unverified data for long.
    and the signature from the first packet.
 2. Fetch the rest of the list's arrays and its blocks, which are the program
    manifests, verifying each piece.
-3. For the chosen program, get manifest offset 0, check its address and
-   signature, then fetch and check its arrays.
+3. For the chosen program, take its manifest from the list, which the
+   list's file hash has already verified, and check its signature and
+   signer. A client that only knows a program's address uses get manifest
+   instead, as in step 1.
 4. Get blocks two at a time from the linear packing, checking each block on
    arrival and each file when it is whole.
 

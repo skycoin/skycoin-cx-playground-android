@@ -23,7 +23,7 @@ import (
 //	                           clear it after the test
 //	before <shell command>     run on the device before the start
 //	after <shell command>      run on the device after the test
-//	echo-server, netem, capture see net.go
+//	echo-server, program-server, netem, capture see net.go
 //	timeout <seconds>          for wait-for steps and the expected output,
 //	                           10 by default
 const settingsFile = "emulator.txt"
@@ -128,6 +128,13 @@ func (t *testFolder) parseSettings(r io.Reader) error {
 			t.after = append(t.after, rest)
 		case "echo-server":
 			t.net.echoPort = rest
+		case "program-server":
+			f := strings.Fields(rest)
+			if len(f) < 3 {
+				return fmt.Errorf("line %d: program-server takes a port, a directory and a seed", n)
+			}
+			t.net.programPort, t.net.programDir = f[0], filepath.Join(t.dir, f[1])
+			t.net.programSeed = strings.Join(f[2:], " ")
 		case "netem":
 			t.net.netem = rest
 		case "capture":

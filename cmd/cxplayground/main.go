@@ -256,14 +256,22 @@ func (u *ui) start(a *store.App) {
 			fmt.Fprintf(out, "verification failed: %v\n", err)
 			return
 		}
-		opts := cxrun.Options{Args: a.Manifest.Args, Stderr: out}
+		m := a.Manifest
+		if m.Kind == fetchKind {
+			if m, files, err = fetchProgram(a.Manifest, out); err != nil {
+				fmt.Fprintf(out, "fetch failed: %v\n", err)
+				u.trace.printf("finished app=%q err=%v", a.Manifest.Name, err)
+				return
+			}
+		}
+		opts := cxrun.Options{Args: m.Args, Stderr: out}
 		if opts.Dir, err = writeDataFiles(*a, files); err != nil {
 			fmt.Fprintf(out, "data files: %v\n", err)
 			return
 		}
 		log.Printf("cxplayground: running %s (%s)", a.Manifest.Name, a.Hash)
 		var stdout bytes.Buffer
-		err = apprun.Run(a.Manifest, files, opts, h, io.MultiWriter(out, &stdout))
+		err = apprun.Run(m, files, opts, h, io.MultiWriter(out, &stdout))
 		if err != nil {
 			fmt.Fprintf(out, "error: %v\n", err)
 		}

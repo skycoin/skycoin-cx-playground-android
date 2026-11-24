@@ -1,0 +1,7 @@
+# The same fetch with tc netem dropping 40% of the packets of port 7003 and
+# delaying each by 50 ms, both ways, and tcpdump capturing them.
+ready start app="Programs: fetch over UDP with loss"
+program-server 7003 served cx playground test signer
+timeout 90
+netem delay 50ms loss 40%
+capture udp.pcap
