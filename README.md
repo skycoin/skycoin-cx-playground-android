@@ -12,26 +12,21 @@ make install  # adb install and start
 
 ## Apps, manifests and hashes
 
-An app is a directory of CX sources plus a `cxapp.json` with its name,
-description, kind (`gfx` or `console`) and entry file. `cxmanifest` turns it
-into a manifest:
+An app is a directory of CX sources plus a `cxapp.txt` with its name,
+description, kind (`gfx` or `console`) and entry file, in the CX text form
+(#38): a header line per section, one entry per line, a blank line before
+the next header. There is no JSON in the core.
 
-```json
-{
-  "version": 1,
-  "name": "Keyboard",
-  "kind": "gfx",
-  "entry": "main.cx",
-  "chunk_size": 65536,
-  "files": [
-    {"path": "main.cx", "size": 2162, "sha256": "…", "chunks": ["…"]}
-  ]
-}
+```ini
+; CX app, text form.
+[app]
+name = Keyboard
+kind = gfx
+entry = main.cx
 ```
 
-`cxmanifest build` and `hash` still print this JSON form of one app, and the
-app shows its fields. The bundle the APK embeds uses the binary manifest of
-docs/ProgramDistribution.md instead, in the layout of the program store:
+The bundle the APK embeds uses the binary manifest of
+docs/ProgramDistribution.md, in the layout of the program store:
 `list.bin` is the signed manifest list, `m/<address>.bin` one signed binary
 manifest per app, `p/<address>.pack` its linear packing and `index.txt` one
 line per app. The app checks the list, every manifest and its signer, every
@@ -43,16 +38,15 @@ signature of each manifest whose address has not changed, and a rebuild of
 the same apps gives the same bytes.
 
 ```
-cxmanifest hash apps/keyboard
-cxmanifest build apps/keyboard > manifest.json
 cxmanifest bundle -o cmd/cxplayground/bundle apps/*
 cxmanifest verify cmd/cxplayground/bundle
 ```
 
-Two optional `cxapp.json` fields serve programs that read files. `args` is
-the program's `os.Args`, as the `++` arguments of cx, and goes into the
-manifest. `include` lists files and directories outside the app directory,
-relative to it, whose files `cxmanifest` adds under their base names, so an
+Two optional sections of `cxapp.txt` serve programs that read files.
+`[args]` is the program's `os.Args`, one per line, as the `++` arguments of
+cx, and goes into the manifest. `[include]` lists files and directories
+outside the app directory, relative to it, one per line, whose files
+`cxmanifest` adds under their base names, so an
 app can use sources kept elsewhere without a copy. The app writes the files
 of an app that are not CX sources to `app-files/<hash>/` in its files dir
 and makes that the program's sandbox root, which its `os` file operations
@@ -63,7 +57,7 @@ them, and the app enables all three for the bundled apps through
 
 ### Program forms
 
-The `form` field of `cxapp.json` says how the app holds its program.
+The `form` key of `cxapp.txt` says how the app holds its program.
 
 | `form` | The bundle holds | The app runs it |
 | --- | --- | --- |
@@ -143,7 +137,7 @@ programnetwork getpeers HOST:7010
 
 An app of kind `subscribe` runs a node on the phone: its `args` are the
 comma separated nodes to subscribe to, the trusted signer key and the name
-in the wanted program's `cxapp.json`. It reads every have, requests the
+in the wanted program's `cxapp.txt`. It reads every have, requests the
 program, verified block by block, then checks and runs it like a `fetch`
 app. An app of kind `thin` gets one program by address from one node.
 
@@ -299,10 +293,11 @@ suite at once with that many runs.
 | `ui-swipe` | swipes in four directions |
 | `ui-soft-keyboard` | `app.ShowKeyboard` and `app.HideKeyboard` open and close the soft keyboard |
 | `ui-rotation` | resize events on a turn and a tap in landscape |
-| `benchmark-suite-one-pass` | one pass of the benchmark suite, every benchmark passes and the JSON document is saved |
+| `benchmark-suite-one-pass` | one pass of the benchmark suite, every benchmark passes and the text results document is saved |
 | `femtoclaw-replay-in-emulator` | the femtoclaw CX port replays its tape in the app with output byte identical to the host replay |
 | `benchmark-hashes` (go) | expected hashes against the math and skycoin-cx, and every program run from the bundle on both executors prints them |
-| `benchmark-opcounts` (go) | the operation counts in `suite.json` (needs `-tags cxopcount`) |
+| `benchmark-opcounts` (go) | the operation counts in `suite.txt` (needs `-tags cxopcount`) |
+| `no-json-in-core` (go) | no Go file outside `microagents/` and `vendor/` imports `encoding/json` (#38) |
 | `results-schema-roundtrip` (go) | a document encodes and decodes unchanged, malformed ones are refused |
 | `collector-accept-reject` (go) | the collector stores a valid upload and refuses duplicates, bad and oversized ones |
 | `femtoclaw-replay-in-app-runtime` (go) | the bundled femtoclaw app run through `store` and `cxrun` on the host prints the host replay's bytes, twice |
@@ -373,14 +368,14 @@ programs of skycoin-cx `t0-benchmarks/compare` (count, fib, array, struct,
 memtest, primes) on the old executor, which the other apps use, and on the vm.
 Each program runs N times per executor (5 by default, `fewer` and `more`
 change it before `start`). The app then shows the results document, saves it
-to `benchmark-results/<time>-<run_id>.json` in the app's files dir and offers
+to `benchmark-results/<time>-<run_id>.txt` in the app's files dir and offers
 to upload it.
 
 The choices below were made without a spec and are provisional.
 
 - **Scale.** The phone scale is about 1/30 of the full skycoin-cx scale, so one
   run of the suite on the old executor takes a few seconds on a desktop. The
-  sizes are in `apps/benchmarks/suite.json`. The expected hashes there are
+  sizes are in `apps/benchmarks/suite.txt`. The expected hashes there are
   derived from the math by `benchsuite.ExpectedHash`, a copy of
   `compareExpected` in skycoin-cx `t0-benchmarks/compare_test.go`. Tests check
   them against the math and the copy against skycoin-cx `expected.txt`.
@@ -388,7 +383,7 @@ The choices below were made without a spec and are provisional.
   median of the N runs is reported, and every run is kept in `runs_ms`.
 - **ops/ms.** The app is not built with the `cxopcount` tag, because counting
   costs time in the loop. The operation counts of each program are measured
-  once on a host and stored in `suite.json`, and
+  once on a host and stored in `suite.txt`, and
   `go test -tags cxopcount ./tests/benchmark-opcounts` checks them (`make test`
   runs it). The old executor counts expressions and the vm counts
   instructions, so ops/ms is only comparable within one executor.
@@ -403,40 +398,49 @@ The choices below were made without a spec and are provisional.
 
 ### Results document
 
-```
-{
-  "schema": "cx-playground-benchmark/1",
-  "run_id": "32 hex digits, random per run",
-  "started_at": "RFC 3339 UTC", "finished_at": "RFC 3339 UTC",
-  "build": {"app_version", "app_revision"?, "skycoin_cx", "go_version"},
-  "device": {"os", "arch", "android_release"?, "android_sdk"?, "manufacturer"?,
-             "model"?, "abi"?, "cpu_cores", "cpu_max_mhz", "ram_total_mb"},
-  "suite": {"scale", "sizes": {"count_n", "fib_n", "array_rounds",
-            "struct_rounds", "mem_n", "mem_walk", "sieve_n", "miller_n",
-            "lucas_rounds"}, "runs"},
-  "results": [{
-    "benchmark": "count|fib|array|struct|memtest|primes",
-    "executor": "old|vm",
-    "status": "pass|fail|rejected|error",
-    "runs_ms": [n, ...], "median_ms": n,
-    "hash": "decimal FNV-1a the program printed",
-    "expected_hash": "decimal",
-    "operations"?: n, "ops_per_ms"?: n,
-    "message"?: "why it failed, was rejected or errored"
-  }]
-}
+A results document is in the CX text form (#38), schema
+`cx-playground-benchmark/2`:
+
+```ini
+; CX playground benchmark run, text form.
+[run]
+schema = cx-playground-benchmark/2
+run_id = 32 hex digits, random per run
+started_at = RFC 3339 UTC
+finished_at = RFC 3339 UTC
+
+[build]
+app_version, app_revision?, skycoin_cx, go_version
+
+[device]
+os, arch, android_release?, manufacturer?, model?, abi?, android_sdk?,
+cpu_cores, cpu_max_mhz, ram_total_mb
+
+[suite]
+scale, runs, count_n, fib_n, array_rounds, struct_rounds, mem_n, mem_walk,
+sieve_n, miller_n, lucas_rounds
+
+[results]
+; benchmark, executor, status, median_ms, hash, expected_hash, operations, ops_per_ms, runs_ms, message
+count, old, pass, 900.5, 17727803403943808447, 17727803403943808447, 6000014, 6662.9, 900.5 899.25 901,
 ```
 
-Fields marked `?` may be left out. Hashes are strings because they do not fit
-a JSON number. `pass` needs the expected hash and the `<name> pass` line,
-`rejected` means the vm does not lower the program. `benchsuite.Validate` is
-the full rule set and the collector applies it.
+Each of `[build]`, `[device]` and `[suite]` holds one `key = value` line
+per key named above, and keys marked `?` may be left out. A result line has
+the benchmark (count, fib, array, struct, memtest or primes), the executor
+(old or vm), the status (pass, fail, rejected or error), the median, the
+hash the program printed and the expected one in decimal, the operations
+and ops/ms (0 when unknown), the run times separated by spaces, and the
+message last, which may hold commas. `pass` needs the expected hash and the
+`<name> pass` line, `rejected` means the vm does not lower the program.
+`benchsuite.Validate` is the full rule set and the collector applies it.
 
 ### Collector
 
-`cmd/benchmark-collector` takes `POST /runs`, validates the document, stores it
-in a bbolt file keyed by run ID and lists all runs at `GET /runs.txt` (plain
-text) and `GET /` (HTML).
+`cmd/benchmark-collector` takes `POST /runs`, validates the document, stores
+it in a bbolt file keyed by run ID, in the text form in the `runs-text`
+bucket, and lists all runs at `GET /runs.txt` (plain text) and `GET /`
+(HTML).
 
 ```
 make collector

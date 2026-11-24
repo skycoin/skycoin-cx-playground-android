@@ -1,0 +1,42 @@
+; CX app, text form.
+[app]
+name = Network: TCP echo
+description = Test demo: five lines through the echo server on the host
+kind = console
+package main
+
+import "sys/app"
+import "sys/string"
+
+// Sends five lines to the echo server the test runs on the emulator's host
+// and reads each one back.
+
+func main() {
+	var conn i32
+	var err str
+	conn, err = app.NetDial("tcp", "10.0.2.2:7001")
+	if len(err) > 0 {
+		printf("tcp dial error %s\n", err)
+		return
+	}
+	var ok i32 = 0
+	for i := 0; i < 5; i++ {
+		var msg str = sprintf("line %d over tcp\n", i)
+		err = app.NetSend(conn, msg)
+		var got str = ""
+		var data str
+		for len(got) < len(msg) {
+			data, err = app.NetRecv(conn, 3000)
+			if len(err) > 0 {
+				printf("tcp recv error %s\n", err)
+				return
+			}
+			got = sprintf("%s%s", got, data)
+		}
+		if string.EqualityByByteValue(got, msg) {
+			ok = ok + 1
+		}
+	}
+	app.NetClose(conn)
+	printf("tcp echoed %d of 5\n", ok)
+}

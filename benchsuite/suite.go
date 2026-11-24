@@ -4,15 +4,16 @@
 package benchsuite
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
+
+	"github.com/skycoin/skycoin-cx-playground-android/textform"
 )
 
 // SuiteFile is the file of the benchmark app that lists its programs.
-const SuiteFile = "suite.json"
+const SuiteFile = "suite.txt"
 
 // BenchmarkNames are the compare programs in the order they run.
 var BenchmarkNames = []string{"count", "fib", "array", "struct", "memtest", "primes"}
@@ -20,41 +21,44 @@ var BenchmarkNames = []string{"count", "fib", "array", "struct", "memtest", "pri
 // Sizes are the parameters of one scale of the compare programs, the fields
 // of compareScale in skycoin-cx t0-benchmarks/compare_test.go.
 type Sizes struct {
-	CountN       uint64 `json:"count_n"`
-	FibN         int    `json:"fib_n"`
-	ArrayRounds  int    `json:"array_rounds"`
-	StructRounds int    `json:"struct_rounds"`
-	MemN         uint64 `json:"mem_n"`
-	MemWalk      uint64 `json:"mem_walk"`
-	SieveN       int64  `json:"sieve_n"`
-	MillerN      int64  `json:"miller_n"`
-	LucasRounds  int    `json:"lucas_rounds"`
+	CountN       uint64
+	FibN         int
+	ArrayRounds  int
+	StructRounds int
+	MemN         uint64
+	MemWalk      uint64
+	SieveN       int64
+	MillerN      int64
+	LucasRounds  int
 }
 
 // SuiteBenchmark is one program of the suite.
 type SuiteBenchmark struct {
-	Name string `json:"name"`
-	File string `json:"file"`
+	Name string
+	File string
 	// ExpectedHash is the FNV-1a hash the program prints, in decimal.
-	ExpectedHash string `json:"expected_hash"`
+	ExpectedHash string
 	// Operations are the operations each executor runs, counted on a host
 	// with the cxopcount build tag, so the app reports ops/ms without the
 	// cost of counting.
-	Operations map[string]uint64 `json:"operations"`
+	Operations map[string]uint64
 }
 
 // SuiteDefinition is the content of SuiteFile.
 type SuiteDefinition struct {
-	Scale      string           `json:"scale"`
-	Sizes      Sizes            `json:"sizes"`
-	Runs       int              `json:"runs"`
-	Benchmarks []SuiteBenchmark `json:"benchmarks"`
+	Scale      string
+	Sizes      Sizes
+	Runs       int
+	Benchmarks []SuiteBenchmark
 }
 
-// ParseSuiteDefinition decodes and checks a SuiteFile.
+// ParseSuiteDefinition reads and checks a SuiteFile in the text form: a
+// [suite] section with scale and runs, a [sizes] section with the fields
+// of Sizes, and a [benchmarks] table of name, file, expected_hash and the
+// operations of the old and the vm executor.
 func ParseSuiteDefinition(b []byte) (*SuiteDefinition, error) {
-	var suite SuiteDefinition
-	if err := json.Unmarshal(b, &suite); err != nil {
+	suite, err := parseSuite(b)
+	if err != nil {
 		return nil, fmt.Errorf("%s: %w", SuiteFile, err)
 	}
 	if suite.Runs < 1 {
@@ -68,7 +72,86 @@ func ParseSuiteDefinition(b []byte) (*SuiteDefinition, error) {
 			return nil, fmt.Errorf("benchmark %s: expected_hash: %w", b.Name, err)
 		}
 	}
-	return &suite, nil
+	return suite, nil
+}
+
+// sizeFields maps the [sizes] keys to the fields of Sizes.
+func sizeFields(s *Sizes) map[string]any {
+	return map[string]any{
+		"count_n": &s.CountN, "fib_n": &s.FibN, "array_rounds": &s.ArrayRounds, "struct_rounds": &s.StructRounds,
+		"mem_n": &s.MemN, "mem_walk": &s.MemWalk, "sieve_n": &s.SieveN, "miller_n": &s.MillerN, "lucas_rounds": &s.LucasRounds,
+	}
+}
+
+// setNumber parses text into the integer field p points to.
+func setNumber(p any, text string) error {
+	switch v := p.(type) {
+	case *int:
+		n, err := strconv.Atoi(text)
+		*v = n
+		return err
+	case *int64:
+		n, err := strconv.ParseInt(text, 10, 64)
+		*v = n
+		return err
+	case *uint64:
+		n, err := strconv.ParseUint(text, 10, 64)
+		*v = n
+		return err
+	}
+	return fmt.Errorf("field of type %T", p)
+}
+
+func parseSuite(b []byte) (*SuiteDefinition, error) {
+	d, err := textform.Parse(string(b))
+	if err != nil {
+		return nil, err
+	}
+	if err := d.Only("suite", "sizes", "benchmarks"); err != nil {
+		return nil, err
+	}
+	suite := &SuiteDefinition{}
+	s, _ := d.Section("suite")
+	k, err := s.Keys("scale", "runs")
+	if err != nil {
+		return nil, err
+	}
+	suite.Scale = k["scale"]
+	if err := setNumber(&suite.Runs, k["runs"]); err != nil {
+		return nil, fmt.Errorf("runs: %w", err)
+	}
+	fields := sizeFields(&suite.Sizes)
+	names := make([]string, 0, len(fields))
+	for n := range fields {
+		names = append(names, n)
+	}
+	s, _ = d.Section("sizes")
+	k, err = s.Keys(names...)
+	if err != nil {
+		return nil, err
+	}
+	for n, v := range k {
+		if err := setNumber(fields[n], v); err != nil {
+			return nil, fmt.Errorf("sizes %s: %w", n, err)
+		}
+	}
+	s, _ = d.Section("benchmarks")
+	rows, err := s.Rows(5)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		bench := SuiteBenchmark{Name: r[0], File: r[1], ExpectedHash: r[2], Operations: map[string]uint64{}}
+		for i, executor := range []string{"old", "vm"} {
+			n, err := strconv.ParseUint(r[3+i], 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("benchmark %s operations %s: %w", r[0], executor, err)
+			}
+			bench.Operations[executor] = n
+		}
+		suite.Benchmarks = append(suite.Benchmarks, bench)
+	}
+	return suite, nil
 }
 
 const (

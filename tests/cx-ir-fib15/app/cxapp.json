@@ -1,1 +1,0 @@
-{"name": "CX IR: fib 0 to 14", "description": "Test demo: the same program as a serialized CX program", "kind": "console", "form": "ir", "include": ["../../cx-source-fib15/app/main.cx"]}

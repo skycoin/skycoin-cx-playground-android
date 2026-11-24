@@ -1,0 +1,14 @@
+; CX app, text form.
+[app]
+name = Femtoclaw replay
+description = Test demo: the femtoclaw CX port replayed from its tape
+kind = console
+entry = 000-configuration-values.cx
+
+[args]
+++mode=replay
+++tape=tape.txt
+
+[include]
+../../../microagents/femtoclaw/port
+../../../microagents/femtoclaw/tests/replay-determinism/tape.txt

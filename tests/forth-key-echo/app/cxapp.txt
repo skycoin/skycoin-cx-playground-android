@@ -1,0 +1,6 @@
+; CX app, text form.
+[app]
+name = cx-forth: key echo
+description = Test demo: Forth reads keys and echoes each line
+kind = gfx
+form = forth

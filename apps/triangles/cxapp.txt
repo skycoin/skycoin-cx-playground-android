@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Spinning triangles
+description = Animated triangles drawn every frame on the GPU, with FPS and screen size
+kind = gfx

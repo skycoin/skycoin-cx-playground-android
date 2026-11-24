@@ -1,0 +1,59 @@
+; CX app, text form.
+[app]
+name = Network: UDP delay and loss
+description = Test demo: the UDP echo program while the test delays and drops packets
+kind = console
+package main
+
+import "sys/app"
+import "sys/string"
+import "sys/time"
+
+// Sends 20 numbered datagrams to the echo server the test runs on the
+// emulator's host, waits up to a second for each echo and reports the
+// losses and the round trip times.
+
+func main() {
+	var conn i32
+	var err str
+	conn, err = app.NetDial("udp", "10.0.2.2:7001")
+	if len(err) > 0 {
+		printf("udp dial error %s\n", err)
+		return
+	}
+	var got i32 = 0
+	var minRtt i64 = 1000000L
+	var maxRtt i64 = 0L
+	for i := 0; i < 20; i++ {
+		var msg str = sprintf("ping %d", i)
+		var start i64 = time.UnixMilli()
+		err = app.NetSend(conn, msg)
+		var data str = ""
+		for bool.not(string.EqualityByByteValue(data, msg)) && len(err) == 0 {
+			data, err = app.NetRecv(conn, 1000)
+		}
+		if string.EqualityByByteValue(data, msg) {
+			got = got + 1
+			var rtt i64 = time.UnixMilli() - start
+			if rtt < minRtt {
+				minRtt = rtt
+			}
+			if rtt > maxRtt {
+				maxRtt = rtt
+			}
+		}
+	}
+	app.NetClose(conn)
+	printf("udp received %d of 20\n", got)
+	printf("udp rtt min %d ms max %d ms\n", minRtt, maxRtt)
+	if got < 20 {
+		printf("loss detected\n")
+	} else {
+		printf("no loss\n")
+	}
+	if minRtt >= 150L {
+		printf("delay detected\n")
+	} else {
+		printf("no delay\n")
+	}
+}

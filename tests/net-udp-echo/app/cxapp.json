@@ -1,1 +1,0 @@
-{"name": "Network: UDP echo", "description": "Test demo: 20 datagrams through the echo server on the host", "kind": "console"}

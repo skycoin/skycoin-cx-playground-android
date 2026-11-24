@@ -8,7 +8,7 @@
 //	programblocks signer (-seed TEXT | -secret HEX)
 //
 // Every subdirectory of DIR is a program named after it, with its
-// cxapp.json. A seed derives the signing key with the Skycoin cipher
+// cxapp.txt. A seed derives the signing key with the Skycoin cipher
 // package; a public seed is for tests only.
 package main
 

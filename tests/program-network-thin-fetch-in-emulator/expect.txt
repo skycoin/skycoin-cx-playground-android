@@ -1,7 +1,7 @@
-out thin get 2be5b3ae0178b0aa from 10.0.2.2:7020
+out thin get 8cc5be3a0d13eb8f from 10.0.2.2:7020
 out got Downloaded: fib and primes from 10.0.2.2:7020
 out signer 03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d verified
-out 2 files, 3 blocks, 798 bytes, every block verified
+out 2 files, 3 blocks, 818 bytes, every block verified
 out 2 requests, no subscription, nothing kept
 out downloaded program running
 out primes below 100: 25

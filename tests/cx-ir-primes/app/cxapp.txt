@@ -1,0 +1,10 @@
+; CX app, text form.
+[app]
+name = CX IR: primes
+description = Test demo: the primes benchmark as a serialized CX program
+kind = console
+form = ir
+entry = primes.cx
+
+[include]
+../../../apps/benchmarks/primes.cx

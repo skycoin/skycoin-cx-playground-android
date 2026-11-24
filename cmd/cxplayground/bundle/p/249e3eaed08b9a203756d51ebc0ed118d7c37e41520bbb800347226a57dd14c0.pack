@@ -1,0 +1,93 @@
+; CX app, text form.
+[app]
+name = Keyboard
+description = Open and close the soft keyboard from CX and edit a line of text
+kind = gfx
+package main
+
+import "sys/app"
+import "sys/string"
+
+func button(x f32, y f32, w f32, h f32, label str, r f32, g f32, b f32) {
+	app.Rect(x, y, w, h, r, g, b, 1.0)
+	app.Text(label, x+30.0, y+h/2.0-24.0, 44.0, 1.0, 1.0, 1.0, 1.0)
+}
+
+func inside(px f32, py f32, x f32, y f32, w f32, h f32) (in bool) {
+	in = false
+	if px >= x {
+		if px <= x+w {
+			if py >= y {
+				if py <= y+h {
+					in = true
+				}
+			}
+		}
+	}
+}
+
+func main() {
+	var w i32
+	var h i32
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var text str = ""
+	var shown bool = false
+	var status str = "keyboard closed"
+	var lines i32 = 0
+	var bw f32
+	var bh f32 = 140.0
+	var by f32 = 260.0
+
+	for bool.not(app.ShouldClose()) {
+		w, h = app.ScreenSize()
+		bw = i32.f32(w)/2.0 - 48.0
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			if kind == app.TOUCH_UP {
+				if inside(ex, ey, 32.0, by, bw, bh) {
+					app.ShowKeyboard()
+					shown = true
+					status = "ShowKeyboard() called"
+					printf("show keyboard\n")
+				}
+				if inside(ex, ey, bw+64.0, by, bw, bh) {
+					app.HideKeyboard()
+					shown = false
+					status = "HideKeyboard() called"
+					printf("hide keyboard\n")
+				}
+			}
+			if kind == app.KEY {
+				if code == app.KEY_BACKSPACE {
+					if len(text) > 0 {
+						text = string.SubstringByByteRange(text, 0, len(text)-1)
+					}
+				} else {
+					if code == app.KEY_ENTER {
+						lines = lines + 1
+						text = ""
+					} else {
+						text = string.Concatenation(text, app.Rune(code))
+					}
+				}
+			}
+			kind, ex, ey, code = app.PollEvent()
+		}
+
+		app.Clear(0.1, 0.09, 0.14)
+		app.Text("Soft keyboard from CX", 32.0, 40.0, 52.0, 1.0, 1.0, 1.0, 1.0)
+		app.Text(status, 32.0, 120.0, 36.0, 1.0, 0.8, 0.3, 1.0)
+		button(32.0, by, bw, bh, "Show", 0.15, 0.55, 0.3)
+		button(bw+64.0, by, bw, bh, "Hide", 0.65, 0.2, 0.25)
+		app.Rect(32.0, by+bh+60.0, i32.f32(w)-64.0, 110.0, 0.0, 0.0, 0.0, 1.0)
+		app.Text(string.Concatenation(text, "_"), 52.0, by+bh+80.0, 48.0, 0.6, 1.0, 0.6, 1.0)
+		app.Text(sprintf("lines entered: %d   text length: %d", lines, len(text)), 32.0, by+bh+200.0, 34.0, 0.8, 0.8, 0.9, 1.0)
+		if shown {
+			app.Text("type on the keyboard, Enter clears the line", 32.0, by+bh+260.0, 32.0, 0.7, 0.7, 0.8, 1.0)
+		}
+		app.Frame()
+	}
+}

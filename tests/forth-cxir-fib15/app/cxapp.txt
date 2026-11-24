@@ -1,0 +1,7 @@
+; CX app, text form.
+[app]
+name = cx-forth: fib 0 to 14
+description = Test demo: the cx-forth translation of the CX IR of fib
+kind = console
+form = forth
+cxir_example = fib

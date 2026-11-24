@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Terminal grid resize
+description = Test demo: the grid takes new columns and rows when the display turns
+kind = gfx

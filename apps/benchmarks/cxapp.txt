@@ -1,0 +1,6 @@
+; CX app, text form.
+[app]
+name = Benchmark suite
+description = All compare benchmarks on both executors, device info, upload
+kind = benchmark
+entry = suite.txt

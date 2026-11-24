@@ -1,0 +1,11 @@
+; CX app, text form.
+[app]
+name = Programs: fetch over UDP
+description = Test demo: fetch, verify and run a signed program from the host
+kind = fetch
+entry = fetch.txt
+
+[args]
+10.0.2.2:7002
+03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d
+fib-and-primes

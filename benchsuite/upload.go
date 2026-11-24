@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-// UploadResults POSTs doc as JSON to url and returns the response body.
+// UploadResults POSTs doc in the text form to url and returns the response
+// body.
 func UploadResults(ctx context.Context, url string, doc *ResultsDocument) (string, error) {
 	body, err := EncodeResultsDocument(doc)
 	if err != nil {
@@ -22,7 +23,7 @@ func UploadResults(ctx context.Context, url string, doc *ResultsDocument) (strin
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err

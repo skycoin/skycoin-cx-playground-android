@@ -1,0 +1,9 @@
+; CX app, text form.
+[app]
+name = CX source: primes
+description = Test demo: the primes benchmark as CX source
+kind = console
+entry = primes.cx
+
+[include]
+../../../apps/benchmarks/primes.cx

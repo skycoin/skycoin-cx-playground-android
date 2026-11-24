@@ -1,0 +1,470 @@
+package main
+
+// Bubble sorts a reversed [150]i32 12 times, 11175 swaps each.
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() {
+	var h ui64
+	h = 14695981039346656037UL
+	var ok bool
+	ok = true
+	var nums [150]i32
+	var i i32
+	var j i32
+	var t i32
+	var swaps i32
+	var round i32
+	for round = 0; round < 12; round++ {
+		for i = 0; i < 150; i++ {
+			nums[i] = 150 - i
+		}
+		swaps = 0
+		for i = 0; i < 149; i++ {
+			for j = 0; j < 149-i; j++ {
+				if nums[j] > nums[j+1] {
+					t = nums[j]
+					nums[j] = nums[j+1]
+					nums[j+1] = t
+					swaps++
+				}
+			}
+		}
+		h = fnv(h, i32.ui64(swaps))
+		ok = ok && swaps == 11175
+	}
+	for i = 0; i < 150; i++ {
+		h = fnv(h, i32.ui64(nums[i]))
+		ok = ok && nums[i] == i + 1
+	}
+	ui64.print(h)
+	if ok {
+		printf("array pass\n")
+	} else {
+		printf("array FAIL\n")
+	}
+}
+package main
+
+// Sums 0 to 999,999 into an i64.
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() {
+	var sum i64
+	var i i32
+	for i = 0; i < 1000000; i++ {
+		sum = sum + i32.i64(i)
+	}
+	ui64.print(fnv(14695981039346656037UL, i64.ui64(sum)))
+	if sum == 499999500000L {
+		printf("count pass\n")
+	} else {
+		printf("count FAIL\n")
+	}
+}
+; CX app, text form.
+[app]
+name = Benchmark suite
+description = All compare benchmarks on both executors, device info, upload
+kind = benchmark
+entry = suite.txt
+package main
+
+// Recursive fib(27), 635,621 calls.
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func fib(n i32) (out i32) {
+	if n < 2 {
+		out = n
+	} else {
+		out = fib(n-1) + fib(n-2)
+	}
+}
+
+func main() {
+	var r i32
+	r = fib(27)
+	ui64.print(fnv(14695981039346656037UL, i32.ui64(r)))
+	if r == 196418 {
+		printf("fib pass\n")
+	} else {
+		printf("fib FAIL\n")
+	}
+}
+package main
+
+// A memtest86 style test of a 128 KiB ui32 array: address in address, walking
+// ones over the first 2 Ki words and moving inversions with four patterns.
+// Each test folds its mismatch count and the sum of the words it read.
+
+var mem [32768]ui32
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() { global mem
+	var h ui64
+	h = 14695981039346656037UL
+	var n i32
+	n = 32768
+	var walk i32
+	walk = 2048
+	var i i32
+	var bad i32
+	var total i32
+	var read ui32
+	var sum ui64
+	var all ui32
+	all = 4294967295U
+
+	bad = 0
+	sum = 0UL
+	for i = 0; i < n; i++ {
+		mem[i] = i32.ui32(i)
+	}
+	for i = 0; i < n; i++ {
+		read = mem[i]
+		if read != i32.ui32(i) {
+			bad++
+		}
+		sum = sum + ui32.ui64(read)
+	}
+	for i = 0; i < n; i++ {
+		mem[i] = i32.ui32(i) ^ all
+	}
+	for i = 0; i < n; i++ {
+		read = mem[i]
+		if read != (i32.ui32(i) ^ all) {
+			bad++
+		}
+		sum = sum + ui32.ui64(read)
+	}
+	h = fnv(h, i32.ui64(bad))
+	h = fnv(h, sum)
+	total = bad
+
+	var bit ui32
+	var pattern ui32
+	for bit = 0U; bit < 32U; bit++ {
+		pattern = 1U << bit
+		bad = 0
+		sum = 0UL
+		for i = 0; i < walk; i++ {
+			mem[i] = pattern
+		}
+		for i = 0; i < walk; i++ {
+			read = mem[i]
+			if read != pattern {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+		}
+		h = fnv(h, i32.ui64(bad))
+		h = fnv(h, sum)
+		total = total + bad
+	}
+
+	var patterns [4]ui32
+	patterns[0] = 0U
+	patterns[1] = 4294967295U
+	patterns[2] = 1431655765U
+	patterns[3] = 2863311530U
+	var k i32
+	var inverse ui32
+	for k = 0; k < 4; k++ {
+		pattern = patterns[k]
+		inverse = pattern ^ all
+		bad = 0
+		sum = 0UL
+		for i = 0; i < n; i++ {
+			mem[i] = pattern
+		}
+		for i = 0; i < n; i++ {
+			read = mem[i]
+			if read != pattern {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+			mem[i] = inverse
+		}
+		for i = n - 1; i >= 0; i-- {
+			read = mem[i]
+			if read != inverse {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+			mem[i] = pattern
+		}
+		for i = 0; i < n; i++ {
+			read = mem[i]
+			if read != pattern {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+		}
+		h = fnv(h, i32.ui64(bad))
+		h = fnv(h, sum)
+		total = total + bad
+	}
+
+	ui64.print(h)
+	if total == 0 {
+		printf("memtest pass\n")
+	} else {
+		printf("memtest FAIL\n")
+	}
+}
+package main
+
+// A sieve, deterministic Miller-Rabin and Lucas-Lehmer, see ../../README.md.
+
+var sieve [100000]i32
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func powmod(base ui64, exp ui64, n ui64) (out ui64) {
+	var r ui64
+	r = 1UL
+	var a ui64
+	a = base % n
+	var d ui64
+	d = exp
+	for d > 0UL {
+		if (d & 1UL) == 1UL {
+			r = r * a % n
+		}
+		a = a * a % n
+		d = d >> 1UL
+	}
+	out = r
+}
+
+func witness(a ui64, d ui64, s ui64, n ui64) (composite bool) {
+	composite = false
+	if a % n != 0UL {
+		var x ui64
+		x = powmod(a, d, n)
+		if x != 1UL && x != n - 1UL {
+			composite = true
+			var r ui64
+			for r = 1UL; r < s && composite; r++ {
+				x = x * x % n
+				if x == n - 1UL {
+					composite = false
+				}
+			}
+		}
+	}
+}
+
+func millerRabin(n ui64) (prime bool) {
+	if n < 2UL {
+		prime = false
+	} else if n % 2UL == 0UL {
+		prime = n == 2UL
+	} else {
+		var d ui64
+		d = n - 1UL
+		var s ui64
+		s = 0UL
+		for d % 2UL == 0UL {
+			d = d / 2UL
+			s++
+		}
+		prime = !witness(2UL, d, s, n) && !witness(7UL, d, s, n) && !witness(61UL, d, s, n)
+	}
+}
+
+func mulmod(x ui64, y ui64, m ui64) (out ui64) {
+	var r ui64
+	r = 0UL
+	var a ui64
+	a = x % m
+	var b ui64
+	b = y
+	for b > 0UL {
+		if (b & 1UL) == 1UL {
+			r = r + a
+			if r >= m {
+				r = r - m
+			}
+		}
+		a = a + a
+		if a >= m {
+			a = a - m
+		}
+		b = b >> 1UL
+	}
+	out = r
+}
+
+func lucasLehmer(p ui64) (prime bool) {
+	var m ui64
+	m = (1UL << p) - 1UL
+	var s ui64
+	s = 4UL
+	var i ui64
+	for i = 0UL; i < p - 2UL; i++ {
+		s = mulmod(s, s, m)
+		s = (s + m - 2UL) % m
+	}
+	prime = s == 0UL
+}
+
+func main() { global sieve
+	var h ui64
+	h = 14695981039346656037UL
+	var ok bool
+	ok = true
+
+	var n i32
+	n = 100000
+	var i i32
+	var j i32
+	for i = 2; i < n; i++ {
+		sieve[i] = 1
+	}
+	for i = 2; i * i < n; i++ {
+		if sieve[i] == 1 {
+			for j = i * i; j < n; j = j + i {
+				sieve[j] = 0
+			}
+		}
+	}
+	var count i32
+	count = 0
+	for i = 2; i < n; i++ {
+		count = count + sieve[i]
+	}
+	h = fnv(h, i32.ui64(count))
+	ok = ok && count == 9592
+
+	var mrCount i32
+	mrCount = 0
+	var k ui64
+	for k = 0UL; k < 15000UL; k++ {
+		if millerRabin(k) {
+			mrCount++
+		}
+	}
+	h = fnv(h, i32.ui64(mrCount))
+	ok = ok && mrCount == 1754
+
+	var exponents [17]ui64
+	exponents[0] = 3UL
+	exponents[1] = 5UL
+	exponents[2] = 7UL
+	exponents[3] = 11UL
+	exponents[4] = 13UL
+	exponents[5] = 17UL
+	exponents[6] = 19UL
+	exponents[7] = 23UL
+	exponents[8] = 29UL
+	exponents[9] = 31UL
+	exponents[10] = 37UL
+	exponents[11] = 41UL
+	exponents[12] = 43UL
+	exponents[13] = 47UL
+	exponents[14] = 53UL
+	exponents[15] = 59UL
+	exponents[16] = 61UL
+	var mask ui64
+	var round i32
+	for round = 0; round < 1; round++ {
+		mask = 0UL
+		for i = 0; i < 17; i++ {
+			if lucasLehmer(exponents[i]) {
+				mask = mask | (1UL << exponents[i])
+				h = fnv(h, 1UL)
+			} else {
+				h = fnv(h, 0UL)
+			}
+		}
+		ok = ok && mask == 2305843011361841320UL
+	}
+
+	ui64.print(h)
+	if ok {
+		printf("primes pass\n")
+	} else {
+		printf("primes FAIL\n")
+	}
+}
+package main
+
+// Walks a [100]point through a pointer 2500 times.
+
+type point struct {
+	x i32
+	y i32
+}
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() {
+	var h ui64
+	h = 14695981039346656037UL
+	var ok bool
+	ok = true
+	var points [100]point
+	var i i32
+	for i = 0; i < 100; i++ {
+		points[i].x = i
+		points[i].y = 2 * i
+	}
+	var sum i32
+	var p *point
+	var round i32
+	for round = 0; round < 2500; round++ {
+		sum = 0
+		for i = 0; i < 100; i++ {
+			p = &points[i]
+			sum = sum + p.x + p.y
+		}
+		h = fnv(h, i32.ui64(sum))
+		ok = ok && sum == 14850
+	}
+	ui64.print(h)
+	if ok {
+		printf("struct pass\n")
+	} else {
+		printf("struct FAIL\n")
+	}
+}
+; CX benchmark suite, text form. Operations are counted on a host with the cxopcount build tag.
+[suite]
+scale = phone
+runs = 5
+
+[sizes]
+count_n = 1000000
+fib_n = 27
+array_rounds = 12
+struct_rounds = 2500
+mem_n = 32768
+mem_walk = 2048
+sieve_n = 100000
+miller_n = 15000
+lucas_rounds = 1
+
+[benchmarks]
+; name, file, expected_hash, operations_old, operations_vm
+count, count.cx, 17727803403943808447, 6000014, 6000021
+fib, fib.cx, 12546183366041830149, 3495925, 6038416
+array, array.cx, 8801407059629469910, 2036840, 3651052
+struct, struct.cx, 3993961243277266981, 1788119, 3051021
+memtest, memtest.cx, 9833778128310793357, 6423367, 8520907
+primes, primes.cx, 14456747749191347431, 4259124, 5252055

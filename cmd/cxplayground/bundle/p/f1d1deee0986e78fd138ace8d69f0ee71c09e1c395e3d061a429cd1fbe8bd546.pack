@@ -1,0 +1,39 @@
+; CX app, text form.
+[app]
+name = Key input
+description = Test demo: prints the code of every key event
+kind = gfx
+package main
+
+import "sys/app"
+
+func main() {
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var last str = "none"
+	var count i32 = 0
+
+	for bool.not(app.ShouldClose()) {
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			if kind == app.KEY {
+				count = count + 1
+				last = sprintf("%d", code)
+				if code == app.KEY_ENTER {
+					last = "enter"
+				}
+				if code == app.KEY_BACKSPACE {
+					last = "backspace"
+				}
+				printf("key %d code=%d %s\n", count, code, last)
+			}
+			kind, ex, ey, code = app.PollEvent()
+		}
+		app.Clear(0.1, 0.1, 0.12)
+		app.Text(sprintf("keys: %d", count), 32.0, 40.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+		app.Text(sprintf("last: %s", last), 32.0, 120.0, 0.0, 0.6, 1.0, 0.6, 1.0)
+		app.Frame()
+	}
+}

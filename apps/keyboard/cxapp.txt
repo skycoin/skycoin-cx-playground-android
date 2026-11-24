@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Keyboard
+description = Open and close the soft keyboard from CX and edit a line of text
+kind = gfx

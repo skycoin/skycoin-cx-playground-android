@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -24,13 +23,13 @@ func BuildDir(dir string, chunkSize int) (*Manifest, map[Hash][]byte, error) {
 // list, with a MetaFile whose Include is empty, ready for Build. A caller
 // can change the files first, as cxmanifest does for the ir and forth forms.
 func ReadDir(dir string) (fstest.MapFS, Meta, error) {
-	var meta Meta
 	b, err := os.ReadFile(filepath.Join(dir, MetaFile))
-	if err == nil {
-		err = json.Unmarshal(b, &meta)
-	}
 	if err != nil {
-		return nil, meta, fmt.Errorf("%s: %w", MetaFile, err)
+		return nil, Meta{}, fmt.Errorf("%s: %w", MetaFile, err)
+	}
+	meta, err := ParseMeta(b)
+	if err != nil {
+		return nil, meta, fmt.Errorf("%s: %w", dir, err)
 	}
 	files := fstest.MapFS{}
 	add := func(name, src string) error {
@@ -80,10 +79,6 @@ func ReadDir(dir string) (fstest.MapFS, Meta, error) {
 
 // SetMeta writes meta to the MetaFile of files.
 func SetMeta(files fstest.MapFS, meta Meta) error {
-	b, err := json.Marshal(meta)
-	if err != nil {
-		return err
-	}
-	files[MetaFile] = &fstest.MapFile{Data: b}
+	files[MetaFile] = &fstest.MapFile{Data: meta.Encode()}
 	return nil
 }

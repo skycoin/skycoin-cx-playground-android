@@ -13,5 +13,5 @@ out memtest  vm  pass
 out primes   old pass
 out primes   vm  pass
 out saved /data/user/0/com.skycoin.cxplayground/files/benchmark-results/
-file-contains results.json "schema": "cx-playground-benchmark/1"
-file-contains results.json "runs": 1
+file-contains results.txt schema = cx-playground-benchmark/2
+file-contains results.txt runs = 1

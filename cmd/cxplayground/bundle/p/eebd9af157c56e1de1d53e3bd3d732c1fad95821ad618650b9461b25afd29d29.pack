@@ -1,0 +1,113 @@
+; CX app, text form.
+[app]
+name = Touch and key events
+description = Event log: touch down/move/up, taps, typed keys, screen size, and a finger paint trail
+kind = gfx
+package main
+
+import "sys/app"
+import "sys/string"
+
+func kindName(k i32) (s str) {
+	s = "?"
+	if k == app.TOUCH_DOWN {
+		s = "down"
+	}
+	if k == app.TOUCH_MOVE {
+		s = "move"
+	}
+	if k == app.TOUCH_UP {
+		s = "up"
+	}
+	if k == app.KEY {
+		s = "key"
+	}
+	if k == app.RESIZE {
+		s = "resize"
+	}
+}
+
+func main() {
+	var w i32
+	var h i32
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var log []str
+	var xs []f32
+	var ys []f32
+	var taps i32 = 0
+	var moves i32 = 0
+	var typed str = ""
+	var downX f32
+	var downY f32
+	var i i32
+	var line str
+	var y f32
+
+	for bool.not(app.ShouldClose()) {
+		w, h = app.ScreenSize()
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			line = ""
+			if kind == app.TOUCH_MOVE {
+				moves = moves + 1
+			} else {
+				if kind == app.KEY {
+					line = sprintf("key code %d", code)
+					if code == app.KEY_BACKSPACE {
+						if len(typed) > 0 {
+							typed = string.SubstringByByteRange(typed, 0, len(typed)-1)
+						}
+					} else {
+						typed = string.Concatenation(typed, app.Rune(code))
+					}
+				} else {
+					line = sprintf("%s at %d,%d", kindName(kind), f32.i32(ex), f32.i32(ey))
+				}
+			}
+			if kind == app.TOUCH_DOWN {
+				downX = ex
+				downY = ey
+				xs = append(xs, ex)
+				ys = append(ys, ey)
+			}
+			if kind == app.TOUCH_MOVE {
+				xs = append(xs, ex)
+				ys = append(ys, ey)
+			}
+			if kind == app.TOUCH_UP {
+				if f32.abs(ex-downX) < 30.0 {
+					if f32.abs(ey-downY) < 30.0 {
+						taps = taps + 1
+						line = sprintf("tap #%d at %d,%d", taps, f32.i32(ex), f32.i32(ey))
+					}
+				}
+			}
+			if len(line) > 0 {
+				log = append(log, line)
+				printf("%s\n", line)
+			}
+			kind, ex, ey, code = app.PollEvent()
+		}
+
+		app.Clear(0.08, 0.08, 0.1)
+		for i = 0; i < len(xs); i++ {
+			app.Circle(xs[i], ys[i], 14.0, 0.2, 0.8, 1.0, 0.8)
+		}
+		app.Text(sprintf("screen %d x %d px", w, h), 24.0, 40.0, 40.0, 1.0, 0.85, 0.3, 1.0)
+		app.Text(sprintf("taps %d   moves %d   points %d", taps, moves, len(xs)), 24.0, 100.0, 36.0, 0.8, 0.9, 1.0, 1.0)
+		app.Text(sprintf("typed: %s", typed), 24.0, 160.0, 36.0, 0.6, 1.0, 0.6, 1.0)
+		y = 230.0
+		i = len(log) - 12
+		if i < 0 {
+			i = 0
+		}
+		for ; i < len(log); i++ {
+			app.Text(log[i], 24.0, y, 32.0, 0.9, 0.9, 0.9, 1.0)
+			y = y + 44.0
+		}
+		app.Frame()
+	}
+}

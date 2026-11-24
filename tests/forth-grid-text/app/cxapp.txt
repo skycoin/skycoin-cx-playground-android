@@ -1,0 +1,6 @@
+; CX app, text form.
+[app]
+name = cx-forth: grid text
+description = Test demo: Forth text at rows and columns of the terminal grid
+kind = gfx
+form = forth

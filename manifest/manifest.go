@@ -1,14 +1,13 @@
-// Package manifest describes a CX app as a list of files, each split into
-// fixed size chunks addressed by their SHA-256. An app is identified by the
-// SHA-256 of its encoded manifest, so anything that can fetch bytes by hash
-// can deliver an app and every byte can be checked on arrival.
+// Package manifest describes a CX app: its metadata file, MetaFile, in the
+// text form, and its files, each split into fixed size chunks addressed by
+// their SHA-256, so every byte can be checked on arrival. The bundle and
+// the network identify an app by its programblocks manifest address.
 package manifest
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,9 +23,10 @@ const Version = 1
 // DefaultChunkSize is the chunk size used by Build.
 const DefaultChunkSize = 64 << 10
 
-// MetaFile is the optional app metadata file in a source directory. It is
+// MetaFile is the app metadata file of a source directory, in the text form
+// of ParseMeta. It is
 // read by Build and is not itself listed in the manifest.
-const MetaFile = "cxapp.json"
+const MetaFile = "cxapp.txt"
 
 // Hash is a hex encoded SHA-256 digest.
 type Hash string
@@ -63,42 +63,42 @@ const (
 
 // Manifest lists the files of one app.
 type Manifest struct {
-	Version     int    `json:"version"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Kind        string `json:"kind,omitempty"`
+	Version     int
+	Name        string
+	Description string
+	Kind        string
 	// Form is how the app holds its program: FormSource, FormIR or FormForth.
-	Form      string   `json:"form,omitempty"`
-	Entry     string   `json:"entry"`
-	Args      []string `json:"args,omitempty"`
-	ChunkSize int      `json:"chunk_size"`
-	Files     []File   `json:"files"`
+	Form      string
+	Entry     string
+	Args      []string
+	ChunkSize int
+	Files     []File
 }
 
 // File is one file of an app. Chunks holds the hash of each ChunkSize piece
 // of the file in order, the last one possibly shorter.
 type File struct {
-	Path   string `json:"path"`
-	Size   int64  `json:"size"`
-	Hash   Hash   `json:"sha256"`
-	Chunks []Hash `json:"chunks"`
+	Path   string
+	Size   int64
+	Hash   Hash
+	Chunks []Hash
 }
 
 // Meta is the content of MetaFile.
 type Meta struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Kind        string `json:"kind,omitempty"`
-	Form        string `json:"form,omitempty"`
-	Entry       string `json:"entry,omitempty"`
+	Name        string
+	Description string
+	Kind        string
+	Form        string
+	Entry       string
 	// Args is the program's os.Args, as the ++ arguments of cx.
-	Args []string `json:"args,omitempty"`
+	Args []string
 	// Include lists files and directories outside the app directory, relative
 	// to it, whose regular files BuildDir adds under their base names.
-	Include []string `json:"include,omitempty"`
+	Include []string
 	// CXIRExample names a cx-forth cxir.Examples program. cxmanifest writes
 	// its Forth translation to main.fs of a FormForth app.
-	CXIRExample string `json:"cxir_example,omitempty"`
+	CXIRExample string
 }
 
 // Build makes the manifest for every regular file under fsys. It also
@@ -109,9 +109,9 @@ func Build(fsys fs.FS, chunkSize int) (*Manifest, map[Hash][]byte, error) {
 	}
 	m := &Manifest{Version: Version, ChunkSize: chunkSize, Entry: "main.cx"}
 	if b, err := fs.ReadFile(fsys, MetaFile); err == nil {
-		var meta Meta
-		if err := json.Unmarshal(b, &meta); err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", MetaFile, err)
+		meta, err := ParseMeta(b)
+		if err != nil {
+			return nil, nil, err
 		}
 		if len(meta.Include) > 0 {
 			return nil, nil, errors.New(MetaFile + ": include needs BuildDir")
@@ -154,43 +154,6 @@ func Build(fsys fs.FS, chunkSize int) (*Manifest, map[Hash][]byte, error) {
 		return nil, nil, err
 	}
 	return m, chunks, nil
-}
-
-// Encode returns the canonical encoding of m. The app hash is the hash of
-// these bytes.
-func (m *Manifest) Encode() ([]byte, error) {
-	b, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	return append(b, '\n'), nil
-}
-
-// Hash returns the app hash of m.
-func (m *Manifest) Hash() (Hash, error) {
-	b, err := m.Encode()
-	if err != nil {
-		return "", err
-	}
-	return Sum(b), nil
-}
-
-// Decode parses manifest bytes and checks them against want, the app hash
-// they were requested by.
-func Decode(b []byte, want Hash) (*Manifest, error) {
-	if got := Sum(b); got != want {
-		return nil, fmt.Errorf("manifest hash %s, want %s", got, want)
-	}
-	var m Manifest
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&m); err != nil {
-		return nil, err
-	}
-	if err := m.Check(); err != nil {
-		return nil, err
-	}
-	return &m, nil
 }
 
 // Check validates the structure of m: version, paths, chunk counts and

@@ -31,7 +31,7 @@ func validDocument() *benchsuite.ResultsDocument {
 }
 
 func post(t *testing.T, url string, body []byte) (int, string) {
-	resp, err := http.Post(url+"/runs", "application/json", bytes.NewReader(body))
+	resp, err := http.Post(url+"/runs", "text/plain; charset=utf-8", bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,9 +72,9 @@ func TestCollectorAcceptsAndRejects(t *testing.T) {
 	bad.RunID, bad.Results[0].Executor = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "jit"
 	badBytes, _ := benchsuite.EncodeResultsDocument(bad)
 	for name, body := range map[string][]byte{
-		"not json":      []byte("hello"),
+		"not text form": []byte("hello"),
 		"bad executor":  badBytes,
-		"unknown field": bytes.Replace(valid, []byte(`"schema"`), []byte(`"serial": "x", "schema"`), 1),
+		"unknown key":   bytes.Replace(valid, []byte("schema = "), []byte("serial = x\nschema = "), 1),
 		"too large":     bytes.Repeat([]byte(" "), benchsuite.MaxDocumentBytes+10),
 	} {
 		if code, reply := post(t, server.URL, body); code != http.StatusBadRequest {

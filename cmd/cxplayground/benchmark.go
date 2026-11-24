@@ -108,7 +108,7 @@ func saveBenchmarkResults(doc *benchsuite.ResultsDocument, encoded []byte) (stri
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
-	path := filepath.Join(dir, doc.StartedAt.Format("20060102-150405")+"-"+doc.RunID+".json")
+	path := filepath.Join(dir, doc.StartedAt.Format("20060102-150405")+"-"+doc.RunID+".txt")
 	return path, os.WriteFile(path, encoded, 0o600)
 }
 

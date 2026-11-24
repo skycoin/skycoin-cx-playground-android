@@ -58,7 +58,7 @@ type FSSource struct{ FS fs.FS }
 func (s FSSource) ReadFile(name string) ([]byte, error) { return fs.ReadFile(s.FS, name) }
 
 // App is a listed app: the address of its binary manifest, in hex, and the
-// app manifest built from its cxapp.json.
+// app manifest built from its cxapp.txt.
 type App struct {
 	Hash     manifest.Hash
 	Manifest *manifest.Manifest
@@ -150,7 +150,7 @@ func packedFiles(src Source, addr programblocks.Hash, m *programblocks.Manifest)
 }
 
 // WriteBundle writes apps, each a map of file path to bytes with its
-// cxapp.json, keyed by app name, as a bundle in dir, which it replaces. A
+// cxapp.txt, keyed by app name, as a bundle in dir, which it replaces. A
 // signature is not repeatable, so a manifest whose address is the same as
 // in previous, an earlier bundle or nil, keeps the signature it has there,
 // and the bundle of the same apps has the same bytes. It returns the rows of

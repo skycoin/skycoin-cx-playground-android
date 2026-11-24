@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Benchmark: allocation
+description = Slice appends, string building and struct slices on the CX heap
+kind = console

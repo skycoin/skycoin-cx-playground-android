@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Key input
+description = Test demo: prints the code of every key event
+kind = gfx

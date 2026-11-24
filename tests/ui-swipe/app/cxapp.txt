@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Swipe
+description = Test demo: prints the start, end, moves and direction of every swipe
+kind = gfx

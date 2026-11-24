@@ -1,0 +1,24 @@
+; CX benchmark suite, text form. Operations are counted on a host with the cxopcount build tag.
+[suite]
+scale = phone
+runs = 5
+
+[sizes]
+count_n = 1000000
+fib_n = 27
+array_rounds = 12
+struct_rounds = 2500
+mem_n = 32768
+mem_walk = 2048
+sieve_n = 100000
+miller_n = 15000
+lucas_rounds = 1
+
+[benchmarks]
+; name, file, expected_hash, operations_old, operations_vm
+count, count.cx, 17727803403943808447, 6000014, 6000021
+fib, fib.cx, 12546183366041830149, 3495925, 6038416
+array, array.cx, 8801407059629469910, 2036840, 3651052
+struct, struct.cx, 3993961243277266981, 1788119, 3051021
+memtest, memtest.cx, 9833778128310793357, 6423367, 8520907
+primes, primes.cx, 14456747749191347431, 4259124, 5252055

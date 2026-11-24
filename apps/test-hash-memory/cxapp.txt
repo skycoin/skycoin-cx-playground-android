@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Test program: hash and memory
+description = Known SHA-256 and Merkle hashes and memory pattern tests, one result line each
+kind = console

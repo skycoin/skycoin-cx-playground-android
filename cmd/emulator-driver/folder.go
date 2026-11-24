@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/skycoin/skycoin-cx-playground-android/manifest"
 )
 
 // settingsFile is the optional per test settings file of an emulator test.
@@ -69,9 +70,9 @@ func loadTestFolder(dir string) (testFolder, error) {
 	if !emulatorTest(dir) {
 		return t, errNotEmulatorTest
 	}
-	if b, err := os.ReadFile(filepath.Join(dir, "app", "cxapp.json")); err == nil {
-		var app struct{ Name string }
-		if err := json.Unmarshal(b, &app); err != nil {
+	if b, err := os.ReadFile(filepath.Join(dir, "app", manifest.MetaFile)); err == nil {
+		app, err := manifest.ParseMeta(b)
+		if err != nil {
 			return t, fmt.Errorf("%s: %w", dir, err)
 		}
 		t.appName = app.Name

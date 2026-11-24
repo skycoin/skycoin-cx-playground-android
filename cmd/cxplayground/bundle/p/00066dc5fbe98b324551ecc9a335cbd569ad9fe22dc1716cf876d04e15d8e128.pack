@@ -1,6 +1,0 @@
-{"name":"Programs: announce and request","description":"Test demo: run a node, read the haves of the host nodes, request a signed program and run it","kind":"subscribe","entry":"subscribe.txt","args":["10.0.2.2:7012,10.0.2.2:7011","03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d","Downloaded: fib and primes"]}This app holds no program. It runs a programnetwork node and subscribes to
-the nodes its args give. Every have they send goes in its have queue, it
-reads each one, and its policy requests the program from a node that
-announced it. It checks the signer key of its args and every block hash,
-then runs the program.
-See "Announce and request" in docs/ProgramDistribution.md.

@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Test program: storage and serial
+description = Block write, read and verify through the file system; direct block and serial tests skipped on the phone, one result line each
+kind = console

@@ -1,1 +1,0 @@
-{"name": "CX source: primes", "description": "Test demo: the primes benchmark as CX source", "kind": "console", "include": ["../../../apps/benchmarks/primes.cx"], "entry": "primes.cx"}

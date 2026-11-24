@@ -98,7 +98,7 @@ type Held struct {
 	Address  programblocks.Hash
 	Manifest *programblocks.Manifest
 	Files    map[string][]byte
-	Name     string // the name in its cxapp.json
+	Name     string // the name in its cxapp.txt
 	From     string // the node it was downloaded from, "" when published here
 	Elapsed  time.Duration
 }

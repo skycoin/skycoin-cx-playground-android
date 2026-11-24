@@ -1,19 +1,20 @@
 package benchsuite
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/skycoin/skycoin-cx-playground-android/textform"
 )
 
 // SchemaName is the schema field of every results document this version
 // writes and the collector accepts.
-const SchemaName = "cx-playground-benchmark/1"
+const SchemaName = "cx-playground-benchmark/2"
 
 // MaxDocumentBytes bounds a results document. A full run is about 6 KiB.
 const MaxDocumentBytes = 1 << 20
@@ -26,78 +27,155 @@ const (
 	StatusError    = "error"    // compile or runtime error
 )
 
-// ResultsDocument is the JSON document of one suite run.
+// ResultsDocument is the document of one suite run, in the text form.
 type ResultsDocument struct {
-	Schema string `json:"schema"`
+	Schema string
 	// RunID is 16 random bytes in hex, the only identifier in the document.
-	RunID      string            `json:"run_id"`
-	StartedAt  time.Time         `json:"started_at"`
-	FinishedAt time.Time         `json:"finished_at"`
-	Build      AppBuild          `json:"build"`
-	Device     DeviceProfile     `json:"device"`
-	Suite      SuiteSettings     `json:"suite"`
-	Results    []BenchmarkResult `json:"results"`
+	RunID      string
+	StartedAt  time.Time
+	FinishedAt time.Time
+	Build      AppBuild
+	Device     DeviceProfile
+	Suite      SuiteSettings
+	Results    []BenchmarkResult
 }
 
 // AppBuild says what ran the suite.
 type AppBuild struct {
-	AppVersion string `json:"app_version"`
+	AppVersion string
 	// AppRevision is the vcs revision Go stamped into the binary, if any.
-	AppRevision string `json:"app_revision,omitempty"`
+	AppRevision string
 	// SkycoinCx is the skycoin-cx module version, its commit at the end.
-	SkycoinCx string `json:"skycoin_cx"`
-	GoVersion string `json:"go_version"`
+	SkycoinCx string
+	GoVersion string
 }
 
 // DeviceProfile describes the hardware and OS. It holds no personal
 // identifier: no serial, IMEI, account or location.
 type DeviceProfile struct {
-	OS             string `json:"os"`
-	Arch           string `json:"arch"`
-	AndroidRelease string `json:"android_release,omitempty"`
-	AndroidSdk     int    `json:"android_sdk,omitempty"`
-	Manufacturer   string `json:"manufacturer,omitempty"`
-	Model          string `json:"model,omitempty"`
-	Abi            string `json:"abi,omitempty"`
-	CPUCores       int    `json:"cpu_cores"`
+	OS             string
+	Arch           string
+	AndroidRelease string
+	AndroidSdk     int
+	Manufacturer   string
+	Model          string
+	Abi            string
+	CPUCores       int
 	// CPUMaxMHz is the highest cpuinfo_max_freq of any core, 0 if unreadable.
-	CPUMaxMHz  int `json:"cpu_max_mhz"`
-	RAMTotalMB int `json:"ram_total_mb"`
+	CPUMaxMHz  int
+	RAMTotalMB int
 }
 
 // SuiteSettings are the scale and repetition of the run.
 type SuiteSettings struct {
-	Scale string `json:"scale"`
-	Sizes Sizes  `json:"sizes"`
-	Runs  int    `json:"runs"`
+	Scale string
+	Sizes Sizes
+	Runs  int
 }
 
 // BenchmarkResult is one program on one executor.
 type BenchmarkResult struct {
-	Benchmark string `json:"benchmark"`
-	Executor  string `json:"executor"`
-	Status    string `json:"status"`
+	Benchmark string
+	Executor  string
+	Status    string
 	// RunsMs are the wall times of main in milliseconds, compile excluded.
-	RunsMs       []float64 `json:"runs_ms"`
-	MedianMs     float64   `json:"median_ms"`
-	Hash         string    `json:"hash"`
-	ExpectedHash string    `json:"expected_hash"`
-	Operations   uint64    `json:"operations,omitempty"`
-	OpsPerMs     float64   `json:"ops_per_ms,omitempty"`
-	Message      string    `json:"message,omitempty"`
+	RunsMs       []float64
+	MedianMs     float64
+	Hash         string
+	ExpectedHash string
+	Operations   uint64
+	OpsPerMs     float64
+	Message      string
 }
 
-// EncodeResultsDocument returns doc as indented JSON.
+// resultColumns names the columns of the [results] table. The message is
+// last, so it may hold commas.
+const resultColumns = "benchmark, executor, status, median_ms, hash, expected_hash, operations, ops_per_ms, runs_ms, message"
+
+func formatFloat(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }
+
+// EncodeResultsDocument returns doc in the text form (#38): [run], [build],
+// [device] and [suite] sections of key = value lines and a [results] table
+// with one result per line. runs_ms is space separated.
 func EncodeResultsDocument(doc *ResultsDocument) ([]byte, error) {
-	b, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return nil, err
+	var w textform.Writer
+	w.Comment("CX playground benchmark run, text form.")
+	w.Section("run")
+	w.Key("schema", doc.Schema)
+	w.Key("run_id", doc.RunID)
+	w.Key("started_at", doc.StartedAt.Format(time.RFC3339Nano))
+	w.Key("finished_at", doc.FinishedAt.Format(time.RFC3339Nano))
+	w.Section("build")
+	for _, kv := range doc.Build.keys() {
+		w.Key(kv[0], kv[1])
 	}
-	return append(b, '\n'), nil
+	w.Section("device")
+	for _, kv := range doc.Device.keys() {
+		w.Key(kv[0], kv[1])
+	}
+	w.Section("suite")
+	w.Key("scale", doc.Suite.Scale)
+	w.Key("runs", strconv.Itoa(doc.Suite.Runs))
+	sizes := doc.Suite.Sizes
+	for _, name := range sizeNames {
+		w.Key(name, fmt.Sprint(reflectValue(sizeFields(&sizes)[name])))
+	}
+	w.Section("results")
+	w.Comment(resultColumns)
+	for _, r := range doc.Results {
+		runs := make([]string, len(r.RunsMs))
+		for i, v := range r.RunsMs {
+			runs[i] = formatFloat(v)
+		}
+		if strings.ContainsAny(r.Benchmark+r.Executor+r.Status+r.Hash+r.ExpectedHash, ",\n") {
+			return nil, fmt.Errorf("result %s %s: a comma in a column", r.Benchmark, r.Executor)
+		}
+		w.Row(r.Benchmark, r.Executor, r.Status, formatFloat(r.MedianMs), r.Hash, r.ExpectedHash,
+			strconv.FormatUint(r.Operations, 10), formatFloat(r.OpsPerMs), strings.Join(runs, " "), r.Message)
+	}
+	return w.Bytes(), nil
 }
 
-// DecodeResultsDocument reads one results document, rejecting unknown
-// fields, trailing data and documents that fail Validate.
+// sizeNames are the [sizes] keys in their order.
+var sizeNames = []string{"count_n", "fib_n", "array_rounds", "struct_rounds", "mem_n", "mem_walk", "sieve_n", "miller_n", "lucas_rounds"}
+
+func reflectValue(p any) any {
+	switch v := p.(type) {
+	case *int:
+		return *v
+	case *int64:
+		return *v
+	case *uint64:
+		return *v
+	}
+	return p
+}
+
+func (b AppBuild) keys() [][2]string {
+	out := [][2]string{{"app_version", b.AppVersion}}
+	if b.AppRevision != "" {
+		out = append(out, [2]string{"app_revision", b.AppRevision})
+	}
+	return append(out, [2]string{"skycoin_cx", b.SkycoinCx}, [2]string{"go_version", b.GoVersion})
+}
+
+func (d DeviceProfile) keys() [][2]string {
+	out := [][2]string{{"os", d.OS}, {"arch", d.Arch}}
+	for _, kv := range [][2]string{{"android_release", d.AndroidRelease}, {"manufacturer", d.Manufacturer}, {"model", d.Model}, {"abi", d.Abi}} {
+		if kv[1] != "" {
+			out = append(out, kv)
+		}
+	}
+	if d.AndroidSdk != 0 {
+		out = append(out, [2]string{"android_sdk", strconv.Itoa(d.AndroidSdk)})
+	}
+	return append(out, [2]string{"cpu_cores", strconv.Itoa(d.CPUCores)}, [2]string{"cpu_max_mhz", strconv.Itoa(d.CPUMaxMHz)},
+		[2]string{"ram_total_mb", strconv.Itoa(d.RAMTotalMB)})
+}
+
+// DecodeResultsDocument reads one results document in the text form,
+// rejecting unknown sections and keys, a section given twice, and
+// documents that fail Validate.
 func DecodeResultsDocument(r io.Reader) (*ResultsDocument, error) {
 	b, err := io.ReadAll(io.LimitReader(r, MaxDocumentBytes+1))
 	if err != nil {
@@ -106,19 +184,108 @@ func DecodeResultsDocument(r io.Reader) (*ResultsDocument, error) {
 	if len(b) > MaxDocumentBytes {
 		return nil, errors.New("document larger than 1 MiB")
 	}
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
-	var doc ResultsDocument
-	if err := dec.Decode(&doc); err != nil {
+	doc, err := parseResultsDocument(string(b))
+	if err != nil {
 		return nil, err
-	}
-	if dec.More() {
-		return nil, errors.New("data after the document")
 	}
 	if err := doc.Validate(); err != nil {
 		return nil, err
 	}
-	return &doc, nil
+	return doc, nil
+}
+
+func parseResultsDocument(text string) (*ResultsDocument, error) {
+	d, err := textform.Parse(text)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.Only("run", "build", "device", "suite", "results"); err != nil {
+		return nil, err
+	}
+	doc := &ResultsDocument{}
+	section := func(name string, keys ...string) (map[string]string, error) {
+		s, _ := d.Section(name)
+		return s.Keys(keys...)
+	}
+	k, err := section("run", "schema", "run_id", "started_at", "finished_at")
+	if err != nil {
+		return nil, err
+	}
+	doc.Schema, doc.RunID = k["schema"], k["run_id"]
+	for _, t := range []struct {
+		key string
+		to  *time.Time
+	}{{"started_at", &doc.StartedAt}, {"finished_at", &doc.FinishedAt}} {
+		if k[t.key] == "" {
+			continue
+		}
+		if *t.to, err = time.Parse(time.RFC3339Nano, k[t.key]); err != nil {
+			return nil, fmt.Errorf("%s: %w", t.key, err)
+		}
+	}
+	if k, err = section("build", "app_version", "app_revision", "skycoin_cx", "go_version"); err != nil {
+		return nil, err
+	}
+	doc.Build = AppBuild{AppVersion: k["app_version"], AppRevision: k["app_revision"], SkycoinCx: k["skycoin_cx"], GoVersion: k["go_version"]}
+	if k, err = section("device", "os", "arch", "android_release", "android_sdk", "manufacturer", "model", "abi", "cpu_cores", "cpu_max_mhz", "ram_total_mb"); err != nil {
+		return nil, err
+	}
+	doc.Device = DeviceProfile{OS: k["os"], Arch: k["arch"], AndroidRelease: k["android_release"], Manufacturer: k["manufacturer"], Model: k["model"], Abi: k["abi"]}
+	for _, n := range []struct {
+		key string
+		to  *int
+	}{{"android_sdk", &doc.Device.AndroidSdk}, {"cpu_cores", &doc.Device.CPUCores}, {"cpu_max_mhz", &doc.Device.CPUMaxMHz}, {"ram_total_mb", &doc.Device.RAMTotalMB}} {
+		if k[n.key] == "" {
+			continue
+		}
+		if *n.to, err = strconv.Atoi(k[n.key]); err != nil {
+			return nil, fmt.Errorf("device %s: %w", n.key, err)
+		}
+	}
+	if k, err = section("suite", append([]string{"scale", "runs"}, sizeNames...)...); err != nil {
+		return nil, err
+	}
+	doc.Suite.Scale = k["scale"]
+	if k["runs"] != "" {
+		if doc.Suite.Runs, err = strconv.Atoi(k["runs"]); err != nil {
+			return nil, fmt.Errorf("suite runs: %w", err)
+		}
+	}
+	fields := sizeFields(&doc.Suite.Sizes)
+	for _, name := range sizeNames {
+		if k[name] == "" {
+			continue
+		}
+		if err := setNumber(fields[name], k[name]); err != nil {
+			return nil, fmt.Errorf("suite %s: %w", name, err)
+		}
+	}
+	s, _ := d.Section("results")
+	rows, err := s.Rows(10)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		r := BenchmarkResult{Benchmark: row[0], Executor: row[1], Status: row[2], Hash: row[4], ExpectedHash: row[5], Message: row[9], RunsMs: []float64{}}
+		if r.MedianMs, err = strconv.ParseFloat(row[3], 64); err != nil {
+			return nil, fmt.Errorf("result %s %s median_ms: %w", r.Benchmark, r.Executor, err)
+		}
+		if r.Operations, err = strconv.ParseUint(row[6], 10, 64); err != nil {
+			return nil, fmt.Errorf("result %s %s operations: %w", r.Benchmark, r.Executor, err)
+		}
+		if r.OpsPerMs, err = strconv.ParseFloat(row[7], 64); err != nil {
+			return nil, fmt.Errorf("result %s %s ops_per_ms: %w", r.Benchmark, r.Executor, err)
+		}
+		for _, f := range strings.Fields(row[8]) {
+			v, err := strconv.ParseFloat(f, 64)
+			if err != nil {
+				return nil, fmt.Errorf("result %s %s runs_ms: %w", r.Benchmark, r.Executor, err)
+			}
+			r.RunsMs = append(r.RunsMs, v)
+		}
+		doc.Results = append(doc.Results, r)
+	}
+	return doc, nil
 }
 
 func validHex(s string, size int) bool {

@@ -1,7 +1,7 @@
 out synced 2 programs from 10.0.2.2:7003
 programs selected n=1 name="fib-and-primes"
-out downloaded fib-and-primes: 2 files, 798 bytes
-out checked fib-and-primes, loaded in RAM (798 bytes): runs
+out downloaded fib-and-primes: 2 files, 818 bytes
+out checked fib-and-primes, loaded in RAM (818 bytes): runs
 report file system no
 report networking no
 report process no
@@ -12,7 +12,7 @@ finished app="Downloaded: fib and primes" err=<nil>
 programs back
 programs selected n=2 name="reads-a-file"
 out downloaded reads-a-file
-out checked reads-a-file, loaded in RAM (243 bytes): refused, 3 sandbox violations
+out checked reads-a-file, loaded in RAM (261 bytes): refused, 3 sandbox violations
 report file system yes
 report library calls file os.ReadAllText
 report blocked imports os

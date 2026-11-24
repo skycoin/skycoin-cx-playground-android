@@ -13,14 +13,14 @@ import (
 func testApps() map[string]map[string][]byte {
 	return map[string]map[string][]byte{
 		"t": {
-			"cxapp.json": []byte(`{"name":"t","kind":"console"}`),
-			"main.cx":    bytes.Repeat([]byte("package main\n"), 90),
-			"lib/a.cx":   []byte("package main\n"),
-			"empty.txt":  nil,
+			"cxapp.txt": []byte("[app]\nname = t\nkind = console\n"),
+			"main.cx":   bytes.Repeat([]byte("package main\n"), 90),
+			"lib/a.cx":  []byte("package main\n"),
+			"empty.txt": nil,
 		},
 		"u": {
-			"cxapp.json": []byte(`{"name":"u","kind":"console"}`),
-			"main.cx":    []byte("package main\nfunc main() {}\n"),
+			"cxapp.txt": []byte("[app]\nname = u\nkind = console\n"),
+			"main.cx":   []byte("package main\nfunc main() {}\n"),
 		},
 	}
 }

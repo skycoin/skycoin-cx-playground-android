@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Benchmark: loops
+description = Integer and float loops, nested loops, iterative factorial
+kind = console

@@ -3,7 +3,7 @@
 package benchcollector
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"fmt"
 	"html"
@@ -19,7 +19,9 @@ import (
 	"github.com/skycoin/skycoin-cx-playground-android/benchsuite"
 )
 
-var runsBucket = []byte("runs")
+// runsBucket holds the documents in the text form of schema 2. Schema 1
+// documents were JSON in the "runs" bucket, which is left as it is.
+var runsBucket = []byte("runs-text")
 
 // ErrDuplicateRun is returned for a run ID that is already stored.
 var ErrDuplicateRun = errors.New("run already stored")
@@ -51,7 +53,7 @@ func (s *RunStore) Close() error { return s.db.Close() }
 
 // StoreRun saves doc, which must already be valid.
 func (s *RunStore) StoreRun(doc *benchsuite.ResultsDocument) error {
-	b, err := json.Marshal(doc)
+	b, err := benchsuite.EncodeResultsDocument(doc)
 	if err != nil {
 		return err
 	}
@@ -69,11 +71,11 @@ func (s *RunStore) ListRuns() ([]*benchsuite.ResultsDocument, error) {
 	var runs []*benchsuite.ResultsDocument
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket(runsBucket).ForEach(func(_, v []byte) error {
-			var doc benchsuite.ResultsDocument
-			if err := json.Unmarshal(v, &doc); err != nil {
+			doc, err := benchsuite.DecodeResultsDocument(bytes.NewReader(v))
+			if err != nil {
 				return err
 			}
-			runs = append(runs, &doc)
+			runs = append(runs, doc)
 			return nil
 		})
 	})

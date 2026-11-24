@@ -73,9 +73,9 @@ func TestRejects(t *testing.T) {
 		}
 	}
 	b, _ := benchsuite.EncodeResultsDocument(sampleDocument())
-	extra := bytes.Replace(b, []byte(`"schema"`), []byte(`"imei": "1", "schema"`), 1)
-	if _, err := benchsuite.DecodeResultsDocument(bytes.NewReader(extra)); err == nil || !strings.Contains(err.Error(), "unknown field") {
-		t.Errorf("unknown field: err %v", err)
+	extra := bytes.Replace(b, []byte("schema = "), []byte("imei = 1\nschema = "), 1)
+	if _, err := benchsuite.DecodeResultsDocument(bytes.NewReader(extra)); err == nil || !strings.Contains(err.Error(), "unknown key") {
+		t.Errorf("unknown key: err %v", err)
 	}
 	if _, err := benchsuite.DecodeResultsDocument(bytes.NewReader(append(b, b...))); err == nil {
 		t.Error("two documents accepted")

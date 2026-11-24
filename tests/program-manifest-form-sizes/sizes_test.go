@@ -59,7 +59,7 @@ func benchmarkApp(t testing.TB) map[string][]byte {
 func program64KB() map[string][]byte {
 	b := make([]byte, 64<<10)
 	rand.New(rand.NewSource(1)).Read(b)
-	return map[string][]byte{"cxapp.json": []byte(`{"name":"64 KB program","form":"ir","entry":"main.cxir"}`), "main.cxir": b}
+	return map[string][]byte{"cxapp.txt": []byte("[app]\nname = 64 KB program\nform = ir\nentry = main.cxir\n"), "main.cxir": b}
 }
 
 func TestFormSizes(t *testing.T) {

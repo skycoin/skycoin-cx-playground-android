@@ -1,7 +1,7 @@
 //go:build cxopcount
 
 // Package benchmarkopcounts checks the operation counts in the benchmark
-// app's suite.json, which the app divides by its median times for ops/ms.
+// app's suite.txt, which the app divides by its median times for ops/ms.
 // Run it with: go test -tags cxopcount ./tests/benchmark-opcounts
 package benchmarkopcounts
 
@@ -42,7 +42,7 @@ func TestSuiteOperationCounts(t *testing.T) {
 				t.Fatal(bench.Name, executor, err)
 			}
 			if got := *counter - before; got != bench.Operations[string(executor)] {
-				t.Errorf("%s %s: counted %d operations, suite.json has %d", bench.Name, executor, got, bench.Operations[string(executor)])
+				t.Errorf("%s %s: counted %d operations, suite.txt has %d", bench.Name, executor, got, bench.Operations[string(executor)])
 			}
 		}
 	}

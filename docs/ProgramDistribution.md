@@ -16,7 +16,7 @@ it is named next to the lead's term, and the two do not correspond exactly.
 
 This section defines the words the rest of the document uses.
 
-- A *program* is one CX app: its source or serialized IR, its `cxapp.json`
+- A *program* is one CX app: its source or serialized IR, its `cxapp.txt`
   metadata file and any data files. It is what the app list shows today.
 - A *block* is a piece of a file of at most the file's block size, 512
   bytes by default. The last block of a file can be shorter. A block is what
@@ -201,8 +201,8 @@ client can read any range of them without reading the rest.
 The block IDs, lengths and offsets are redundant with the file list. A
 reader checks that they all agree and rejects the manifest otherwise.
 
-A program of 64 KB has 129 blocks with its `cxapp.json`, which makes a
-manifest of 8769 bytes (measured, see D30).
+A program of 64 KB has 129 blocks with its `cxapp.txt`, which makes a
+manifest of 8768 bytes (measured, see D30).
 
 ### Linear packing
 
@@ -303,7 +303,7 @@ whose test rebuilds it from `program/` and checks that it prints back the
 same bytes. Its signer key is derived from the public seed `cx playground
 example signer`, so it is for tests only. The program has two files, and
 `main.cx` is 673 bytes, so it has two blocks, and its second block starts at
-offset 637 of the linear packing, not at a multiple of 512.
+offset 657 of the linear packing, not at a multiple of 512.
 
 ```ini
 ; CX program manifest, text form. The address and signature are over the binary form.
@@ -311,35 +311,35 @@ offset 637 of the linear packing, not at a multiple of 512.
 magic           = CXPM
 version         = 1
 date            = 1795478400
-manifest_length = 703
-pack_length     = 798
-merkle_hash     = ec58e0a6486748dd3e27041d757216637ea7dbefd55e07aa90dd54e62a0642a8
+manifest_length = 702
+pack_length     = 818
+merkle_hash     = 91a183d90c771d505b8cd0189e804e8ee9e3a13e0d00a634759b228c4a18c50f
 signer          = 039a645f9f2e3e101defd413e99b31a44c2e8f43620f3029bdd5454c652d6f0399
-signature       = 76073fb71696b820525e17084b6b3ce45066bf15417597687bcf557979dd75e946e01dbddb37eae4bd97fad3dc9314b6fe99ea6d4e8cec2172e4e95ae347c4d901
-address         = 33b4c5b0eecd6b75fe88fac07b24e7a31c024c027a74e0ea566390b8a908dd41
+signature       = 3152d3b05733e170c9cecec7742603af07015f1784db60342d47c9805a41ef4834ca155fc8e016c5303657070919b5c1c28c36379961238b89a47ec988bb680601
+address         = 86577f95c11bcfd79350e0ea0b24780ed0014c389f0a546e07eb867840e72f1e
 
 [arrays]
 ; kind, count, offset, length, hash
-  1,    2,     306,    205,    6e402d956969a8a2318aff1356087f87c6d240c8077ea3130456c84e1a0558ba
-  2,    3,     511,    144,    7df19b9d10ec8c9155008be599d248dfd8ffd3b878dcf9972266f2fc30aa6e35
-  3,    3,     655,    48,     4e596b093b847948772757a8997d7038bc3ea14be0bbe75fc603fa889aeefc87
+  1,    2,     306,    204,    b4df9cf2d8335c18708d56093cfd0ccb18f02d6efc4d2c133b1575794fa30235
+  2,    3,     510,    144,    2292f8cbe45054a1b8222b4d187a960547afad377f435b4b7cf72fc44dcd6ff8
+  3,    3,     654,    48,     9e7ca0119fb6498899b703a610eecb527709709f87801244e0177983e63c1f84
 
 [files]
-; path,       file_hash,                                                        size, offset, block_size, first_block, block_count, merkle_hash
-  cxapp.json, 4755ead67638c13fd43f56cca93b8946074e3f86e0be0a1fe9da862722d2ef3f, 125,  0,      512,        1,           1,           4755ead67638c13fd43f56cca93b8946074e3f86e0be0a1fe9da862722d2ef3f
-  main.cx,    aa24c98456232ee3a7d1f898e3eb1146caa23779dbd6cb2f2c55c1d61beda91f, 673,  125,    512,        2,           2,           adaea5e4a6e79ec088ec23db8c02c40594b78975ec68a5b0f5b636fbb142d48b
+; path,      file_hash,                                                        size, offset, block_size, first_block, block_count, merkle_hash
+  cxapp.txt, 2e40baeaa7dbbbb0483eaa7113421b7a91d3d55aba4e4f479bde83918193184d, 145,  0,      512,        1,           1,           2e40baeaa7dbbbb0483eaa7113421b7a91d3d55aba4e4f479bde83918193184d
+  main.cx,   aa24c98456232ee3a7d1f898e3eb1146caa23779dbd6cb2f2c55c1d61beda91f, 673,  145,    512,        2,           2,           adaea5e4a6e79ec088ec23db8c02c40594b78975ec68a5b0f5b636fbb142d48b
 
 [hashes]
 ; block_hash,                                                       block_id, size, offset
-  4755ead67638c13fd43f56cca93b8946074e3f86e0be0a1fe9da862722d2ef3f, 1,        125,  0
+  2e40baeaa7dbbbb0483eaa7113421b7a91d3d55aba4e4f479bde83918193184d, 1,        145,  0
   d431f9aa898ad795ac4d3fdda0c34a8db75f9ec07d47b7e90158222c02db5a93, 2,        512,  0
   44f5c83df84986299209e4083f376d8c5694df314fd8ece10c48da6d2bd9f017, 3,        161,  512
 
 [linear]
 ; block_id, offset, length
-  1,        0,      125
-  2,        125,    512
-  3,        637,    161
+  1,        0,      145
+  2,        145,    512
+  3,        657,    161
 ```
 
 ### Verification of the files
@@ -355,16 +355,40 @@ the manifest is verified.
 
 ### Relation to the JSON manifest
 
-This section says how the new format sits next to the existing one.
+There is no JSON left in the core (#38, D25). The binary manifest replaced
+the JSON program manifest (#28), and the embedded bundle uses it too, in
+the layout of the program store. `cxmanifest build` and `hash`, which
+printed the old JSON form, are gone.
 
-- The embedded bundle uses the binary format too, in the layout of the
-  program store, as D25 option a planned once the store existed. The JSON
-  form stays only as the output of `cxmanifest build` and `hash` and as the
-  app manifest the app shows and runs.
-- The program metadata (name, kind, form, entry, arguments) stays in
-  `cxapp.json`, which is an ordinary file of the binary manifest. A client
-  rebuilds a `manifest.Manifest` from the downloaded files with
+- The program metadata (name, description, kind, form, entry, arguments,
+  includes) is `cxapp.txt` in the text form: an `[app]` section of
+  `key = value` lines and optional `[args]` and `[include]` sections with
+  one entry per line. It is an ordinary file of the binary manifest. A
+  client rebuilds a `manifest.Manifest` from the downloaded files with
   `programblocks.AppManifest`, and runs it with `apprun.Run` as today.
+- The benchmark suite is `suite.txt` and a results document is text too,
+  see the README. `tests/no-json-in-core` fails when a Go file outside
+  `microagents/` and `vendor/` imports `encoding/json`. The micro agents'
+  codingbench `solution.json` files stay: they are Anthropic API message
+  transcripts, which that API defines as JSON, kept as test data.
+
+```ini
+; CX app, text form.
+[app]
+name = Programs: fetch over UDP at 128 bytes
+kind = fetch
+entry = fetch.txt
+
+[args]
+10.0.2.2:7004
+03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d
+fib-and-primes
+packet=128
+forms=short
+```
+
+An argument line is taken as it is, trimmed, so an argument cannot start
+with `;` or `[` or be empty.
 
 ## UDP operations (#15)
 
@@ -585,11 +609,11 @@ in its folder. It also checks every operation's floor, the smallest size
 its packet layout allows, against the runs: every size at or above the
 floor works and every size below it fails with error 6, packet too small.
 
-The reference program is `apps/benchmarks`: 8 files, a manifest of 2472
-bytes, 21 blocks and 8599 bytes of linear packing. A cell is the packets
+The reference program is `apps/benchmarks`: 8 files, a manifest of 2406
+bytes, 20 blocks and 8247 bytes of linear packing. A cell is the packets
 (requests and replies) and bytes (headers included) for one fetch: the
 manifest list address for list manifests, the program manifest for get
-manifest, all 21 block entries for get block list, the whole linear packing
+manifest, all 20 block entries for get block list, the whole linear packing
 for get blocks, and the whole program from list to verified files for fetch
 program. The DHT rows are one announce and request of the program from
 a node to its subscriber (subscribe, have, and the subscriber's request
@@ -601,18 +625,18 @@ are not counted, and there were none.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | list manifests 0x01 | 2/48 | 2/48 | 2/48 | 2/48 | 2/48 | 2/48 | 2/48 | fails | fails | 42 | reply: header 6, 32-byte address, length 4 |
 | list manifests prefix 0x05 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/23 | 15 | reply: header 6, prefix 1+4, length 4 |
-| get manifest 0x02 | 4/2652 | 6/2742 | 6/2742 | 12/3012 | 24/3552 | 62/5262 | 276/14892 | fails | fails | 47 | request 44 with the 32-byte address, reply 46 before the first byte |
-| get manifest by prefix 0x06 | 4/2560 | 6/2604 | 6/2604 | 12/2736 | 22/2956 | 48/3528 | 122/5156 | 550/14572 | fails | 20 | reply: header 6, prefix 1+4, offset 4, length 4, one byte |
-| get block list 0x03 | 2/1096 | 2/1096 | 4/1184 | 6/1272 | 12/1536 | 42/2856 | fails | fails | fails | 92 | reply 44 with the 32-byte address, plus one 48-byte block entry |
-| get block list bytes 0x07 | 2/1052 | 2/1052 | 4/1096 | 6/1140 | 10/1228 | 20/1448 | 50/2108 | 224/5936 | fails | 20 | as get manifest by prefix |
-| get blocks 0x04 | 16/9367 | 18/9463 | 28/9943 | fails | fails | fails | fails | fails | fails | 560 | reply 48 with the 32-byte address, plus one whole 512-byte block |
-| get block part 0x08 | 42/9586 | 42/9586 | 42/9586 | 68/10197 | 102/10996 | 174/12688 | 408/18187 | 1350/40324 | 17198/275168 | 16 | reply: header 6, block prefix 1+4, offset 2, length 2, one byte |
-| fetch program, forms=full | 26/12995 | 28/13091 | 40/13667 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
-| fetch program, forms=short | 56/13093 | 56/13093 | 56/13093 | 92/13936 | 140/15058 | 238/17352 | 562/24933 | 1902/56231 | fails | 20 | get manifest by prefix |
+| get manifest 0x02 | 4/2586 | 6/2676 | 6/2676 | 12/2946 | 24/3486 | 60/5106 | 268/14466 | fails | fails | 47 | request 44 with the 32-byte address, reply 46 before the first byte |
+| get manifest by prefix 0x06 | 4/2494 | 6/2538 | 6/2538 | 10/2626 | 22/2890 | 46/3418 | 118/5002 | 536/14198 | fails | 20 | reply: header 6, prefix 1+4, offset 4, length 4, one byte |
+| get block list 0x03 | 2/1048 | 2/1048 | 2/1048 | 6/1224 | 10/1400 | 40/2720 | fails | fails | fails | 92 | reply 44 with the 32-byte address, plus one 48-byte block entry |
+| get block list bytes 0x07 | 2/1004 | 2/1004 | 2/1004 | 4/1048 | 10/1180 | 20/1400 | 48/2016 | 214/5668 | fails | 20 | as get manifest by prefix |
+| get blocks 0x04 | 16/9014 | 18/9110 | 26/9494 | fails | fails | fails | fails | fails | fails | 560 | reply 48 with the 32-byte address, plus one whole 512-byte block |
+| get block part 0x08 | 40/9186 | 40/9186 | 40/9186 | 64/9750 | 96/10502 | 166/12147 | 392/17458 | 1294/38655 | 16492/263872 | 16 | reply: header 6, block prefix 1+4, offset 2, length 2, one byte |
+| fetch program, forms=full | 26/12576 | 28/12672 | 38/13152 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
+| fetch program, forms=short | 54/12627 | 54/12627 | 54/12627 | 88/13423 | 134/14498 | 230/16745 | 542/24044 | 1836/54261 | fails | 20 | get manifest by prefix |
 | subscribe 0x11 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 10 | request and reply: header 6, lease 4 |
 | have 0x10 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | fails | fails | 50 | request: header 6, 32-byte address, lengths 4 and 8 |
-| announce and request one program, forms=full | 14/11655 | 16/11749 | 21/11989 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
-| announce and request one program, forms=short | 27/11624 | 28/11647 | 28/11647 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
+| announce and request one program, forms=full | 14/11236 | 16/11330 | 20/11522 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
+| announce and request one program, forms=short | 26/11186 | 27/11209 | 27/11209 | 41/11483 | 63/11925 | 110/12866 | 259/15841 | fails | fails | 50 | the have |
 | get peers 0x12 | 2/138 | 2/138 | 2/138 | 2/138 | 2/138 | 2/113 | 2/63 | 2/38 | fails | 32 | reply: header 6, count 1, one 25-byte IPv6 entry |
 
 Findings:
@@ -637,14 +661,14 @@ Findings:
   down to 20 bytes, where 16 fails at get manifest by prefix.
 - Announce and request needs the have, so its floor in the short forms
   is 50 bytes (D35).
-- In the short forms every operation works at 64 bytes and up. That is the
-  practical floor. At 32 bytes a program can still be fetched from a
-  server, in 1902 packets instead of 56 at 1200, but a node cannot announce.
-  At 16 no program can be fetched.
-- Cost: in the full forms fetching the program takes 28 packets and 13091
-  bytes at 1200. In the short forms it takes 56 packets and 13093 bytes at
-  1200, 238 packets and 17352 bytes at 128, 562 and 24933 at 64, and 1902
-  and 56231 at 32 (4.3 times the bytes).
+- In the short forms every operation works at 64 bytes and up. That is
+  the practical floor. At 32 bytes a program can still be fetched from
+  a server, in 1836 packets instead of 54 at 1200, but a node cannot
+  announce. At 16 no program can be fetched.
+- Cost: in the full forms fetching the program takes 28 packets and 12672
+  bytes at 1200. In the short forms it takes 54 packets and 12627 bytes at
+  1200, 230 packets and 16745 bytes at 128, 542 and 24044 at 64, and 1836
+  and 54261 at 32 (4.3 times the bytes).
 - At 1200 the short forms send about the same bytes in twice the packets,
   because a get block part never spans two blocks. So the forms flag
   defaults to full.
@@ -1049,7 +1073,7 @@ node gives the caller.
 
 An app of kind `subscribe` runs a super node on the phone with an empty
 store in the app's files dir. Its args are the nodes to subscribe to, the
-trusted signer key and the name in the wanted program's `cxapp.json`. It
+trusted signer key and the name in the wanted program's `cxapp.txt`. It
 prints every have it reads from its queue, its policy requests each
 program, and it waits up to 30 s for the wanted one, then checks and runs
 it like a `fetch` app.
@@ -1365,12 +1389,13 @@ D30 ProgramManifestCanonicalFormDecision
   a tool or a small device writes it directly, and the binary form is dropped
   or kept only as a cache.
 - Evidence, measured by `tests/program-manifest-form-sizes` on the host (an
-  Intel i7-3770S), with gzip at its best level and lz4 block mode:
+  Intel i7-3770S), with gzip at its best level and lz4 block mode, after
+  the text cxapp.txt of #38:
 
   | Manifest | Blocks | Binary | gzip | lz4 | Text | gzip | lz4 |
   |---|---|---|---|---|---|---|---|
-  | apps/benchmarks | 21 | 2472 | 1780 | 1947 | 5157 | 2265 | 3817 |
-  | 64 KB program | 129 | 8769 | 6087 | 6854 | 16313 | 7171 | 12787 |
+  | apps/benchmarks | 20 | 2406 | 1742 | 1900 | 5045 | 2214 | 3725 |
+  | 64 KB program | 129 | 8768 | 6090 | 6855 | 16310 | 7160 | 12756 |
 
   Decoding the 64 KB program's manifest takes 0.72 ms and 123 allocations
   (35 KB) in binary, and 1.03 ms and 1396 allocations (149 KB) from text.
@@ -1429,7 +1454,7 @@ D35 ProgramPacketSizeFloorDecision
   names, with the sizes below 128 left as untested extras.
 - Evidence: the sweep table. The smallest links named so far are 802.15.4
   (127-byte frames) and LoRa at its slowest data rates (51-byte payloads),
-  and both carry the 50-byte have. A fetch at 32 bytes takes 1902 packets
+  and both carry the 50-byte have. A fetch at 32 bytes takes 1836 packets
   and 4.3 times the bytes of a fetch at 1200.
 - Recommendation: option a, because every link named so far carries 64
   bytes, the have fits LoRa's 51 bytes, and option b changes how a node
@@ -1555,6 +1580,24 @@ D70 MediumNodeRelayDefaultDecision
 - Recommendation: option a, because #44 asks for relay as an option instead
   of always on, and a medium node that keeps only its pins has little to
   relay. Built: `Settings.Relay` false by default.
+
+D71 CollectorJsonRunsDecision
+- What exists now: #38 makes a results document text, schema
+  `cx-playground-benchmark/2`. The collector at bench.skywire.dev (D11)
+  holds the runs uploaded so far as JSON in its `runs` bucket, and a
+  collector built from main reads only text from a new `runs-text` bucket.
+  Release APKs built before #38 upload JSON, which the new collector
+  refuses.
+- Question: what happens to the JSON runs already stored?
+- Option a: leave them in the `runs` bucket, unread, and list only runs
+  uploaded in the text form.
+- Option b: convert them once with a tool outside the core (it needs a
+  JSON reader), then drop the JSON bucket.
+- Option c: delete them.
+- Recommendation: option a, because it keeps the data without bringing
+  JSON back into the core, and option b stays possible later. Built: the
+  `runs-text` bucket in `benchcollector`. The deployed collector and the
+  release APKs need a rebuild from main to take text documents.
 
 ## Task breakdown
 

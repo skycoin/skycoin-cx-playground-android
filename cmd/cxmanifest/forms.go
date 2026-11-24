@@ -18,19 +18,8 @@ const (
 	forthEntry = "main.fs"
 )
 
-// buildApp is manifest.BuildDir with the program forms applied: an ir app's
-// CX sources become one serialized program, and a forth app with a
-// cxir_example gets that program's Forth translation.
-func buildApp(dir string, chunk int) (*manifest.Manifest, map[manifest.Hash][]byte, error) {
-	files, err := appFiles(dir)
-	if err != nil {
-		return nil, nil, err
-	}
-	return manifest.Build(files, chunk)
-}
-
 // appFiles returns the files of the app directory dir with the program
-// forms applied and the final cxapp.json, the files the bundle holds.
+// forms applied and the final cxapp.txt, the files the bundle holds.
 func appFiles(dir string) (fstest.MapFS, error) {
 	files, meta, err := manifest.ReadDir(dir)
 	if err != nil {

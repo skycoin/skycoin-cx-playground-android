@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Terminal grid text
+description = Test demo: text at rows and columns of the monospaced grid, with a block cursor
+kind = gfx

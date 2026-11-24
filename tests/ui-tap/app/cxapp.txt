@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Tap
+description = Test demo: marks and prints every tap
+kind = gfx

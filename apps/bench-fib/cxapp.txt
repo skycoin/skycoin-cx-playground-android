@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Benchmark: recursive fib
+description = Recursive Fibonacci, timed per n
+kind = console

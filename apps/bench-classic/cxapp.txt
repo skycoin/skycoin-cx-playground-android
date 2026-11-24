@@ -1,0 +1,5 @@
+; CX app, text form.
+[app]
+name = Benchmark: skycoin-cx classics
+description = Ackermann, recursive and iterative factorial, digital root from skycoin-cx/benchmarks
+kind = console

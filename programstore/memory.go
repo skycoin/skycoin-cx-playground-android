@@ -10,7 +10,7 @@ import (
 )
 
 // LoadedProgram is a program held in RAM: its verified files and the app
-// manifest built from their cxapp.json, ready for apprun.Run.
+// manifest built from their cxapp.txt, ready for apprun.Run.
 type LoadedProgram struct {
 	Address programblocks.Hash
 	App     *manifest.Manifest

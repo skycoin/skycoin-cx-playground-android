@@ -1,0 +1,54 @@
+; CX app, text form.
+[app]
+name = Type echo
+description = Test demo: echoes typed lines and taps to the screen and the console
+kind = gfx
+package main
+
+import "sys/app"
+import "sys/string"
+
+func main() {
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var text str = ""
+	var last str = "nothing typed yet"
+	var taps i32 = 0
+
+	printf("ready\n")
+	for bool.not(app.ShouldClose()) {
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			if kind == app.TOUCH_UP {
+				taps = taps + 1
+				printf("tap %d at %d %d\n", taps, f32.i32(ex), f32.i32(ey))
+			}
+			if kind == app.KEY {
+				if code == app.KEY_ENTER {
+					printf("typed: %s\n", text)
+					last = text
+					text = ""
+				} else {
+					if code == app.KEY_BACKSPACE {
+						if len(text) > 0 {
+							text = string.SubstringByByteRange(text, 0, len(text)-1)
+						}
+					} else {
+						text = string.Concatenation(text, app.Rune(code))
+					}
+				}
+			}
+			kind, ex, ey, code = app.PollEvent()
+		}
+
+		app.Clear(0.1, 0.1, 0.12)
+		app.Text("Type echo", 32.0, 40.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+		app.Text(string.Concatenation("> ", string.Concatenation(text, "_")), 32.0, 120.0, 0.0, 0.6, 1.0, 0.6, 1.0)
+		app.Text(string.Concatenation("last: ", last), 32.0, 200.0, 0.0, 0.8, 0.8, 0.9, 1.0)
+		app.Text(sprintf("taps: %d", taps), 32.0, 280.0, 0.0, 0.8, 0.8, 0.9, 1.0)
+		app.Rect(32.0, 360.0, 200.0, 200.0, 0.2, 0.5, f32.mul(i32.f32(taps%5), 0.2), 1.0)
+		app.Frame()
+	}
+}

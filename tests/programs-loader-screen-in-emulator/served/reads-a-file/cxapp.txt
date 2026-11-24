@@ -1,0 +1,6 @@
+; CX app, text form.
+[app]
+name = reads a file
+description = Reads a file, which a fetched program may not
+kind = console
+entry = main.cx

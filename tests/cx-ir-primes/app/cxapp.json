@@ -1,1 +1,0 @@
-{"name": "CX IR: primes", "description": "Test demo: the primes benchmark as a serialized CX program", "kind": "console", "form": "ir", "include": ["../../../apps/benchmarks/primes.cx"], "entry": "primes.cx"}

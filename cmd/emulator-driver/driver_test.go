@@ -143,14 +143,14 @@ func TestParseNewSteps(t *testing.T) {
 			t.Errorf("%q parsed", bad)
 		}
 	}
-	expect, err := parseExpectations(strings.NewReader("screen-matches grid 0 100 720 300\nfile-equals out.txt ../x/expected.txt\nfile-contains doc.json \"status\": \"pass\"\n"))
+	expect, err := parseExpectations(strings.NewReader("screen-matches grid 0 100 720 300\nfile-equals out.txt ../x/expected.txt\nfile-contains doc.txt status = pass\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if r := region(expect[0]); r == nil || *r != image.Rect(0, 100, 720, 400) {
 		t.Fatalf("region %v", r)
 	}
-	if expect[2].args[1] != `"status": "pass"` {
+	if expect[2].args[1] != "status = pass" {
 		t.Fatalf("file-contains %q", expect[2].args)
 	}
 	for _, bad := range []string{"screen-matches a 1 2 3", "screen-matches a 1 2 3 -4", "file-equals a", "file-contains a"} {
@@ -190,10 +190,10 @@ func TestPublishedFile(t *testing.T) {
 	sum := sha256.Sum256(data)
 	trace := []string{
 		"file path=other/a.txt bytes=1 chunks=1 sha256=00",
-		fmt.Sprintf("file path=benchmark-results/x.json bytes=%d chunks=2 sha256=%x", len(data), sum),
-		"file-chunk path=benchmark-results/x.json n=0 " + base64.StdEncoding.EncodeToString(data[:10]),
+		fmt.Sprintf("file path=benchmark-results/x.txt bytes=%d chunks=2 sha256=%x", len(data), sum),
+		"file-chunk path=benchmark-results/x.txt n=0 " + base64.StdEncoding.EncodeToString(data[:10]),
 		"frame n=1 event=0",
-		"file-chunk path=benchmark-results/x.json n=1 " + base64.StdEncoding.EncodeToString(data[10:]),
+		"file-chunk path=benchmark-results/x.txt n=1 " + base64.StdEncoding.EncodeToString(data[10:]),
 	}
 	var raw strings.Builder
 	for _, l := range trace {
@@ -203,7 +203,7 @@ func TestPublishedFile(t *testing.T) {
 	close(w.done)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	b, err := w.publishedFile(ctx, "benchmark-results/*.json")
+	b, err := w.publishedFile(ctx, "benchmark-results/*.txt")
 	if err != nil || string(b) != string(data) {
 		t.Fatalf("%q %v", b, err)
 	}

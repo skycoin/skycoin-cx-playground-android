@@ -22,7 +22,7 @@ import (
 // phone. It subscribes to nodes, reads every have from its have queue, and
 // requests each program, until the wanted one is held (#42). Its args are
 // the comma separated nodes to subscribe to, the trusted signer key in hex
-// and the name in the wanted program's cxapp.json, see "Announce and
+// and the name in the wanted program's cxapp.txt, see "Announce and
 // request" in docs/ProgramDistribution.md.
 const subscribeKind = "subscribe"
 
