@@ -5,7 +5,7 @@ import "sys/string"
 // inboundNext is the wrapper for the inbound message queue, the port of
 // message_bus_pop_inbound. Live messages come from the ++inbound file, one
 // per line as channel, chat id and content separated by tabs.
-func inboundNext() (message InboundMessage, found bool) {
+func inboundNext() (message InboundMessage, found bool) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
 	found = false
 	if gWrapperState.mode == WrapperModeReplay {
 		var kind str = tapePeekKind()

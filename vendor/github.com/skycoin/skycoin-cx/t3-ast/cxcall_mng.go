@@ -23,6 +23,7 @@ type CXCallMng struct {
 }
 
 // CXCallMngInit sets the Cap and whether the grow boundary may grow it.
+// VIOLATION STRHOT-247: E, the assert text of a bad Init, built only when it fails, #412.
 func (manager *CXCallMng) CXCallMngInit(capacity int, growable bool) {
 	if manager.CXCallMngLen != 0 {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("CXCallMngInit on a manager holding %d objects", manager.CXCallMngLen))

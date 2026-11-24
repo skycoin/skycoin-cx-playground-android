@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -22,6 +23,9 @@ type Lexer struct {
 	nlsemi    bool //whether or not newline is SCOLON
 	eof       bool //eof
 	colbefore bool //used for colon keywords
+
+	// braceDepth counts the braces open, which a global statement needs to be 1.
+	braceDepth int
 
 	// VIOLATION: pointer at rest; becomes yySymTypeGid in phase 3.
 	tok *yySymType //symbol read. soon to be depracated for fully new cxgo
@@ -222,9 +226,11 @@ redonext:
 		s.tok.yys = RBRACK
 	case '{':
 		s.nextch()
+		s.braceDepth++
 		s.tok.yys = LBRACE
 	case '}':
 		s.nextch()
+		s.braceDepth--
 		s.nlsemi = true
 		s.tok.yys = RBRACE
 	case ',':
@@ -473,6 +479,9 @@ func (s *Lexer) ident() {
 				RETURN, BREAK, CONTINUE, BOOLEAN_LITERAL:
 				s.nlsemi = true
 				s.tok.tok = getTypeName(tok)
+			}
+			if tok == GLOBAL {
+				s.tok.i = s.braceDepth
 			}
 			s.tok.yys = tok
 			if tok == BOOLEAN_LITERAL {
@@ -784,13 +793,15 @@ func (s *Lexer) lineComment() {
 	}
 }
 
+// rawString reads a raw string literal. As Go, its value drops the carriage
+// returns (https://go.dev/ref/spec#String_literals).
 func (s *Lexer) rawString() {
 	s.stop()
 	s.nextch()
 	s.start()
 	for {
 		if s.ch == '`' {
-			s.tok.tok = string(s.segment())
+			s.tok.tok = strings.ReplaceAll(string(s.segment()), "\r", "")
 			s.nextch()
 			break
 		}
@@ -800,15 +811,15 @@ func (s *Lexer) rawString() {
 		}
 		s.nextch()
 	}
-	// We leave CRs in the string since they are part of the
-	// literal (even though they are not part of the literal
-	// value).
 
 	s.tok.yys = STRING_LITERAL
 	s.nlsemi = true
 }
 
+// stdString reads an interpreted string literal, whose escapes follow
+// https://go.dev/ref/spec#Rune_literals.
 func (s *Lexer) stdString() {
+	valid := true
 	s.nextch()
 
 	for {
@@ -818,12 +829,9 @@ func (s *Lexer) stdString() {
 		}
 		if s.ch == '\\' {
 			s.nextch()
-
-			if !s.IsEscape('"') {
-				continue
-				//nothing? Empty Branch?
+			if !s.escape('"') {
+				valid = false
 			}
-			s.nextch()
 			continue
 		}
 		if s.ch == '\n' {
@@ -843,30 +851,40 @@ func (s *Lexer) stdString() {
 		s.nextch()
 	}
 
-	var err error
 	s.tok.yys = STRING_LITERAL
+	s.nlsemi = true
+	if !valid {
+		// The escape is reported, and Unquote would only report it again.
+		s.tok.tok = ""
+		return
+	}
+	var err error
 	s.tok.tok, err = strconv.Unquote(string(s.segment()))
 	if err != nil {
 		s.errorf("invalid string literal: " + err.Error())
 	}
-	s.nlsemi = true
 }
 
-func (s *Lexer) IsEscape(quote rune) bool {
+// escape reads the escape after a backslash as the Go scanner does, quote
+// being the quote of the literal, and reports whether it is valid.
+func (s *Lexer) escape(quote rune) bool {
 	var n int
 	var base, max uint32
 
 	switch s.ch {
 	case quote, 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\':
+		s.nextch()
 		return true
 	case '0', '1', '2', '3', '4', '5', '6', '7':
 		n, base, max = 3, 8, 255
-		//TODO <-- find way to trigger this condition in strings test
 	case 'x':
+		s.nextch()
 		n, base, max = 2, 16, 255
 	case 'u':
+		s.nextch()
 		n, base, max = 4, 16, unicode.MaxRune
 	case 'U':
+		s.nextch()
 		n, base, max = 8, 16, unicode.MaxRune
 	default:
 		if s.ch < 0 {
@@ -891,8 +909,8 @@ func (s *Lexer) IsEscape(quote rune) bool {
 			s.errorf(fmt.Sprintf("invalid character %q in %s escape", s.ch, baseName(int(base))))
 			return false
 		}
-		// d < base
 		x = x*base + d
+		s.nextch()
 	}
 
 	if x > max && base == 8 {
@@ -907,69 +925,3 @@ func (s *Lexer) IsEscape(quote rune) bool {
 
 	return true
 }
-
-//has side effects???
-//replace with "IsEscape" and call nextch() manuelly
-
-/*
-func (s *Lexer) escape(quote rune) bool {
-	var n int
-	var base, max uint32
-
-	switch s.ch {
-	case quote, 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\':
-		s.nextch()
-		return true
-	case '0', '1', '2', '3', '4', '5', '6', '7':
-		n, base, max = 3, 8, 255
-		//ERROR!? Why isnt nextch() called here?
-	case 'x':
-		s.nextch()
-		n, base, max = 2, 16, 255
-	case 'u':
-		s.nextch()
-		n, base, max = 4, 16, unicode.MaxRune
-	case 'U':
-		s.nextch()
-		n, base, max = 8, 16, unicode.MaxRune
-	default:
-		if s.ch < 0 {
-			return true // complain in caller about EOF
-		}
-		s.errorf("unknown escape")
-		return false
-	}
-
-	var x uint32
-	for i := n; i > 0; i-- {
-		if s.ch < 0 {
-			return true // complain in caller about EOF
-		}
-		d := base
-		if isDecimal(s.ch) {
-			d = uint32(s.ch) - '0'
-		} else if 'a' <= lower(s.ch) && lower(s.ch) <= 'f' {
-			d = uint32(lower(s.ch)) - 'a' + 10
-		}
-		if d >= base {
-			s.errorf(fmt.Sprintf("invalid character %q in %s escape", s.ch, baseName(int(base))))
-			return false
-		}
-		// d < base
-		x = x*base + d
-		s.nextch()
-	}
-
-	if x > max && base == 8 {
-		s.errorf(fmt.Sprintf("octal escape value %d > 255", x))
-		return false
-	}
-
-	if x > max || 0xD800 <= x && x < 0xE000   { // surrogate range
-		s.errorf(fmt.Sprintf("escape is invalid Unicode code point %#U", x))
-		return false
-	}
-
-	return true
-}
-*/

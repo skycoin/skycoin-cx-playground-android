@@ -2,25 +2,19 @@ package types
 
 //"fmt"
 
-func AllocWrite_str_data(prgrm interface{}, memory []byte, str string) Pointer {
-	return AllocWrite_obj_data(prgrm, memory, []byte(str))
-}
-
 func Write_str_data(memory []byte, offset Pointer, value string) {
 	bytes := []byte(value)
 	size := Compute_obj_size(bytes)
 	Write_obj_data(memory, offset, size, bytes)
 }
 
+// VIOLATION STRHOT-009: B, reads a str for the affordance opcodes, #412.
 func Read_str_data(memory []byte, offset Pointer) string {
 	str := Read_obj_data(memory, offset)
 	return string(str)
 }
 
-func Write_str(prgrm interface{}, memory []byte, offset Pointer, str string) {
-	Write_obj(prgrm, memory, offset, []byte(str))
-}
-
+// VIOLATION STRHOT-011: O, the opcode works on Go string copies of CX strs, #412.
 func Read_str(memory []byte, offset Pointer) string {
 	str := string(Read_obj(memory, offset))
 	return str

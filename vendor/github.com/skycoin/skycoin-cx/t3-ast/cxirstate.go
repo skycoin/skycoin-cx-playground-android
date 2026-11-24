@@ -45,12 +45,16 @@ type CxIrState struct {
 	CxIrStateGlobalsDeferred []GlobalDeferred
 	// CxIrStateGlobalInitializers holds the run of SysInitExprs of each global.
 	CxIrStateGlobalInitializers []GlobalInitializer
+	// CxIrStateNativeNames caches the built-ins CXProgramNativeFind found by
+	// name Gids. It is a compile cache and is not serialized.
+	CxIrStateNativeNames map[NativeNameKey]NativeNameFound
 }
 
-// CxIrStateManagerLen is one manager's name and Len, for the teardown test.
+// CxIrStateManagerLen is the type tag of one manager's objects and its Len,
+// for the teardown test. objmodel.GidTypeTagNameTable names the tag.
 type CxIrStateManagerLen struct {
-	Name string
-	Len  int
+	TypeTag objmodel.TypeTag
+	Len     int
 }
 
 // CxIrStateInit sets up every manager. One state holds one program, and the
@@ -140,22 +144,22 @@ func cxIrStateGrowWarn(name string, grow func() (int, int)) {
 	}
 }
 
-// CxIrStateManagerLens returns each manager's name and Len.
+// CxIrStateManagerLens returns the type tag and Len of each manager.
 func (state *CxIrState) CxIrStateManagerLens() []CxIrStateManagerLen {
 	return []CxIrStateManagerLen{
-		{"CXProgramMng", state.CXProgramMng.CXProgramLen()},
-		{"CXPackageMng", state.CXPackageMng.CXPackageLen()},
-		{"CXFunctionMng", state.CXFunctionMng.CXFunctionLen()},
-		{"CXNativeFunctionMng", state.CXNativeFunctionMng.CXNativeFunctionLen()},
-		{"CXStructMng", state.CXStructMng.CXStructLen()},
-		{"CXExpressionMng", state.CXExpressionMng.CXExpressionLen()},
-		{"CXAtomicOperatorMng", state.CXAtomicOperatorMng.CXAtomicOperatorLen()},
-		{"CXLineMng", state.CXLineMng.CXLineLen()},
-		{"CXArgumentMng", state.CXArgumentMng.CXArgumentLen()},
-		{"CXArgumentDebugMng", state.CXArgumentDebugMng.CXArgumentDebugLen()},
-		{"CXTypeSignatureMng", state.CXTypeSignatureMng.CXTypeSignatureLen()},
-		{"CXTypeSignature_ArrayMng", state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayLen()},
-		{"CXTypeSignature_StructMng", state.CXTypeSignature_StructMng.CXTypeSignature_StructLen()},
-		{"CXCallMng", state.CXCallMng.CXCallLen()},
+		{CXProgramGidTypeTag, state.CXProgramMng.CXProgramLen()},
+		{CXPackageGidTypeTag, state.CXPackageMng.CXPackageLen()},
+		{CXFunctionGidTypeTag, state.CXFunctionMng.CXFunctionLen()},
+		{CXNativeFunctionGidTypeTag, state.CXNativeFunctionMng.CXNativeFunctionLen()},
+		{CXStructGidTypeTag, state.CXStructMng.CXStructLen()},
+		{CXExpressionGidTypeTag, state.CXExpressionMng.CXExpressionLen()},
+		{CXAtomicOperatorGidTypeTag, state.CXAtomicOperatorMng.CXAtomicOperatorLen()},
+		{CXLineGidTypeTag, state.CXLineMng.CXLineLen()},
+		{CXArgumentGidTypeTag, state.CXArgumentMng.CXArgumentLen()},
+		{CXArgumentDebugGidTypeTag, state.CXArgumentDebugMng.CXArgumentDebugLen()},
+		{CXTypeSignatureGidTypeTag, state.CXTypeSignatureMng.CXTypeSignatureLen()},
+		{CXTypeSignature_ArrayGidTypeTag, state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayLen()},
+		{CXTypeSignature_StructGidTypeTag, state.CXTypeSignature_StructMng.CXTypeSignature_StructLen()},
+		{CXCallGidTypeTag, state.CXCallMng.CXCallLen()},
 	}
 }

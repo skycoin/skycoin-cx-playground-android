@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of history_add of agent.c. A full history drops its oldest message,
 // and every field is cut to its C buffer.
-func historyAdd(role str, content str, toolUse bool, toolResult bool, toolId str, toolName str) {
+func historyAdd(role str, content str, toolUse bool, toolResult bool, toolId str, toolName str) { global gAgentState, ZclawMaxHistoryMessages, ZclawMaxMessageLength, ZclawToolIdLength, ZclawToolNameLength
 	var history []ConversationMessage
 	var first i32 = 0
 	if len(gAgentState.history) >= ZclawMaxHistoryMessages {

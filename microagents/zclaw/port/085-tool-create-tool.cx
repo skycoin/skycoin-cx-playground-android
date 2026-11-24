@@ -5,7 +5,7 @@ import "sys/string"
 // Port of tools_create_tool_handler of tools_system.c with user_tools_create
 // of the host mock, which keeps up to MAX_DYNAMIC_TOOLS tools, cut to their
 // buffers, and does not check for duplicates.
-func toolCreateTool(inputJson str) (ok bool, result str) {
+func toolCreateTool(inputJson str) (ok bool, result str) { global gAgentState, ZclawMaxDynamicTools, ZclawToolNameMaxLength, ZclawToolDescriptionMaxLength, ZclawCronMaxActionLength
 	ok = false
 	name, nameFound := jsonStringField(inputJson, 0, "name")
 	description, descriptionFound := jsonStringField(inputJson, 0, "description")

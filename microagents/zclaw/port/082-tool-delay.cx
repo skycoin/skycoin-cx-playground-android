@@ -2,7 +2,7 @@ package main
 
 // Port of tools_delay_handler of tools_gpio.c. vTaskDelay of the host mock
 // only counts the delay, so no time passes.
-func toolDelay(inputJson str) (ok bool, result str) {
+func toolDelay(inputJson str) (ok bool, result str) { global ZclawDelayMaxMs
 	ok = false
 	var milliseconds i32 = 0
 	var isNumber bool = false

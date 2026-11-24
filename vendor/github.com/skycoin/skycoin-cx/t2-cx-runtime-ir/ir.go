@@ -83,6 +83,10 @@ type Image struct {
 	ImageLines       []Line
 	ImageFileNames   []string
 	ImageFuncNames   []string
+
+	// ImageLibraryEnabled marks the system libraries the run may call, by
+	// library number, as CXProgram.ProgramLibrariesEnabled.
+	ImageLibraryEnabled [constants.LibraryCount]bool
 }
 
 // ImageDataEnd returns the first byte after the data segment, where the
@@ -95,11 +99,8 @@ func ImageDataEnd(image *Image) uint32 {
 type PrintStrMode uint32
 
 const (
-	// PrintStrModeRaw writes the bytes as they are, printf %v.
+	// PrintStrModeRaw writes the bytes as they are, printf %s and %v.
 	PrintStrModeRaw PrintStrMode = iota
-	// PrintStrModeEscaped turns \% into % and \n into a new line, printf %s
-	// as CheckForEscapedChars does.
-	PrintStrModeEscaped
 	// PrintStrModeLine writes the bytes and a new line, string.PrintLine.
 	PrintStrModeLine
 )
@@ -195,6 +196,9 @@ const (
 	// OpcodePrintStr writes the bytes of the str at A to the output. N is a
 	// PrintStrMode.
 	OpcodePrintStr
+	// OpcodeLibraryCall calls function N of system library M on the block at
+	// sp, its inputs then its outputs, after checking ImageLibraryEnabled[M].
+	OpcodeLibraryCall
 	// OpcodeBoolNot and the rest of the bool family read A and B and write C.
 	OpcodeBoolNot
 	OpcodeBoolAnd

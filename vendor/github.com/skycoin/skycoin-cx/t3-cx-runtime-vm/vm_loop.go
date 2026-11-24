@@ -899,6 +899,11 @@ func (machine *Machine) slow() Stop {
 			return machine.slowStop(StopAddressInvalid)
 		}
 		return machine.printBytes(str, ir.PrintStrMode(in.InstrN))
+	case ir.OpcodeLibraryCall:
+		if !machine.MachineImage.ImageLibraryEnabled[in.InstrM] {
+			return machine.slowStop(StopLibraryDisabled)
+		}
+		LibraryFunctionVmHandlers[in.InstrM][in.InstrN](mem, machine.MachineStackPointer)
 	case ir.OpcodePrintValue:
 		machine.MachineOutput = printValue(machine.MachineOutput, mem, a, types.Code(in.InstrM), byte(in.InstrN))
 	case ir.OpcodeTestEqual:
@@ -968,25 +973,9 @@ func (machine *Machine) printBytes(src []byte, mode ir.PrintStrMode) Stop {
 		if len(out) == cap(out) {
 			return machine.printFull(out, cursor)
 		}
-		if mode != ir.PrintStrModeEscaped {
-			n := copy(out[len(out):cap(out)], src[cursor:])
-			out = out[:len(out)+n]
-			cursor += n
-			continue
-		}
-		ch := src[cursor]
-		if ch == '\\' && cursor+1 < len(src) {
-			switch src[cursor+1] {
-			case '%':
-				ch = '%'
-				cursor++
-			case 'n':
-				ch = '\n'
-				cursor++
-			}
-		}
-		out = append(out, ch)
-		cursor++
+		n := copy(out[len(out):cap(out)], src[cursor:])
+		out = out[:len(out)+n]
+		cursor += n
 	}
 	if mode == ir.PrintStrModeLine {
 		if len(out) == cap(out) {

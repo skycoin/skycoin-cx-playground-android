@@ -18,6 +18,10 @@ type GlobalDeferred struct {
 	GlobalDeferredStartColumn int
 	GlobalDeferredEndLine     int
 	GlobalDeferredEndColumn   int
+	// A value of var a, b = f() has GlobalDeferredResults results, of which
+	// the global takes the one at GlobalDeferredResult. Other values have 0.
+	GlobalDeferredResult  int
+	GlobalDeferredResults int
 }
 
 // GlobalInitializer is the run of SysInitExprs that initializes one global,
@@ -28,6 +32,9 @@ type GlobalInitializer struct {
 	GlobalInitializerName    stringpool.StringGid
 	GlobalInitializerStart   int
 	GlobalInitializerEnd     int
+	// GlobalInitializerOthers are the other globals the run initializes, as b
+	// of var a, b = f().
+	GlobalInitializerOthers []stringpool.StringGid
 }
 
 // CXProgramGlobalDeferredAdd records the global of declarator, whose value
@@ -38,11 +45,12 @@ func (prgrm *CXProgram) CXProgramGlobalDeferredAdd(deferred GlobalDeferred) {
 
 // CXProgramGlobalInitializerAdd records that SysInitExprs from start on
 // initializes the global name of the package pkg.
-func (prgrm *CXProgram) CXProgramGlobalInitializerAdd(pkg CXPackageIndex, name stringpool.StringGid, start int) {
+func (prgrm *CXProgram) CXProgramGlobalInitializerAdd(pkg CXPackageIndex, name stringpool.StringGid, start int, others ...stringpool.StringGid) {
 	prgrm.CxIrState.CxIrStateGlobalInitializers = append(prgrm.CxIrState.CxIrStateGlobalInitializers, GlobalInitializer{
 		GlobalInitializerPackage: pkg,
 		GlobalInitializerName:    name,
 		GlobalInitializerStart:   start,
 		GlobalInitializerEnd:     len(prgrm.SysInitExprs),
+		GlobalInitializerOthers:  others,
 	})
 }

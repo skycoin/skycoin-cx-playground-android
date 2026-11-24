@@ -20,11 +20,16 @@ const (
 	// CXEXPR_STRUCT_LITERAL_FIELD writes one field of a struct literal that is not
 	// yet given its variable.
 	CXEXPR_STRUCT_LITERAL_FIELD
+	// CXEXPR_SHORT_DECLARATION_SHARED declares a name of a := with more than
+	// one name, which assigns a variable of the same scope instead.
+	CXEXPR_SHORT_DECLARATION_SHARED
+	// CXEXPR_SHORT_DECLARATION_SHARED_LAST is the last of them.
+	CXEXPR_SHORT_DECLARATION_SHARED_LAST
 )
 
 // String returns alias for constants defined for cx edpression type
 func (cxet CXEXPR_TYPE) String() string {
-	return [...]string{"Unused", "MethodCall", "StructLiteral", "ArrayLiteral", "FunctionCall", "StructLiteralField"}[int(cxet)]
+	return [...]string{"Unused", "MethodCall", "StructLiteral", "ArrayLiteral", "FunctionCall", "StructLiteralField", "ShortDeclarationShared", "ShortDeclarationSharedLast"}[int(cxet)]
 }
 
 // IsMethodCall checks if expression type is method call

@@ -5,10 +5,13 @@ import (
 	"math/rand"
 	"strconv"
 
+	// GCREACH: t3-ast owns the heap and the GC roots. This file allocates strs, which
+	// adds to the GC pressure, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
 // The built-in str function returns the base 10 string representation of operand 1.
+// VIOLATION STRHOT-096: O, the opcode works on Go string copies of CX strs, #412.
 func opI8ToStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outV0 := strconv.FormatInt(int64(inputs[0].Get_i8(prgrm)), 10)
 	outputs[0].Set_str(prgrm, outV0)
@@ -69,6 +72,7 @@ func opI8ToF64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue
 }
 
 // The print built-in function formats its arguments and prints them.
+// VIOLATION STRHOT-097: O, the opcode works on Go string copies of CX strs, #412.
 func opI8Print(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	fmt.Println(inputs[0].Get_i8(prgrm))
 }

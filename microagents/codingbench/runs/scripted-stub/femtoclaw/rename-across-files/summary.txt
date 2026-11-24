@@ -1,1 +1,1 @@
-solved=yes turns=3 calls=3 sent=29122 received=1086 wall_ms=3275
+solved=yes turns=3 calls=3 sent=29206 received=1100 wall_ms=2441

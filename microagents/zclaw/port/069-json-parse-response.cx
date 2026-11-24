@@ -5,7 +5,7 @@ import "sys/string"
 // Port of json_parse_response and parse_anthropic_response of json_util.c.
 // The last text block and the last tool_use block win, as each overwrites
 // the output buffers. Text, name and id are cut to their C buffers.
-func jsonParseResponse(response str) (result ParsedResponse) {
+func jsonParseResponse(response str) (result ParsedResponse) { global ZclawMaxMessageLength, ZclawToolNameLength, ZclawToolIdLength
 	result.parsed = false
 	result.text = ""
 	result.toolName = ""

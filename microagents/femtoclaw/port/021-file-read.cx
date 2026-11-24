@@ -4,7 +4,7 @@ import "sys/string"
 import "sys/os"
 
 // fileRead is the file system wrapper for reading a whole file.
-func fileRead(path str) (content str, found bool) {
+func fileRead(path str) (content str, found bool) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
 	content = ""
 	found = false
 	if gWrapperState.mode == WrapperModeReplay {

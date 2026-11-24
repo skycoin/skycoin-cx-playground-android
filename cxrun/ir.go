@@ -61,6 +61,11 @@ func RunIRWith(program []byte, executor Executor, opts Options, h Host, out io.W
 	}
 	printer.PrinterCompileErrorsRegister(prgrm)
 	actions.AST = prgrm
+	// The serialized program carries the libraries enabled when it was
+	// built. The run decides instead.
+	if prgrm.ProgramLibrariesEnabled, err = librariesEnabled(opts.Libraries); err != nil {
+		return 0, err
+	}
 	if opts.Dir != "" {
 		root, fileError := util.ProgramSandboxRootOpen(opts.Dir)
 		if fileError != nil {

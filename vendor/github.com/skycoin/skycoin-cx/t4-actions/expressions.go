@@ -471,6 +471,8 @@ func OperatorExpression(prgrm *ast.CXProgram, leftExprs []ast.CXExpression, righ
 		panic(err)
 	}
 
+	outputlessValueCheck(prgrm, leftExprs)
+	outputlessValueCheck(prgrm, rightExprs)
 	lastLeftExpressionIdx := leftExprs[len(leftExprs)-1].Index
 	// OBJMODEL: state.CXFunctionMng.CXFunctionGet(gid), phase 5 #352.
 	// Now an arena getter, site S0647.
@@ -660,7 +662,7 @@ func shortCircuitExpressions(prgrm *ast.CXProgram, exprs []ast.CXExpression, lef
 	jmpExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_JMP])
 	jmpOp := &prgrm.CXAtomicOps[jmpExpr.Index]
 	jmpOp.Package = ast.CXPackageIndex(pkg.Index)
-	jmpOp.AddInput(prgrm, leftTypeSigIdx)
+	jmpOp.AddInput(prgrm, shortCircuitOperandCopy(prgrm, leftTypeSigIdx))
 	if opcode == constants.OP_BOOL_OR {
 		jmpOp.ThenLines = shortCircuitLinesPending
 	} else {
@@ -671,6 +673,38 @@ func shortCircuitExpressions(prgrm *ast.CXProgram, exprs []ast.CXExpression, lef
 	out = append(out, exprs[:leftCount]...)
 	out = append(out, *jmpCXLine, *jmpExpr)
 	return append(out, exprs[leftCount:]...)
+}
+
+// shortCircuitOperandCopy returns a signature of its own for the jmp of the
+// left operand leftTypeSigIdx. The pass resolves the fields of an argument
+// in place, so the jmp and the bool op cannot share item.flag.
+func shortCircuitOperandCopy(prgrm *ast.CXProgram, leftTypeSigIdx ast.CXTypeSignatureIndex) ast.CXTypeSignatureIndex {
+	sig := prgrm.GetCXTypeSignatureFromArray(leftTypeSigIdx)
+	if sig.Type != ast.TYPE_CXARGUMENT_DEPRECATE {
+		return leftTypeSigIdx
+	}
+	original := prgrm.GetCXArgFromArray(ast.CXArgumentIndex(sig.Meta))
+	arg := argumentCopy(prgrm, original)
+	argumentDebugPositionCopy(prgrm, arg.ArgDetails, original.ArgDetails)
+	copied := ast.AllocCXTypeSignatureOfCXArgDeprecate(prgrm, arg)
+	prgrm.GetCXTypeSignatureFromArray(copied).PassBy = sig.PassBy
+	return copied
+}
+
+// shortCircuitOperandSame reports whether the jmp operand jmpSig is the
+// left operand boolSig of its bool op, or the copy shortCircuitOperandCopy
+// made of it.
+func shortCircuitOperandSame(prgrm *ast.CXProgram, jmpSig ast.CXTypeSignatureIndex, boolSig ast.CXTypeSignatureIndex) bool {
+	if jmpSig == boolSig {
+		return true
+	}
+	jmp, left := prgrm.GetCXTypeSignatureFromArray(jmpSig), prgrm.GetCXTypeSignatureFromArray(boolSig)
+	if StripNameNumber(prgrm, jmp.Name) != StripNameNumber(prgrm, left.Name) {
+		return false
+	}
+	jmpFile, jmpLine, jmpColumn := ast.CXArgumentDebugPosition(prgrm, jmp.ArgDetails)
+	leftFile, leftLine, leftColumn := ast.CXArgumentDebugPosition(prgrm, left.ArgDetails)
+	return jmpFile == leftFile && jmpLine == leftLine && jmpColumn == leftColumn
 }
 
 // shortCircuitOperandExpression copies an indexed or dereferenced right operand into a bool temp,
@@ -717,7 +751,7 @@ func ShortCircuitJumpCheck(prgrm *ast.CXProgram, exprs []ast.CXExpression, currI
 	}
 	boolOp := &prgrm.CXAtomicOps[exprs[target].Index]
 	boolOperator := prgrm.GetFunctionFromArray(boolOp.Operator)
-	return boolOperator != nil && boolOperator.AtomicOPCode == boolOpcode && len(boolOp.GetInputs(prgrm)) > 0 && boolOp.GetInputs(prgrm)[0] == jmpOp.GetInputs(prgrm)[0]
+	return boolOperator != nil && boolOperator.AtomicOPCode == boolOpcode && len(boolOp.GetInputs(prgrm)) > 0 && shortCircuitOperandSame(prgrm, jmpOp.GetInputs(prgrm)[0], boolOp.GetInputs(prgrm)[0])
 }
 
 // ProcessShortCircuitJumps points each short-circuit jmp at its bool op, once the function's expressions are final.
@@ -750,7 +784,7 @@ func ProcessShortCircuitJumps(prgrm *ast.CXProgram, exprs []ast.CXExpression) {
 			}
 			boolOp := &prgrm.CXAtomicOps[exprs[j].Index]
 			boolOperator := prgrm.GetFunctionFromArray(boolOp.Operator)
-			if boolOperator == nil || boolOperator.AtomicOPCode != boolOpcode || len(boolOp.GetInputs(prgrm)) == 0 || boolOp.GetInputs(prgrm)[0] != leftTypeSigIdx {
+			if boolOperator == nil || boolOperator.AtomicOPCode != boolOpcode || len(boolOp.GetInputs(prgrm)) == 0 || !shortCircuitOperandSame(prgrm, leftTypeSigIdx, boolOp.GetInputs(prgrm)[0]) {
 				continue
 			}
 			if boolOpcode == constants.OP_BOOL_OR {

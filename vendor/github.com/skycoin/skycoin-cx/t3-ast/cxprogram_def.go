@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
+	"github.com/skycoin/skycoin-cx/t1-constants"
 	stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
 )
 
@@ -35,6 +36,12 @@ type CXProgram struct {
 	CallCounter types.Pointer // What function call is the currently being executed in the CallStack
 	Terminated  bool          // Utility field for the runtime. Indicates if a CX program has already finished or not.
 	Version     int64         // Language version, constants.LanguageVersionCurrent when built.
+
+	// ProgramLibrariesUsed marks, by library number, the system libraries the
+	// program calls. ProgramLibrariesEnabled marks the ones this run may call,
+	// set from --enable, see constants.LibraryPolicyEnabledWhenImported.
+	ProgramLibrariesUsed    [constants.LibraryCount]bool
+	ProgramLibrariesEnabled [constants.LibraryCount]bool
 
 	// RuntimeError is the runtime error that ended the old loop, printed by
 	// the printer package once the loop has returned.
@@ -71,4 +78,12 @@ type CXProgram struct {
 	// OBJMODEL: []CXExpressionGid or CXExpressionGid, phase 5 #347.
 	// Now objects held by value, site S0187.
 	SysInitExprs []CXExpression
+
+	// ImportPositions is where each package imports another, for the shadowing
+	// errors of #486. Compiler only, never serialized.
+	ImportPositions map[CXProgramImportKey]CXProgramImportPosition
+
+	// ImportScoped holds the imports into scope, import . "pkg" and the
+	// others of #487. Compiler only, never serialized.
+	ImportScoped []CXProgramImportScoped
 }

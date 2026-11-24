@@ -147,7 +147,7 @@ func buildStrFunctions(prgrm *CXProgram, pkg *CXPackage, ast1 *string) {
 			if cxAtomicOpOperator != nil {
 				if cxAtomicOpOperator.IsBuiltIn() {
 
-					opName1 = OpNames[cxAtomicOpOperator.AtomicOPCode]
+					opName1 = cxAtomicOpOperator.BuiltInName()
 				} else {
 					opName1 = prgrm.CXProgramNameText(cxAtomicOpOperator.Name)
 				}
@@ -311,10 +311,11 @@ func SignatureStringOfFunction(prgrm *CXProgram, pkg *CXPackage, f *CXFunction) 
 
 // valueAt prints the value of type typ with dimensions dims at addr. A zero
 // dimension is a slice, which holds a pointer to its object.
+// VIOLATION STRHOT-215: P, builds the text of a printed value, #412.
 func valueAt(prgrm *CXProgram, addr types.Pointer, typ types.Code, size types.Pointer, structType *CXStruct, dims []types.Pointer, sep string) string {
 	if len(dims) == 0 {
 		if typ == types.POINTER {
-			return fmt.Sprintf("%v", types.Read_ptr(prgrm.Memory, addr))
+			return printPointer(types.Read_ptr(prgrm.Memory, addr))
 		}
 		if structType != nil {
 			return structAt(prgrm, addr, structType)
@@ -340,6 +341,7 @@ func valueAt(prgrm *CXProgram, addr types.Pointer, typ types.Code, size types.Po
 }
 
 // elementsAt prints the n elements of size stride that start at addr.
+// VIOLATION STRHOT-216: P, builds the text of a printed value, #412.
 func elementsAt(prgrm *CXProgram, addr, n, stride types.Pointer, typ types.Code, size types.Pointer, structType *CXStruct, dims []types.Pointer, sep string) string {
 	val := "["
 	for c := types.Pointer(0); c < n; c++ {
@@ -352,6 +354,7 @@ func elementsAt(prgrm *CXProgram, addr, n, stride types.Pointer, typ types.Code,
 }
 
 // structAt prints the fields of the struct instance at addr as {name: value, ...}.
+// VIOLATION STRHOT-217: P, builds the text of a printed value, #412.
 func structAt(prgrm *CXProgram, addr types.Pointer, strct *CXStruct) string {
 	val := "{"
 	off := types.Pointer(0)
@@ -369,6 +372,7 @@ func structAt(prgrm *CXProgram, addr types.Pointer, strct *CXStruct) string {
 }
 
 // typeSignatureAt prints the value of the struct field typeSig at addr.
+// VIOLATION STRHOT-218: P, builds the text of a printed value, #412.
 func typeSignatureAt(prgrm *CXProgram, addr types.Pointer, typeSig *CXTypeSignature) string {
 	switch typeSig.Type {
 	case TYPE_ATOMIC:
@@ -387,11 +391,50 @@ func typeSignatureAt(prgrm *CXProgram, addr types.Pointer, typeSig *CXTypeSignat
 	case TYPE_CXARGUMENT_DEPRECATE:
 		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
 		// Now an arena getter, site S0491.
-		elt := prgrm.GetCXArgFromArray(CXArgumentIndex(typeSig.Meta))
-		return valueAt(prgrm, addr, elt.Type, elt.Size, elt.StructType, elt.Lengths, printSeparator(elt.Lengths))
+		return argValueAt(prgrm, addr, prgrm.GetCXArgFromArray(CXArgumentIndex(typeSig.Meta)))
 	}
 	// Pointers print their address.
-	return fmt.Sprintf("%v", types.Read_ptr(prgrm.Memory, addr))
+	return printPointer(types.Read_ptr(prgrm.Memory, addr))
+}
+
+// printPointer prints the pointer p as Go does, in hexadecimal with 0x, or
+// as <nil> when it is nil.
+// VIOLATION STRHOT-314: P, builds the text of a printed value, #412.
+func printPointer(p types.Pointer) string {
+	if p == 0 {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%#x", uint64(p))
+}
+
+// printStructPointer prints the pointer p to a struct strct as Go prints a
+// pointer to a struct that it is given, &{...}, or <nil>.
+// VIOLATION STRHOT-315: P, builds the text of a printed value, #412.
+func printStructPointer(prgrm *CXProgram, p types.Pointer, strct *CXStruct) string {
+	if p == 0 || strct == nil {
+		return printPointer(p)
+	}
+	if p >= prgrm.Heap.StartsAt {
+		p += types.OBJECT_HEADER_SIZE
+	}
+	return "&" + structAt(prgrm, p, strct)
+}
+
+// printSpecifiers returns the specifiers of the value elt reads, without
+// those its dereferences and indexes remove.
+func printSpecifiers(elt *CXArgument) []int {
+	var specs []int
+	for _, spec := range elt.DeclarationSpecifiers {
+		switch spec {
+		case constants.DECL_DEREF, constants.DECL_INDEXING:
+			if len(specs) > 0 {
+				specs = specs[:len(specs)-1]
+			}
+		default:
+			specs = append(specs, spec)
+		}
+	}
+	return specs
 }
 
 // printSeparator separates the elements of a one dimensional collection with
@@ -405,6 +448,7 @@ func printSeparator(dims []types.Pointer) string {
 
 // readAtomic reads a value of the atomic type named typ at offset in memory.
 // It returns false when typ is not an atomic type.
+// VIOLATION STRHOT-220: P, builds the text of a printed value, #412.
 func readAtomic(memory []byte, typ string, offset types.Pointer) (string, bool) {
 	switch typ {
 	case "bool":
@@ -437,6 +481,7 @@ func readAtomic(memory []byte, typ string, offset types.Pointer) (string, bool) 
 
 // argValueAt prints the value that elt, the last element of an argument's
 // field path, names at addr after its indexes and dereferences.
+// VIOLATION STRHOT-221: P, builds the text of a printed value, #412.
 func argValueAt(prgrm *CXProgram, addr types.Pointer, elt *CXArgument) string {
 	typ := elt.Type
 	if elt.IsPointer() {
@@ -451,10 +496,27 @@ func argValueAt(prgrm *CXProgram, addr types.Pointer, elt *CXArgument) string {
 	if len(elt.Indexes) <= len(dims) {
 		dims = dims[len(elt.Indexes):]
 	}
+	specs := printSpecifiers(elt)
+	if direct, behind := elt.DirectDimensions(); behind && len(elt.Indexes) <= direct {
+		// The elements of [N]*[M]T are pointers.
+		dims = elt.Lengths[len(elt.Indexes):direct]
+		return valueAt(prgrm, addr, types.POINTER, types.POINTER_SIZE, nil, dims, printSeparator(dims))
+	}
+	if len(specs) > 1 && specs[1] == constants.DECL_POINTER && (len(dims) > 0 || len(specs) == 2) {
+		if len(dims) == 0 && elt.StructType != nil {
+			return printStructPointer(prgrm, types.Read_ptr(prgrm.Memory, addr), elt.StructType)
+		}
+		// A pointer, or an array or slice of pointers, prints addresses.
+		return valueAt(prgrm, addr, types.POINTER, types.POINTER_SIZE, nil, dims, printSeparator(dims))
+	}
+	if len(dims) == 0 && len(specs) > 2 && specs[len(specs)-1] == constants.DECL_POINTER {
+		return printPointer(types.Read_ptr(prgrm.Memory, addr))
+	}
 	return valueAt(prgrm, addr, typ, elt.Size, elt.StructType, dims, printSeparator(dims))
 }
 
 // GetPrintableValue prints the value of argTypeSig in the frame at fp.
+// VIOLATION STRHOT-222: P, builds the text of a printed value, #412.
 func GetPrintableValue(prgrm *CXProgram, fp types.Pointer, argTypeSig *CXTypeSignature) string {
 	switch argTypeSig.Type {
 	case TYPE_CXARGUMENT_DEPRECATE:
@@ -462,15 +524,27 @@ func GetPrintableValue(prgrm *CXProgram, fp types.Pointer, argTypeSig *CXTypeSig
 		// Now an arena getter, site S0493.
 		arg := prgrm.GetCXArgFromArray(CXArgumentIndex(argTypeSig.Meta))
 		elt := arg.GetAssignmentElement(prgrm)
+		if arg.PassBy == constants.PASSBY_REFERENCE {
+			// &v prints the address of v, or &{...} for a struct.
+			addr := GetFinalOffset(prgrm, fp, nil, argTypeSig)
+			if elt.StructType != nil && len(elt.Lengths) <= len(elt.Indexes) {
+				return "&" + structAt(prgrm, addr, elt.StructType)
+			}
+			return fmt.Sprintf("%#x", uint64(addr))
+		}
 		return argValueAt(prgrm, GetFinalOffset(prgrm, fp, nil, argTypeSig), elt)
 	case TYPE_ATOMIC:
 		if argTypeSig.PassBy == constants.PASSBY_REFERENCE {
-			return fmt.Sprintf("%v", GetFinalOffset(prgrm, fp, nil, argTypeSig))
+			return fmt.Sprintf("%#x", uint64(GetFinalOffset(prgrm, fp, nil, argTypeSig)))
 		}
 		val, _ := readAtomic(prgrm.Memory, types.Code(argTypeSig.Meta).Name(), GetFinalOffset(prgrm, fp, nil, argTypeSig))
 		return val
 	case TYPE_POINTER_ATOMIC:
-		return fmt.Sprintf("%v", types.Read_ptr(prgrm.Memory, GetFinalOffset(prgrm, fp, nil, argTypeSig)))
+		if argTypeSig.IsDeref {
+			val, _ := readAtomic(prgrm.Memory, types.Code(argTypeSig.Meta).Name(), GetFinalOffset(prgrm, fp, nil, argTypeSig))
+			return val
+		}
+		return printPointer(types.Read_ptr(prgrm.Memory, GetFinalOffset(prgrm, fp, nil, argTypeSig)))
 	case TYPE_ARRAY_ATOMIC, TYPE_POINTER_ARRAY_ATOMIC, TYPE_SLICE_ATOMIC, TYPE_POINTER_SLICE_ATOMIC:
 		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
 		// Now an arena getter, site S0494.
@@ -485,16 +559,19 @@ func GetPrintableValue(prgrm *CXProgram, fp types.Pointer, argTypeSig *CXTypeSig
 		case (argTypeSig.Type == TYPE_POINTER_ARRAY_ATOMIC || argTypeSig.Type == TYPE_POINTER_SLICE_ATOMIC) && argTypeSig.IsDeref:
 			return valueAt(prgrm, addr, eltType, eltType.Size(), nil, dims, printSeparator(dims))
 		case argTypeSig.Type == TYPE_POINTER_ARRAY_ATOMIC || argTypeSig.Type == TYPE_POINTER_SLICE_ATOMIC:
-			return fmt.Sprintf("%v", types.Read_ptr(prgrm.Memory, addr))
+			return printPointer(types.Read_ptr(prgrm.Memory, addr))
 		}
 		return valueAt(prgrm, addr, eltType, eltType.Size(), nil, dims, printSeparator(dims))
 	case TYPE_STRUCT, TYPE_POINTER_STRUCT:
-		if argTypeSig.Type == TYPE_POINTER_STRUCT && !argTypeSig.IsDeref {
-			return fmt.Sprintf("%v", types.Read_ptr(prgrm.Memory, GetFinalOffset(prgrm, fp, nil, argTypeSig)))
-		}
 		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
 		// Now an arena getter, site S0496.
 		structDetails := prgrm.GetCXTypeSignatureStructFromArray(argTypeSig.Meta)
+		if argTypeSig.Type == TYPE_POINTER_STRUCT && !argTypeSig.IsDeref && len(structDetails.Fields) == 0 {
+			return printStructPointer(prgrm, types.Read_ptr(prgrm.Memory, GetFinalOffset(prgrm, fp, nil, argTypeSig)), structDetails.StructType)
+		}
+		if argTypeSig.Type == TYPE_STRUCT && argTypeSig.PassBy == constants.PASSBY_REFERENCE && len(structDetails.Fields) == 0 {
+			return "&" + structAt(prgrm, GetFinalOffset(prgrm, fp, nil, argTypeSig), structDetails.StructType)
+		}
 		addr := GetFinalOffset(prgrm, fp, nil, argTypeSig)
 		if n := len(structDetails.Fields); n > 0 {
 			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
@@ -733,9 +810,9 @@ func getFormattedType_CXArg(prgrm *CXProgram, arg *CXArgument) string {
 	typ := ""
 	elt := arg.GetAssignmentElement(prgrm)
 
-	// this is used to know what arg.Lengths index to use
-	// used for cases like [5]*[3]i32, where we jump to another decl spec
-	arrDeclCount := len(arg.Lengths) - 1
+	// Lengths are outermost first and specifiers innermost first, and a slice
+	// takes a length of 0, so [2][]i32 has lengths {2, 0}.
+	arrDeclCount := len(elt.Lengths) - 1
 	// looping declaration specifiers
 	for _, spec := range elt.DeclarationSpecifiers {
 		switch spec {
@@ -744,10 +821,15 @@ func getFormattedType_CXArg(prgrm *CXProgram, arg *CXArgument) string {
 		case constants.DECL_DEREF:
 			typ = typ[1:]
 		case constants.DECL_ARRAY:
-			typ = fmt.Sprintf("[%d]%s", arg.Lengths[arrDeclCount], typ)
+			if arrDeclCount >= 0 {
+				typ = fmt.Sprintf("[%d]%s", elt.Lengths[arrDeclCount], typ)
+			} else {
+				typ = "[?]" + typ
+			}
 			arrDeclCount--
 		case constants.DECL_SLICE:
 			typ = "[]" + typ
+			arrDeclCount--
 		case constants.DECL_INDEXING:
 		default:
 			// base type

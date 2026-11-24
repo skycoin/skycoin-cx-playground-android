@@ -1,7 +1,7 @@
 package main
 
 // Port of llm_chat_tools of llm/llm_proxy.c for the anthropic provider.
-func llmChatTools(systemPrompt str, messages []str, toolsJsonText str) (reply LlmReply) {
+func llmChatTools(systemPrompt str, messages []str, toolsJsonText str) (reply LlmReply) { global MimiLlmApiUrl
 	var body str = llmRequestBody(systemPrompt, messages, toolsJsonText)
 	status, response := netPost(MimiLlmApiUrl, body)
 	reply.succeeded = false

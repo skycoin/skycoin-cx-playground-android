@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of tools_get_version_handler of tools_system.c, with the version
 // ota_get_version of the host mock returns.
-func toolGetVersion(inputJson str) (ok bool, result str) {
+func toolGetVersion(inputJson str) (ok bool, result str) { global ZclawMockVersion
 	result = string.Concatenation("zclaw v", ZclawMockVersion)
 	ok = true
 }

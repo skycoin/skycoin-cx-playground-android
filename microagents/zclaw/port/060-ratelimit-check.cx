@@ -1,7 +1,7 @@
 package main
 
 // Port of ratelimit_check of ratelimit.c.
-func ratelimitCheck() (allowed bool, reason str) {
+func ratelimitCheck() (allowed bool, reason str) { global gAgentState, ZclawRateLimitMaxPerHour, ZclawRateLimitMaxPerDay
 	ratelimitUpdateTimeWindow()
 	allowed = false
 	reason = ""

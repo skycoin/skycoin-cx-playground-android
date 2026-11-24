@@ -5,9 +5,12 @@ import (
 	"strconv"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
+	// GCREACH: t3-ast owns the heap and the GC roots. This file allocates strs, which
+	// adds to the GC pressure, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
+// VIOLATION STRHOT-086: O, the opcode works on Go string copies of CX strs, #412.
 func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) []byte {
 	fmtStr := inputs[0].Get_str(prgrm)
 
@@ -21,22 +24,11 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 		if c < lenStr-1 {
 			nextCh = fmtStr[c+1]
 		}
-		if ch == '\\' {
-			switch nextCh {
-			case '%':
-				c++
-				res = append(res, nextCh)
-				continue
-			case 'n':
-				c++
-				res = append(res, '\n')
-				continue
-			default:
-				res = append(res, ch)
-				continue
-			}
+		if ch == '%' && nextCh == '%' {
+			c++
+			res = append(res, '%')
+			continue
 		}
-
 		if ch == '%' {
 			if specifiersCounter+1 == len(inputs) {
 				res = append(res, []byte(fmt.Sprintf("%%!%c(MISSING)", nextCh))...)
@@ -45,9 +37,14 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 			}
 
 			inp := &inputs[specifiersCounter+1]
+			if nextCh == '+' && c+2 < lenStr && fmtStr[c+2] == 'v' {
+				// %+v prints as %v, whose structs name their fields.
+				c++
+				nextCh = 'v'
+			}
 			switch nextCh {
 			case 's':
-				res = append(res, []byte(CheckForEscapedChars(inp.Get_str(prgrm)))...)
+				res = append(res, inp.Get_str(prgrm)...)
 			case 'd':
 				switch inp.Type {
 				case types.I8:
@@ -109,43 +106,12 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	return res
 }
 
+// VIOLATION STRHOT-087: O, the opcode works on Go string copies of CX strs, #412.
 func opSprintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_str(prgrm, string(buildString(prgrm, inputs, outputs)))
 }
 
+// VIOLATION STRHOT-088: O, the opcode works on Go string copies of CX strs, #412.
 func opPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	fmt.Print(string(buildString(prgrm, inputs, outputs)))
-}
-
-// Only used in op_fmt.go, once
-func CheckForEscapedChars(str string) []byte {
-	var res []byte
-	var lenStr = int(len(str))
-	for c := 0; c < len(str); c++ {
-		var nextCh byte
-		ch := str[c]
-		if c < lenStr-1 {
-			nextCh = str[c+1]
-		}
-		if ch == '\\' {
-			switch nextCh {
-			case '%':
-				c++
-				res = append(res, nextCh)
-				continue
-			case 'n':
-				c++
-				res = append(res, '\n')
-				continue
-			default:
-				res = append(res, ch)
-				continue
-			}
-
-		} else {
-			res = append(res, ch)
-		}
-	}
-
-	return res
 }

@@ -53,7 +53,12 @@ func PrinterVmErrorPrint(prgrm *ast.CXProgram, machine *vm.Machine, stop vm.Stop
 	image := machine.MachineImage
 	fileName, lineNumber := printerVmStopLine(machine)
 	code := int(vm.StopExitCodes[stop])
-	fmt.Printf("%s, %s, %v", PrinterErrorHeader(fileName, lineNumber), ast.ErrorString(code), printerVmStopMessages[stop])
+	message := printerVmStopMessages[stop]
+	if stop == vm.StopLibraryDisabled {
+		library := image.ImageFuncs[machine.MachineFunction].FuncCode[machine.MachinePc].InstrM
+		message = ast.RuntimeLibraryDisabledMessage(int(library))
+	}
+	fmt.Printf("%s, %s, %v", PrinterErrorHeader(fileName, lineNumber), ast.ErrorString(code), message)
 
 	copy(prgrm.Memory, machine.MachineMemory[:ir.ImageDataEnd(image)])
 	depth := machine.MachineDepth

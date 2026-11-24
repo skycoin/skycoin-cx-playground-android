@@ -1,0 +1,30 @@
+package main
+
+import "sys/string"
+import "sys/os"
+
+// fileRead is the file system wrapper for reading a whole file.
+func fileRead(path str) (content str, found bool) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
+	content = ""
+	found = false
+	if gWrapperState.mode == WrapperModeReplay {
+		var fields []str = tapeNext("file-read", 4)
+		if !string.EqualityByByteValue(fields[1], path) {
+			fatalStop(joinStrings([]str{"file-read of '", path, "', the tape has '", fields[1], "'"}))
+		}
+		found = string.EqualityByByteValue(fields[2], "found")
+		content = fields[3]
+		return
+	}
+	content, found = os.ReadAllText(liveFilePath(path))
+	if !found {
+		content = ""
+	}
+	if gWrapperState.mode == WrapperModeRecord {
+		var presence str = "missing"
+		if found {
+			presence = "found"
+		}
+		tapeRecord([]str{"file-read", path, presence, content})
+	}
+}

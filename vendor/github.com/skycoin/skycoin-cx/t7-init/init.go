@@ -7,6 +7,7 @@ import (
 	"github.com/skycoin/skycoin-cx/t5-cipher"             // thin: only RegisterPackage; registration list, keep
 	"github.com/skycoin/skycoin-cx/t5-cx-runtime-printer" // thin: only PrinterCompileErrorsRegister, PrinterOpcodesRegister; registration list, keep
 	"github.com/skycoin/skycoin-cx/t5-cxos"               // thin: only RegisterPackage; registration list, keep
+	cxoscore "github.com/skycoin/skycoin-cx/t5-cxos-core" // thin: only RegisterPackage; registration list, keep
 	"github.com/skycoin/skycoin-cx/t5-tcp"                // thin: only RegisterPackage; registration list, keep
 	"github.com/skycoin/skycoin-cx/t6-cxfx"               // thin: only RegisterPackage; registration list, keep
 
@@ -21,6 +22,7 @@ func RegisterPackages(prgrm *ast.CXProgram) {
 	cipher.RegisterPackage(prgrm)
 	cxfx.RegisterPackage(prgrm)
 	cxos.RegisterPackage(prgrm)
+	cxoscore.RegisterPackage(prgrm)
 	printer.PrinterOpcodesRegister(prgrm)
 	printer.PrinterCompileErrorsRegister(prgrm)
 	// http.RegisterPackage()

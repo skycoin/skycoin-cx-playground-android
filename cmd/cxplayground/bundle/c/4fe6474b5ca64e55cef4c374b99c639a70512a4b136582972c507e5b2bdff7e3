@@ -1,0 +1,17 @@
+package main
+
+import "sys/string"
+
+// tapeNext reads the next tape record, which must be of the given kind and
+// field count. Anything else means the replay diverged from the recording.
+func tapeNext(kind str, fieldCount i32) (fields []str) { global gWrapperState
+	var found str = tapePeekKind()
+	if !string.EqualityByByteValue(found, kind) {
+		fatalStop(joinStrings([]str{"tape record ", i32.str(gWrapperState.tapePosition + 1), " is '", found, "', the port asked for '", kind, "'"}))
+	}
+	fields = tapeSplitFields(gWrapperState.tapeLines[gWrapperState.tapePosition])
+	if len(fields) != fieldCount {
+		fatalStop(joinStrings([]str{"tape record ", i32.str(gWrapperState.tapePosition + 1), " has ", i32.str(len(fields)), " fields, want ", i32.str(fieldCount)}))
+	}
+	gWrapperState.tapePosition = gWrapperState.tapePosition + 1
+}

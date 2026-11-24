@@ -186,8 +186,8 @@ func (state *escapeState) escapeExpression(expr *ast.CXExpression) {
 // escapeOpcodeStores reports whether a built-in stores its inputs in the
 // heap, as append does.
 func escapeOpcodeStores(opcode int) bool {
-	switch ast.OpNames[opcode] {
-	case "append", "insert", "resize", "remove", "copy":
+	switch opcode {
+	case constants.OP_APPEND, constants.OP_INSERT, constants.OP_RESIZE, constants.OP_REMOVE, constants.OP_COPY:
 		return true
 	}
 	return false

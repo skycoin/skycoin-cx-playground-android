@@ -6,7 +6,7 @@ import "sys/string"
 // tool the model asked for and keep the persona in step with it.
 // user_tools_find of the host mock finds no user tool, and cron_set is
 // refused during a cron triggered turn.
-func agentToolResult(response ParsedResponse, cronTrigger bool) (result str) {
+func agentToolResult(response ParsedResponse, cronTrigger bool) (result str) { global gAgentState
 	if cronTrigger && string.EqualityByByteValue(response.toolName, "cron_set") {
 		result = "Error: cron_set is not allowed during scheduled task execution. Execute the scheduled action now instead of creating a new schedule."
 		return

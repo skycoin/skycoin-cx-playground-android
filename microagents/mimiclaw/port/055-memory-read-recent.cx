@@ -3,7 +3,7 @@ package main
 import "sys/string"
 
 // Port of memory_read_recent of memory/memory_store.c.
-func memoryReadRecent(days i32) (notes str) {
+func memoryReadRecent(days i32) (notes str) { global MimiSpiffsMemoryDirectory
 	notes = ""
 	for i := 0; i < days; i++ {
 		var date str = memoryDateString(i)

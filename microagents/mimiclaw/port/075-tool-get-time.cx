@@ -5,7 +5,7 @@ import "sys/string"
 // Port of tool_get_time_execute and fetch_time_direct of
 // tools/tool_get_time.c: a HEAD request to MimiTimeUrl, whose Date header
 // gives the time. The proxy path is left out, as http_proxy is not enabled.
-func toolGetTime(inputJson str) (output str) {
+func toolGetTime(inputJson str) (output str) { global MimiTimeUrl
 	succeeded, date := netHead(MimiTimeUrl)
 	var errorName str = ""
 	if !succeeded {

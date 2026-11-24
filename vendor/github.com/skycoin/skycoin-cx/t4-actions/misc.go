@@ -30,8 +30,10 @@ func hasDerefOp(arg *ast.CXArgument, spec int) bool {
 }
 
 // WritePrimary writes those bytes to prgrm.Data and returns a new argument
-// for them. The caller takes the argument or releases it.
-func WritePrimary(prgrm *ast.CXProgram, typeCode types.Code, byts []byte, isSlice bool) *ast.CXArgument {
+// for them. The caller takes the argument or releases it. A str or aff
+// literal points to itself, storage being the zero value of a variable,
+// whose pointer stays nil.
+func WritePrimary(prgrm *ast.CXProgram, typeCode types.Code, byts []byte, storage bool) *ast.CXArgument {
 	pkg, err := prgrm.GetCurrentPackage()
 	if err != nil {
 		panic(err)
@@ -48,8 +50,7 @@ func WritePrimary(prgrm *ast.CXProgram, typeCode types.Code, byts []byte, isSlic
 
 	if arg.Type == types.STR || arg.Type == types.AFF {
 		arg.Size = types.POINTER_SIZE
-		if isSlice == false {
-
+		if !storage {
 			types.Write_ptr(byts, 0, arg.Offset)
 		}
 	}
@@ -221,7 +222,11 @@ func AffordanceStructs(prgrm *ast.CXProgram, pkg *ast.CXPackage, currentFile ast
 
 // PrimaryIdentifier creates an identifier expression with an output name of 'ident'.
 func PrimaryIdentifier(prgrm *ast.CXProgram, ident string) []ast.CXExpression {
-	return primaryIdentifierExpressions(prgrm, prgrm.CXProgramNameIntern(ident))
+	identGid := prgrm.CXProgramNameIntern(ident)
+	if exprs := importScopedIdentifier(prgrm, identGid); exprs != nil {
+		return exprs
+	}
+	return primaryIdentifierExpressions(prgrm, identGid)
 }
 
 // primaryIdentifierExpressions is PrimaryIdentifier for an interned name.

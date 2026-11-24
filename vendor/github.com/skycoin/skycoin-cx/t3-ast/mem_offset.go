@@ -37,6 +37,10 @@ func GetArgSize(prgrm *CXProgram, arg *CXArgument) types.Pointer {
 
 		switch deref {
 		case constants.DEREF_SLICE, constants.DEREF_ARRAY:
+			if direct, behind := arg.DirectDimensions(); behind && len(arg.Indexes) <= direct {
+				// e[1] of a [2]*[3]T is a pointer.
+				return ValueSizeOfLengths(arg.Lengths[len(arg.Indexes):direct], types.POINTER_SIZE)
+			}
 			if len(arg.Indexes) < len(arg.Lengths) {
 				// r[1] of a [2][3]i32 is a [3]i32.
 				return ValueSizeOfLengths(arg.Lengths[len(arg.Indexes):], arg.Size)
@@ -99,6 +103,14 @@ func GetNativeSize(prgrm *CXProgram, arg *CXArgument) types.Pointer {
 
 // GetDerefSize ...
 func GetDerefSize(prgrm *CXProgram, arg *CXArgument, index int, derefPointer bool, derefArray bool) types.Pointer {
+	if direct, behind := arg.DirectDimensions(); behind && index < direct {
+		// The elements of the dimensions before a pointer, as in [2]*[3]T,
+		// are pointers.
+		if derefArray {
+			return types.POINTER_SIZE
+		}
+		return ValueSizeOfLengths(arg.Lengths[index+1:direct], types.POINTER_SIZE)
+	}
 	if !derefArray && len(arg.Lengths) > 1 && ((index + 1) < len(arg.Lengths)) {
 		if rest := arg.Lengths[index+1:]; rest[0] != 0 {
 			// An element of [][N]T is an array.
@@ -413,6 +425,11 @@ func finalOffsetSliceIndexes(prgrm *CXProgram, fp types.Pointer, offset types.Po
 }
 
 func CalculateDereference_Slice(prgrm *CXProgram, drfsStruct *DereferenceStruct) {
+	if drfsStruct.isPointer && drfsStruct.finalOffset.IsValid() && drfsStruct.finalOffset >= prgrm.Heap.StartsAt {
+		// A slice behind a pointer into a heap object, as in (*s[i])[j] on a
+		// []*[]T, see PointerOfAddress.
+		drfsStruct.finalOffset += types.OBJECT_HEADER_SIZE
+	}
 	drfsStruct.sliceIndexed = true
 	drfsStruct.isPointer = false
 	drfsStruct.finalOffset = types.Read_ptr(prgrm.Memory, drfsStruct.finalOffset)
@@ -444,7 +461,11 @@ func CalculateDereference_Array(prgrm *CXProgram, drfsStruct *DereferenceStruct)
 	}
 	var subSize = types.Pointer(1)
 	elementSlice := false
-	for _, len := range drfsStruct.arg.Lengths[drfsStruct.idxCounter+1:] {
+	lengths := drfsStruct.arg.Lengths[drfsStruct.idxCounter+1:]
+	if direct, behind := drfsStruct.arg.DirectDimensions(); behind && drfsStruct.idxCounter < direct {
+		lengths = drfsStruct.arg.Lengths[drfsStruct.idxCounter+1 : direct]
+	}
+	for _, len := range lengths {
 		if len == 0 {
 			// The elements of [N][]T are slices.
 			elementSlice = true

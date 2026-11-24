@@ -4,7 +4,7 @@ import "sys/string"
 
 // The request body that llm_chat_tools of llm/llm_proxy.c builds and prints
 // with cJSON_PrintUnformatted for the anthropic provider.
-func llmRequestBody(systemPrompt str, messages []str, toolsJsonText str) (body str) {
+func llmRequestBody(systemPrompt str, messages []str, toolsJsonText str) (body str) { global MimiModel, MimiMaxTokens
 	body = joinStrings([]str{"{\"model\":", jsonEscapeString(MimiModel), ",\"max_tokens\":", i32.str(MimiMaxTokens), ",\"system\":", jsonEscapeString(systemPrompt), ",\"messages\":["})
 	for i := 0; i < len(messages); i++ {
 		if i > 0 {

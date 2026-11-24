@@ -2,12 +2,14 @@ package actions
 
 import (
 	"github.com/skycoin/skycoin-cx/t0-types"
+	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
 // For the cxgo. These shouldn't be used in the runtime for performance reasons
 var (
+	// ConstNames finds a constant by the name Gids of its package and name.
 	// VIOLATION: state outside State. Owner: t4-actions; moves to CXConstantMng in phase 1.
-	ConstCodes = map[string]int{} //Todo: Used only once in actions/postfix.go
+	ConstNames ast.NativeNameIndex
 	// VIOLATION: state outside State. Owner: t4-actions; moves to CXConstantMng in phase 1.
 	Constants = map[int]CXConstant{} //Todo: Only used once in actions/postfix.go
 )
@@ -16,7 +18,7 @@ var (
 const constPointerSize = types.CX_RUNTIME_NOT_IMPLEMENTED + 1
 
 // nolint typecheck
-// InitConstants registers the cx.* constants in ConstCodes and Constants.
+// InitConstants registers the cx.* constants in ConstNames and Constants.
 func InitConstants() {
 	// cx
 	AddConstI32(types.CX_SUCCESS, "cx.SUCCESS", types.CX_SUCCESS)
@@ -35,7 +37,7 @@ func InitConstants() {
 
 // AddConstCode ...
 func AddConstCode(code int, name string, typeCode types.Code, value []byte) {
-	ConstCodes[name] = code
+	ConstNames.NativeNameIndexAdd(code, name)
 	Constants[code] = CXConstant{Type: typeCode, Value: value}
 }
 

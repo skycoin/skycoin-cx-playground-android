@@ -6,7 +6,7 @@ import "sys/os"
 // liveNetPost posts body through the backendstore client, since the CX tcp
 // package has no read or write. It keeps the path of url and sends it to the
 // ++backend server. The client prints the status line and then the body.
-func liveNetPost(url str, body str) (status i32, reply str) {
+func liveNetPost(url str, body str) (status i32, reply str) { global gWrapperState
 	status = 0
 	reply = ""
 	if !liveFileWrite("net-request.json", body) {

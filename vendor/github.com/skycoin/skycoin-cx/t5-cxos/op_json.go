@@ -245,6 +245,7 @@ func opJsonTokenI64(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CX
 }
 
 // Str returns current token as string value.
+// VIOLATION STRHOT-130: B, hands a path or text to Go or the OS, #412.
 func opJsonTokenStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var tokenStr string
 	success := false

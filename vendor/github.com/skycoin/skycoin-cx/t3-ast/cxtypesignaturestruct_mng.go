@@ -23,6 +23,7 @@ type CXTypeSignature_StructMng struct {
 }
 
 // CXTypeSignature_StructMngInit sets the Cap and whether the grow boundary may grow it.
+// VIOLATION STRHOT-260: E, the assert text of a bad Init, built only when it fails, #412.
 func (manager *CXTypeSignature_StructMng) CXTypeSignature_StructMngInit(capacity int, growable bool) {
 	if manager.CXTypeSignature_StructMngLen != 0 {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("CXTypeSignature_StructMngInit on a manager holding %d objects", manager.CXTypeSignature_StructMngLen))
@@ -92,6 +93,7 @@ func (manager *CXTypeSignature_StructMng) CXTypeSignature_StructRelease(gid CXTy
 
 // CXTypeSignature_StructGet returns a borrowed pointer to the object. It is stale after the
 // next grow boundary or a Release of gid.
+// VIOLATION STRHOT-007: E, the assert text of a bad Gid, built only when the check fails, #412.
 func (manager *CXTypeSignature_StructMng) CXTypeSignature_StructGet(gid CXTypeSignature_StructGid) *CXTypeSignature_Struct {
 	index := objmodel.GidIndex(int64(gid))
 	if objmodel.GidTypeTag(int64(gid)) != CXTypeSignature_StructGidTypeTag || uint64(index) >= uint64(len(manager.CXTypeSignature_StructMngObjects)) ||

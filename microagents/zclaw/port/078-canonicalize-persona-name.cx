@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of canonicalize_persona_name of tools_persona.c: the first 23 bytes
 // lower cased with ASCII tolower, then one of the four names or nothing.
-func canonicalizePersonaName(input str) (canonical str, known bool) {
+func canonicalizePersonaName(input str) (canonical str, known bool) { global gWrapperState
 	var lowered str = ""
 	var count i32 = string.ByteLength(input)
 	if count > 23 {

@@ -4,7 +4,7 @@ import "sys/string"
 
 // The anthropic branch of the response parsing in llm_chat_tools of
 // llm/llm_proxy.c: stop_reason, the text blocks joined, and the tool_use blocks.
-func llmParseReply(response str) (reply LlmReply) {
+func llmParseReply(response str) (reply LlmReply) { global FemtoMaxToolCalls
 	reply.succeeded = false
 	reply.toolUse = false
 	reply.text = ""

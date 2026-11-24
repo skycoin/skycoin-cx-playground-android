@@ -6,7 +6,7 @@ import "sys/string"
 // after each message: the channel queue gets the text cut to its buffer,
 // the Telegram queue the text and the chat id. Each queued message is
 // printed, and the printed text is the agent's output.
-func sendResponse(text str, chatId i64) {
+func sendResponse(text str, chatId i64) { global ZclawChannelSendBufferSize, ZclawTelegramMaxMessageLength
 	var channelText str = truncateBytes(text, ZclawChannelSendBufferSize - 1)
 	var telegramText str = truncateBytes(text, ZclawTelegramMaxMessageLength - 1)
 	string.PrintLine(joinStrings([]str{"--- channel bytes=", i32.str(string.ByteLength(channelText))}))

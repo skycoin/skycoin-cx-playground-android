@@ -94,6 +94,7 @@ func (decoder *serializeDecoder) serializeDecoderFail(err error) {
 	}
 }
 
+// VIOLATION STRHOT-291: E, error or assert text, built on a failure branch only, #412.
 func (decoder *serializeDecoder) serializeDecoderFailf(format string, args ...interface{}) {
 	decoder.serializeDecoderFail(fmt.Errorf("serialized program is malformed: "+format, args...))
 }
@@ -130,6 +131,7 @@ func (decoder *serializeDecoder) serializeDecoderUint() uint64 {
 
 // serializeDecoderIntRange reads a signed integer and fails unless it is in
 // minimum to maximum.
+// VIOLATION STRHOT-292: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderIntRange(minimum int64, maximum int64, name string) int64 {
 	value := decoder.serializeDecoderInt()
 	if value < minimum || value > maximum {
@@ -139,10 +141,12 @@ func (decoder *serializeDecoder) serializeDecoderIntRange(minimum int64, maximum
 	return value
 }
 
+// VIOLATION STRHOT-293: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderIntValue() int {
 	return int(decoder.serializeDecoderIntRange(math.MinInt, math.MaxInt, "integer"))
 }
 
+// VIOLATION STRHOT-297: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderUint32() uint32 {
 	value := decoder.serializeDecoderUint()
 	if value > math.MaxUint32 {
@@ -152,6 +156,7 @@ func (decoder *serializeDecoder) serializeDecoderUint32() uint32 {
 	return uint32(value)
 }
 
+// VIOLATION STRHOT-290: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderBool() bool {
 	if decoder.serializeDecoderError != nil {
 		return false
@@ -169,6 +174,7 @@ func (decoder *serializeDecoder) serializeDecoderBool() bool {
 	return value == 1
 }
 
+// VIOLATION STRHOT-295: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderPointer() types.Pointer {
 	value := decoder.serializeDecoderUint()
 	if value > uint64(types.InvalidPointer) {
@@ -181,6 +187,7 @@ func (decoder *serializeDecoder) serializeDecoderPointer() types.Pointer {
 // serializeDecoderLength reads a length written by serializeEncoderLength and
 // returns -1 for nil. Each element takes at least elementSize bytes, so a
 // length the remaining bytes cannot hold fails before anything is allocated.
+// VIOLATION STRHOT-294: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderLength(elementSize int) int {
 	length := decoder.serializeDecoderInt()
 	if decoder.serializeDecoderError != nil {
@@ -230,6 +237,7 @@ func (decoder *serializeDecoder) serializeDecoderPointers() []types.Pointer {
 
 // serializeDecoderSection reads one section written by serializeEncoderSection
 // with body, which must read all of it.
+// VIOLATION STRHOT-296: B, the serializer, compiler code run by an opcode, #412.
 func (decoder *serializeDecoder) serializeDecoderSection(name string, body func(section *serializeDecoder)) {
 	length := decoder.serializeDecoderUint()
 	if decoder.serializeDecoderError != nil {
@@ -251,6 +259,7 @@ func (decoder *serializeDecoder) serializeDecoderSection(name string, body func(
 	}
 }
 
+// VIOLATION STRHOT-289: B, the serializer, compiler code run by an opcode, #412.
 func deserializeUint8(decoder *serializeDecoder) uint8 {
 	value := decoder.serializeDecoderUint()
 	if value > math.MaxUint8 {

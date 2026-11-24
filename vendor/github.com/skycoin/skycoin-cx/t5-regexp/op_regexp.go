@@ -22,12 +22,15 @@ func expOffset(value ast.CXValue) types.Pointer {
 // regexpCompile is a helper function for `opRegexpMustCompile` and
 // `opRegexpCompile`. `regexpCompile` compiles a `regexp.Regexp` structure
 // and adds it to global `regexps`. It also writes CX structure `regexp.Regexp`.
+// GCREACH: allocates the expression str, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+// VIOLATION STRHOT-142: B, hands a path or text to Go or the OS, #412.
 func regexpCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) error {
 	exp := inputs[0].Get_str(prgrm)
 
 	// The CX Regexp only holds the expression. The same expression in two
 	// parts of a program shares one compiled instance.
-	types.Write_str(prgrm, prgrm.Memory, expOffset(outputs[0]), exp)
+	ast.AllocateStrAt(prgrm, expOffset(outputs[0]), exp)
 
 	r, err := regexp.Compile(exp)
 	if err != nil {
@@ -38,6 +41,7 @@ func regexpCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 }
 
 // opRegexpMustCompile is a wrapper for golang's `regexp`'s `MustCompile`.
+// VIOLATION STRHOT-321: E, error or assert text, built on a failure branch only, #412.
 func opRegexpMustCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	err := regexpCompile(prgrm, inputs, outputs)
 
@@ -49,6 +53,7 @@ func opRegexpMustCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []a
 }
 
 // opRegexpCompile is a wrapper for golang's `regexp`'s `MustCompile`.
+// VIOLATION STRHOT-143: B, hands a path or text to Go or the OS, #412.
 func opRegexpCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	// We're only interested in `out1`, which represents the
 	// returned error.
@@ -63,6 +68,7 @@ func opRegexpCompile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.C
 }
 
 // opRegexpFind is a wrapper for golang's `regexp`'s `Find`.
+// VIOLATION STRHOT-144: B, hands a path or text to Go or the OS, #412.
 func opRegexpFind(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	exp := types.Read_str(prgrm.Memory, expOffset(inputs[0]))
 	r, ok := regexps[exp]

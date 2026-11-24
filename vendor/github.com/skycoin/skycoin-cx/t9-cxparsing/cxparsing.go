@@ -92,6 +92,7 @@ func parseSourceStrings(sourceCodeStrings []string, fileNames []string) error {
 	}
 	for _, pkg := range packages {
 		actions.PackageRedeclarationCheck(actions.AST, pkg)
+		actions.ImportScopedCheck(actions.AST, pkg)
 	}
 	/*
 		Adding global variables `OS_ARGS` to the `os` (operating system)
@@ -145,6 +146,7 @@ func parseSourceStrings(sourceCodeStrings []string, fileNames []string) error {
 
 		profiling.StartProfile(actions.AST.CXProgramSourceFileText(actions.CurrentFile))
 
+		actions.ImportScopedDirectivesRead(actions.CurrentFile, source)
 		parseErrors += Passtwo(b)
 
 		profiling.StopProfile(actions.AST.CXProgramSourceFileText(actions.CurrentFile))

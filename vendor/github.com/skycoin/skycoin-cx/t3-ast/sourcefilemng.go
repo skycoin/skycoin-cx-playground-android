@@ -52,6 +52,7 @@ func (manager *SourceFileMng) SourceFileIntern(path stringpool.StringGid) Source
 
 // SourceFilePath returns the path of the file gid names. SourceFileGidNil
 // gives StringGidNil.
+// VIOLATION STRHOT-313: E, error or assert text, built on a failure branch only, #412.
 func (manager *SourceFileMng) SourceFilePath(gid SourceFileGid) stringpool.StringGid {
 	if gid == SourceFileGidNil {
 		return stringpool.StringGidNil

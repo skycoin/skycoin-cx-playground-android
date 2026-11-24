@@ -6,7 +6,7 @@ import "sys/os"
 // fileAppend is the file system wrapper for appending to a file. A replay
 // checks that the port appends what the recording did, and writes only with
 // ++apply=1.
-func fileAppend(path str, content str) (appended bool) {
+func fileAppend(path str, content str) (appended bool) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
 	appended = true
 	if gWrapperState.mode == WrapperModeReplay {
 		var fields []str = tapeNext("file-append", 3)

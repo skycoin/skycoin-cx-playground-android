@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of tool_edit_file_execute of tools/tool_files.c: replace the first
 // occurrence of old_string, as strstr finds it, and write the file back.
-func toolEditFile(inputJson str) (output str) {
+func toolEditFile(inputJson str) (output str) { global ToolFilesMaxFileSize
 	path, pathFound := jsonStringField(inputJson, 0, "path")
 	oldText, oldFound := jsonStringField(inputJson, 0, "old_string")
 	newText, newFound := jsonStringField(inputJson, 0, "new_string")

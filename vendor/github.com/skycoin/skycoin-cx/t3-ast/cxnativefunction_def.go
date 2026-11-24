@@ -5,6 +5,11 @@ type CXNativeFunction struct {
 	// Metadata
 	AtomicOPCode int
 
+	// LibraryNumber and LibraryFunctionNumber name the system library function
+	// an AtomicOPCode of constants.OP_LIBRARY_CALL calls, and are 0 otherwise.
+	LibraryNumber         int
+	LibraryFunctionNumber int
+
 	// Contents
 	// OBJMODEL: CXArgumentGid, phase 5 #327.
 	// Now a pointer at rest, site S0131.

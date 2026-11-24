@@ -187,3 +187,129 @@ func literalValueInvalid(prgrm *ast.CXProgram, exprs []ast.CXExpression) bool {
 	outputs := prgrm.CXAtomicOps[exprs[len(exprs)-1].Index].GetOutputs(prgrm)
 	return len(outputs) == 1 && typeSignatureInvalid(prgrm, prgrm.GetCXTypeSignatureFromArray(outputs[0]))
 }
+
+// LiteralTypeSlices makes elem the element type of count slice dimensions,
+// as [][] before *T gives [][]*T.
+func LiteralTypeSlices(elem *ast.CXArgument, count int) *ast.CXArgument {
+	for i := 0; i < count; i++ {
+		elem = DeclarationSpecifiers(elem, []types.Pointer{0}, constants.DECL_SLICE)
+	}
+	return elem
+}
+
+// LiteralCompound builds a literal of the array or slice type typ, whose
+// elements are pointers or have array and slice dimensions mixed, as
+// []*T{&t} and [2][]i32{{1}, {2, 3}} do. line and column are where it starts.
+func LiteralCompound(prgrm *ast.CXProgram, typ *ast.CXArgument, line int, column int, elems []LiteralElement) []ast.CXExpression {
+	specs := typ.DeclarationSpecifiers
+	slice := specs[len(specs)-1] == constants.DECL_SLICE
+	elem := literalTemplateElement(prgrm, typ)
+	var exprs []ast.CXExpression
+	for _, element := range elems {
+		element := element
+		value := element.Expressions
+		if element.Elided {
+			if value = literalCompoundElided(prgrm, elem, element); value == nil {
+				// The element is a compile error, already recorded.
+				continue
+			}
+		}
+		elementColumn := 0
+		if slice {
+			elementColumn = element.Column
+		}
+		exprs = append(exprs, SliceLiteralElement(prgrm, value, element.Line, elementColumn)...)
+	}
+	if slice {
+		return sliceLiteralExpressionOf(prgrm, elem.Type, elem.StructType, elem, exprs)
+	}
+	return arrayLiteralExpressionOf(prgrm, typ.Lengths[:1], elem.Type, elem.StructType, elem, line, column, exprs)
+}
+
+// literalTemplateLengths returns the lengths of an array literal of
+// arraySizes whose elements have the type template, nil for a basic or
+// struct element.
+func literalTemplateLengths(arraySizes []types.Pointer, template *ast.CXArgument) []types.Pointer {
+	if template == nil {
+		return arraySizes
+	}
+	return append(append([]types.Pointer(nil), arraySizes...), template.Lengths...)
+}
+
+// literalTemplateElement returns a new argument of the element type of the
+// array or slice type typ.
+func literalTemplateElement(prgrm *ast.CXProgram, typ *ast.CXArgument) *ast.CXArgument {
+	elem := argumentCopy(prgrm, typ)
+	elem.DeclarationSpecifiers = elem.DeclarationSpecifiers[:len(elem.DeclarationSpecifiers)-1]
+	elem.Lengths = elem.Lengths[1:]
+	return elem
+}
+
+// literalCompoundElided builds the elided element elem of a literal whose
+// elements have the type typ. As Go, {x: 1} for a *T is &T{x: 1}.
+func literalCompoundElided(prgrm *ast.CXProgram, typ *ast.CXArgument, elem LiteralElement) []ast.CXExpression {
+	if simple, ok := literalTypeSimple(prgrm, typ); ok {
+		return literalElementElidedBuild(prgrm, simple, elem)
+	}
+	specs := typ.DeclarationSpecifiers
+	switch last := specs[len(specs)-1]; {
+	case last == constants.DECL_ARRAY || last == constants.DECL_SLICE:
+		if !elem.Keyed || len(elem.Fields) == 0 {
+			return LiteralCompound(prgrm, typ, elem.Line, 0, elem.Elements)
+		}
+	case last == constants.DECL_POINTER && len(specs) == 2 && specs[0] == constants.DECL_STRUCT && literalStructLocal(prgrm, typ.StructType):
+		if !elem.Keyed {
+			prgrm.CXProgramCompileErrorAdd(ast.CompileErrorCodeStructLiteralFieldNames, CurrentFile, elem.Line, ast.CompileErrorOperands{int64(typ.StructType.Name)})
+			return nil
+		}
+		return UnaryExpression(prgrm, "&", PrimaryStructLiteral(prgrm, prgrm.CXProgramNameText(typ.StructType.Name), elem.Line, 0, elem.Fields))
+	}
+	prgrm.CXProgramCompileErrorAdd(ast.CompileErrorCodeLiteralElementType, CurrentFile, elem.Line, ast.CompileErrorOperands{prgrm.CXProgramCompileErrorText(ast.GetFormattedType(prgrm, prgrm.GetCXTypeSignatureFromArray(ast.AllocCXTypeSignatureOfCXArg(prgrm, typ))))})
+	return nil
+}
+
+// literalTypeSimple returns typ as a LiteralType when it is a basic or
+// struct type of the current package with only array or only slice
+// dimensions, the types the literal actions build without a template.
+func literalTypeSimple(prgrm *ast.CXProgram, typ *ast.CXArgument) (LiteralType, bool) {
+	specs := typ.DeclarationSpecifiers
+	if len(specs) == 0 || typ.Type == types.POINTER {
+		return LiteralType{}, false
+	}
+	result := LiteralType{Lengths: append([]types.Pointer(nil), typ.Lengths...), TypeCode: typ.Type}
+	switch specs[0] {
+	case constants.DECL_BASIC:
+	case constants.DECL_STRUCT:
+		if !literalStructLocal(prgrm, typ.StructType) {
+			return LiteralType{}, false
+		}
+		result.TypeCode = 0
+		result.StructName = prgrm.CXProgramNameText(typ.StructType.Name)
+	default:
+		return LiteralType{}, false
+	}
+	for i, spec := range specs[1:] {
+		if spec != constants.DECL_ARRAY && spec != constants.DECL_SLICE || i > 0 && spec != specs[1] {
+			return LiteralType{}, false
+		}
+		result.Slice = spec == constants.DECL_SLICE
+	}
+	return result, true
+}
+
+// literalStructLocal reports whether strct is a struct of the current package.
+func literalStructLocal(prgrm *ast.CXProgram, strct *ast.CXStruct) bool {
+	pkg, err := prgrm.GetCurrentPackage()
+	return err == nil && strct != nil && strct.Package == ast.CXPackageIndex(pkg.Index)
+}
+
+// literalTypeCompound reports whether typ is a type only LiteralCompound
+// builds, one with a pointer or with array and slice dimensions mixed.
+func literalTypeCompound(typ *ast.CXArgument) bool {
+	for _, spec := range typ.DeclarationSpecifiers {
+		if spec == constants.DECL_POINTER {
+			return true
+		}
+	}
+	return typ.ArraySliceMixed()
+}

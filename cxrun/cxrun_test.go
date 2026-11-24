@@ -132,7 +132,7 @@ func TestExitArgsDir(t *testing.T) {
 	}
 	src := `package main
 import "sys/os"
-func main() {
+func main() { global os.Args
 	text, found := os.ReadAllText("data.txt")
 	printf("%s %v %d %s\n", text, found, len(os.Args), os.Args[1])
 	os.Exit(3)
@@ -140,7 +140,7 @@ func main() {
 }
 `
 	var out bytes.Buffer
-	opts := Options{Args: []string{"++mode=replay", "++tape=tape.txt"}, Dir: dir}
+	opts := Options{Args: []string{"++mode=replay", "++tape=tape.txt"}, Dir: dir, Libraries: []string{"file"}}
 	err := RunWith(map[string][]byte{"main.cx": []byte(src)}, "main.cx", opts, &fakeHost{}, &out)
 	var exit *ExitError
 	if !errors.As(err, &exit) || exit.Code != 3 {
@@ -161,5 +161,22 @@ func TestCellSize(t *testing.T) {
 	var out bytes.Buffer
 	if err := Run(map[string][]byte{"main.cx": []byte(src)}, "main.cx", &fakeHost{}, &out); err != nil || out.String() != "17 37\n" {
 		t.Fatalf("%v %q", err, out.String())
+	}
+}
+
+// TestLibraryDisabled checks that a program calls a system library only
+// when the run enables it.
+func TestLibraryDisabled(t *testing.T) {
+	src := "package main\nimport \"sys/os\"\nfunc main() {\n\ttext, found := os.ReadAllText(\"x\")\n\tprintf(\"%s %v\\n\", text, found)\n}\n"
+	var out bytes.Buffer
+	opts := Options{Dir: t.TempDir()}
+	err := RunWith(map[string][]byte{"main.cx": []byte(src)}, "main.cx", opts, &fakeHost{}, &out)
+	if err == nil || !strings.Contains(out.String(), "CX_RUNTIME_LIBRARY_DISABLED") {
+		t.Fatalf("err %v output %q, want CX_RUNTIME_LIBRARY_DISABLED", err, out.String())
+	}
+	out.Reset()
+	opts.Libraries = []string{"file"}
+	if err := RunWith(map[string][]byte{"main.cx": []byte(src)}, "main.cx", opts, &fakeHost{}, &out); err != nil || out.String() != " false\n" {
+		t.Fatalf("enabled: err %v output %q", err, out.String())
 	}
 }

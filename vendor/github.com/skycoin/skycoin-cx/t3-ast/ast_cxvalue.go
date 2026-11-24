@@ -69,6 +69,7 @@ func (value *CXValue) Get_bytes(prgrm *CXProgram) []byte {
 	return types.GetSlice_byte(prgrm.Memory, value.Offset, value.Size)
 }
 
+// VIOLATION STRHOT-029: O, the opcode works on Go string copies of CX strs, #412.
 func (value *CXValue) Get_str(prgrm *CXProgram) string {
 	return types.Read_str(prgrm.Memory, value.Offset)
 }
@@ -204,6 +205,9 @@ func (value *CXValue) Set_bytes(prgrm *CXProgram, data []byte) {
 	types.WriteSlice_byte(prgrm.Memory, value.Offset, data)
 }
 
+// GCREACH: allocates a str object, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+// VIOLATION STRHOT-030: O, the opcode works on Go string copies of CX strs, #412.
 func (value *CXValue) Set_str(prgrm *CXProgram, data string) {
 	AllocateStrAt(prgrm, value.Offset, data)
 }

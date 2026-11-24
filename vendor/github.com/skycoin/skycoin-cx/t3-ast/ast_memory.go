@@ -1,8 +1,6 @@
 package ast
 
 import (
-	"fmt"
-
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
 )
@@ -24,8 +22,10 @@ func MinHeapSize() types.Pointer {
 	return minHeapSize
 }
 
-// EnsureHeap ensures that `prgrm` has `minHeapSize()`
-// bytes allocated after the data segment.
+// EnsureMinimumHeapSize ensures that `prgrm` has `minHeapSize()` bytes
+// allocated after the data segment, and starts the GC pressure from 0.
+// GCREACH: sets the GC pressure and its limit,
+// see docs/GarbageCollector.md.
 func (cxprogram *CXProgram) EnsureMinimumHeapSize() {
 	currHeapSize := types.Cast_int_to_ptr(len(cxprogram.Memory)) - cxprogram.Heap.StartsAt
 	minHeapSize := MinHeapSize()
@@ -33,6 +33,8 @@ func (cxprogram *CXProgram) EnsureMinimumHeapSize() {
 		cxprogram.Memory = append(cxprogram.Memory, make([]byte, minHeapSize-currHeapSize)...)
 		cxprogram.Heap.Size = minHeapSize
 	}
+	cxprogram.Heap.Pressure = 0
+	cxprogram.Heap.PressureLimit = cxprogram.Heap.Size - cxprogram.Heap.Pointer
 }
 
 // ResizeMemory ...
@@ -53,76 +55,44 @@ func ResizeMemory(prgrm *CXProgram, newMemSize types.Pointer, isExpand bool) {
 		prgrm.Memory = append(prgrm.Memory, make([]byte, newMemSize-prgrm.Heap.Size)...)
 		prgrm.Heap.Size = newMemSize
 	} else {
-		// Removing bytes to reach a heap equal to `newMemSize`.
-		prgrm.Memory = append([]byte(nil), prgrm.Memory[:prgrm.Heap.StartsAt+newMemSize]...)
+		// Reslicing keeps the array for the next growth. The copy that
+		// releases it runs only when it would free more than half.
+		prgrm.Memory = prgrm.Memory[:prgrm.Heap.StartsAt+newMemSize]
+		if cap(prgrm.Memory) > 2*len(prgrm.Memory) {
+			prgrm.Memory = append([]byte(nil), prgrm.Memory...)
+		}
 		prgrm.Heap.Size = newMemSize
 	}
 }
 
-// AllocateSeq allocates memory in the heap
-func AllocateSeq(program interface{}, size types.Pointer) (offset types.Pointer) {
-	prgrm, ok := program.(*CXProgram)
-	if !ok {
-		panic(fmt.Sprintf("error getting cx program"))
-	}
-	// Current object trying to be allocated would use this address.
-	addr := prgrm.Heap.Pointer
-	// Next object to be allocated will use this address.
-	newFree := addr + size
-
-	// Checking if we can allocate the entirety of the object in the current heap.
-	if newFree > prgrm.Heap.Size {
-		// It does not fit, so calling garbage collector.
-		MarkAndCompact(prgrm)
-		// Heap pointer got moved by GC and recalculate these variables based on the new pointer.
-		addr = prgrm.Heap.Pointer
-		newFree = addr + size
-
-		// If the new heap pointer exceeds `MAX_HEAP_SIZE`, there's nothing left to do.
-		if newFree > constants.MAX_HEAP_SIZE {
+// AllocateSeq allocates size bytes on the heap and returns their address.
+// It never collects. When the heap is full it grows it, up to
+// MAX_HEAP_SIZE, and past that panics with HEAP_EXHAUSTED_ERROR. The bytes
+// count toward Heap.Pressure, which the next GarbageCollectorCheck reads.
+// GCREACH: grows the heap and adds to the GC pressure,
+// see docs/GarbageCollector.md.
+func AllocateSeq(prgrm *CXProgram, size types.Pointer) types.Pointer {
+	address := prgrm.Heap.Pointer
+	free := address + size
+	if free > prgrm.Heap.Size {
+		if free > constants.MAX_HEAP_SIZE || free < address {
 			panic(constants.HEAP_EXHAUSTED_ERROR)
 		}
-
-		// According to MIN_HEAP_FREE_RATIO and MAX_HEAP_FREE_RATION we can either shrink
-		// or expand the heap to maintain "healthy" heap sizes. The idea is that we don't want
-		// to have an absurdly amount of free heap memory, as we would be wasting resources, and we
-		// don't want to have a small amount of heap memory left as we'd be calling the garbage collector
-		// too frequently.
-
-		// Calculating free heap memory percentage.
-		usedPerc := float32(newFree) / float32(prgrm.Heap.Size)
-		freeMemPerc := 1.0 - usedPerc
-
-		// Then we have less than MIN_HEAP_FREE_RATIO memory left. Expand!
-		if freeMemPerc < constants.MIN_HEAP_FREE_RATIO {
-			// Calculating new heap size in order to reach MIN_HEAP_FREE_RATIO.
-			newMemSize := types.Cast_f32_to_ptr(float32(newFree) / (1.0 - constants.MIN_HEAP_FREE_RATIO))
-			ResizeMemory(prgrm, newMemSize, true)
-		}
-
-		// Then we have more than MAX_HEAP_FREE_RATIO memory left. Shrink!
-		if freeMemPerc > constants.MAX_HEAP_FREE_RATIO {
-			// Calculating new heap size in order to reach MAX_HEAP_FREE_RATIO.
-			newMemSize := types.Cast_f32_to_ptr(float32(newFree) / (1.0 - constants.MAX_HEAP_FREE_RATIO))
-
-			// This check guarantees that the CX program has always at least INIT_HEAP_SIZE bytes to work with.
-			// A flag could be added later to remove this, as in some cases this mechanism could not be desired.
-			if newMemSize > constants.INIT_HEAP_SIZE {
-				ResizeMemory(prgrm, newMemSize, false)
-			}
-		}
+		// Growing to leave MIN_HEAP_FREE_RATIO free keeps the next
+		// allocations from growing it again before the next collection.
+		grown := max(free, types.Cast_f32_to_ptr(float32(free)/(1.0-constants.MIN_HEAP_FREE_RATIO)))
+		ResizeMemory(prgrm, grown, true)
 	}
-
-	prgrm.Heap.Pointer = newFree
-
-	// Returning absolute memory address (not relative to where heap starts at).
-	// Above this point we were performing all operations taking into
-	// consideration only heap offsets.
-	return addr + prgrm.Heap.StartsAt
+	prgrm.Heap.Pointer = free
+	prgrm.Heap.Pressure += size
+	return address + prgrm.Heap.StartsAt
 }
 
 // AllocateStr returns a new str object holding data. It writes the object
 // after the allocation, which may give prgrm a new Memory.
+// GCREACH: allocates through AllocateSeq, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+// VIOLATION STRHOT-281: O, the opcode works on Go string copies of CX strs, #412.
 func AllocateStr(prgrm *CXProgram, data string) types.Pointer {
 	size := types.OBJECT_HEADER_SIZE + types.Cast_int_to_ptr(len(data))
 	object := AllocateSeq(prgrm, size)
@@ -130,11 +100,11 @@ func AllocateStr(prgrm *CXProgram, data string) types.Pointer {
 	return object
 }
 
-// AllocateStrAt writes a new str object holding data at address. An address
-// inside a heap object stays pinned, so it moves with the object.
+// AllocateStrAt writes a new str object holding data and stores its address
+// at address. Nothing collects inside it, so address stays valid.
+// GCREACH: allocates through AllocateSeq, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
+// VIOLATION STRHOT-282: O, the opcode works on Go string copies of CX strs, #412.
 func AllocateStrAt(prgrm *CXProgram, address types.Pointer, data string) {
-	prgrm.Heap.Pinned = address
-	object := AllocateStr(prgrm, data)
-	address, prgrm.Heap.Pinned = prgrm.Heap.Pinned, 0
-	types.Write_ptr(prgrm.Memory, address, object)
+	types.Write_ptr(prgrm.Memory, address, AllocateStr(prgrm, data))
 }

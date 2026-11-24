@@ -5,11 +5,14 @@ import (
 	"strings"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
+	// GCREACH: t3-ast owns the heap and the GC roots. This file allocates strs, which
+	// adds to the GC pressure, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
 // OpReadStdin returns the next line of the program's input without its line
 // ending. At the end of input it returns "", see LanguageGuide.md.
+// VIOLATION STRHOT-098: B, hands a path or text to Go or the OS, #412.
 func OpReadStdin(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var text string
 	if prgrm.ProgramStdin != nil {

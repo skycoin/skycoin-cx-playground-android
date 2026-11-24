@@ -6,6 +6,8 @@ import (
 	coreassert "github.com/skycoin/skycoin-cx/t0-cx-core-assert"
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
+	// GCREACH: t3-ast owns the heap and the GC roots. This file reads and writes values
+	// and allocates nothing, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -33,8 +35,7 @@ func RegisterOpCode(prgrm *ast.CXProgram, code int, name string, handler ast.Opc
 	}
 	ast.OpcodeHandlers[code] = handler
 
-	ast.OpNames[code] = name
-	ast.OpCodes[name] = code
+	ast.NativeNames.NativeNameIndexAdd(code, name)
 
 	if inputs == nil {
 		// OBJMODEL: state.CXArgumentMng (manager storage) or []CXArgumentGid, phase 4 #326.

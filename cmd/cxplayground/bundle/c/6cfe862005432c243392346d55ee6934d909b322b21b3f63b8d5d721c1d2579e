@@ -1,0 +1,17 @@
+package main
+
+import "sys/string"
+import "sys/time"
+
+// clockNow is the clock wrapper, the port of time(NULL).
+func clockNow() (epoch i64) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
+	if gWrapperState.mode == WrapperModeReplay {
+		var fields []str = tapeNext("clock", 2)
+		epoch = string.ParseDecimalI64(fields[1])
+		return
+	}
+	epoch = time.UnixMilli() / 1000L
+	if gWrapperState.mode == WrapperModeRecord {
+		tapeRecord([]str{"clock", i64.str(epoch)})
+	}
+}

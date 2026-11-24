@@ -101,6 +101,54 @@ const (
 	// to itself through other globals or functions. Its operands are the
 	// global and the chain of references.
 	CompileErrorCodeInitializationCycle
+	// CompileErrorCodeFunctionResultMissing is a call of a function with no
+	// results used as a value. Its operand is the function.
+	CompileErrorCodeFunctionResultMissing
+	// CompileErrorCodeMultipleValueSingle is a call of a function with more
+	// than one result used as one value. Its operands are the function and
+	// its result list.
+	CompileErrorCodeMultipleValueSingle
+	// CompileErrorCodeShortDeclarationNoNew is a := that declares no new
+	// variable.
+	CompileErrorCodeShortDeclarationNoNew
+	// CompileErrorCodeGlobalUndeclared is a use of a global the function does
+	// not declare (#486). Its operands are the function and the global twice.
+	CompileErrorCodeGlobalUndeclared
+	// CompileErrorCodeGlobalDeclaredUnused is a declared global the function
+	// does not use. Its operands are the global and the function.
+	CompileErrorCodeGlobalDeclaredUnused
+	// CompileErrorCodeGlobalDeclarationPlacement is a global statement that
+	// is not one of the first statements of a function body.
+	CompileErrorCodeGlobalDeclarationPlacement
+	// CompileErrorCodeGlobalDeclarationMissing is a name of a global statement
+	// that is no global. Its operands are the name and the package.
+	CompileErrorCodeGlobalDeclarationMissing
+	// CompileErrorCodeGlobalDeclarationPackageMissing is a declared pkg.name
+	// of a package not imported. Its operands are the package and the name.
+	CompileErrorCodeGlobalDeclarationPackageMissing
+	// CompileErrorCodeGlobalDeclarationRepeated is a global a function
+	// declares twice. Its operand is the global.
+	CompileErrorCodeGlobalDeclarationRepeated
+	// CompileErrorCodeShadowGlobal to CompileErrorCodeShadowVariable are a name
+	// that shadows another, with the position of the other as operands 2 to 4.
+	CompileErrorCodeShadowGlobal
+	CompileErrorCodeShadowImport
+	CompileErrorCodeShadowFunction
+	CompileErrorCodeShadowType
+	CompileErrorCodeShadowVariable
+	// CompileErrorCodeImportMasking is a name that has the name an import into
+	// scope brings in, with the position of that import as operands 2 to 4.
+	// CompileErrorCodeImportMaskingWarning is the same inside a function
+	// under //cx:masking warning, a warning that does not fail the build.
+	CompileErrorCodeImportMasking
+	CompileErrorCodeImportMaskingWarning
+	// CompileErrorCodeImportFormInvalid is an import into scope the compiler
+	// does not accept. Its operand says why.
+	CompileErrorCodeImportFormInvalid
+	// CompileErrorCodeImportNameUnknown is a name an import lists that is not
+	// a global, function or type of the package. Its operands are the name and
+	// the package.
+	CompileErrorCodeImportNameUnknown
 	// CompileErrorCodeEnd is one past the last code.
 	CompileErrorCodeEnd
 )
@@ -176,7 +224,9 @@ func (prgrm *CXProgram) CXProgramCompileErrorAdd(code CompileErrorCode, file Sou
 // CXProgramCompileErrorAddPosition records a compile error at file, line and
 // column, and records that the program has a compile error.
 func (prgrm *CXProgram) CXProgramCompileErrorAddPosition(code CompileErrorCode, file SourceFileGid, line int, column int, operands CompileErrorOperands) {
-	globals.FoundCompileErrors = true
+	if !CompileErrorCodeWarning(code) {
+		globals.FoundCompileErrors = true
+	}
 	list := &prgrm.CxIrState.CompileErrorList
 	for index := range list.CompileErrorListRecords[:list.CompileErrorListPreliminary] {
 		record := &list.CompileErrorListRecords[index]
@@ -253,4 +303,21 @@ func (prgrm *CXProgram) CXProgramImportFailed(name stringpool.StringGid) bool {
 // parser is at is past the function.
 func (prgrm *CXProgram) CXProgramCompileErrorAddLine(code CompileErrorCode, file SourceFileGid, line int, operands CompileErrorOperands) {
 	prgrm.CXProgramCompileErrorAddPosition(code, file, line, 0, operands)
+}
+
+// CompileErrorCodeWarning reports whether code is a warning, which prints
+// but does not fail the build.
+func CompileErrorCodeWarning(code CompileErrorCode) bool {
+	return code == CompileErrorCodeImportMaskingWarning
+}
+
+// CXProgramCompileErrorCount counts the recorded errors, without warnings.
+func (prgrm *CXProgram) CXProgramCompileErrorCount() int {
+	count := 0
+	for _, record := range prgrm.CxIrState.CompileErrorList.CompileErrorListRecords {
+		if !CompileErrorCodeWarning(record.CompileErrorRecordCode) {
+			count++
+		}
+	}
+	return count
 }

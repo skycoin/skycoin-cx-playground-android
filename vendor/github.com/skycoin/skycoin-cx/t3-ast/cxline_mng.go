@@ -23,6 +23,7 @@ type CXLineMng struct {
 }
 
 // CXLineMngInit sets the Cap and whether the grow boundary may grow it.
+// VIOLATION STRHOT-250: E, the assert text of a bad Init, built only when it fails, #412.
 func (manager *CXLineMng) CXLineMngInit(capacity int, growable bool) {
 	if manager.CXLineMngLen != 0 {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("CXLineMngInit on a manager holding %d objects", manager.CXLineMngLen))
@@ -92,6 +93,7 @@ func (manager *CXLineMng) CXLineRelease(gid CXLineGid) {
 
 // CXLineGet returns a borrowed pointer to the object. It is stale after the
 // next grow boundary or a Release of gid.
+// VIOLATION STRHOT-004: E, the assert text of a bad Gid, built only when the check fails, #412.
 func (manager *CXLineMng) CXLineGet(gid CXLineGid) *CXLine {
 	index := objmodel.GidIndex(int64(gid))
 	if objmodel.GidTypeTag(int64(gid)) != CXLineGidTypeTag || uint64(index) >= uint64(len(manager.CXLineMngObjects)) ||

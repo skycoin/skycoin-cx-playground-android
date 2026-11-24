@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "CX IR: primes",
+  "description": "Test demo: the primes benchmark as a serialized CX program",
+  "kind": "console",
+  "form": "ir",
+  "entry": "main.cxir",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cxir",
+      "size": 73556,
+      "sha256": "0876a4b6210de25f9f8b1c51286208642c625dc15a0c15b9447af37a1c15f354",
+      "chunks": [
+        "cd79b8b833131c7daa4c93865763efcf6dbc71d3507fb751dccedcc520a81b0a",
+        "f6d2d5c0022b4b6c0206b90827f9c2777d419e98f60c0d13b20834945e39f659"
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ package main
 import "sys/string"
 
 // Port of memory_get of memory.h, as test/host/mock_memory.c implements it.
-func memoryGet(key str) (value str, found bool) {
+func memoryGet(key str) (value str, found bool) { global gAgentState
 	value = ""
 	found = false
 	if string.ByteLength(key) == 0 {

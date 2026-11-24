@@ -25,6 +25,8 @@ func gcRootsDeclare(prgrm *ast.CXProgram, fn *ast.CXFunction, typeSig *ast.CXTyp
 }
 
 // gcRootAdd adds the local at offset to fn.ListOfSlots.
+// GCREACH: adds a GC root to ListOfSlots,
+// see docs/GarbageCollector.md.
 func gcRootAdd(fn *ast.CXFunction, offset types.Pointer, specs []int, typ types.Code, strct *ast.CXStruct, lengths []types.Pointer) {
 	fn.ListOfSlots = append(fn.ListOfSlots, ast.CXFunctionSlot{
 		CXFunctionSlotOffset:     offset,

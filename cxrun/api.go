@@ -163,8 +163,7 @@ func registerHost(p *cxast.CXProgram, code int, name string, h handler, inputs, 
 		cxast.OpcodeHandlers = append(cxast.OpcodeHandlers, make([]cxast.OpcodeHandler, code+1-len(cxast.OpcodeHandlers))...)
 	}
 	cxast.OpcodeHandlers[code] = h
-	cxast.OpNames[code] = name
-	cxast.OpCodes[name] = code
+	cxast.NativeNames.NativeNameIndexAdd(code, name)
 	if inputs == nil {
 		inputs = []*cxast.CXArgument{}
 	}

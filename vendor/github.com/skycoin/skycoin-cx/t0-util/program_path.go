@@ -24,6 +24,7 @@ func (programPath ProgramFileSystemPath) ProgramFileSystemPathText() string {
 
 // ProgramFileSystemPathFromBytes validates a path read from program memory.
 // It must be relative, use only '/' and not start with ".." once cleaned.
+// VIOLATION STRHOT-269: B, hands a path or text to Go or the OS, #412.
 func ProgramFileSystemPathFromBytes(pathBytes []byte) (ProgramFileSystemPath, *FileError) {
 	invalid := func(code FileErrorCode, reason string) (ProgramFileSystemPath, *FileError) {
 		fileError := &FileError{
@@ -91,6 +92,7 @@ func programSandboxRootCheck(root *os.Root, operation FileOperationCode, program
 }
 
 // ProgramSandboxFileOpen opens a program path for reading inside root.
+// VIOLATION STRHOT-272: B, hands a path or text to Go or the OS, #412.
 func ProgramSandboxFileOpen(root *os.Root, programPath ProgramFileSystemPath) (*os.File, *FileError) {
 	if fileError := programSandboxRootCheck(root, FileOperationOpen, programPath); fileError != nil {
 		return nil, fileError
@@ -106,6 +108,7 @@ func ProgramSandboxFileOpen(root *os.Root, programPath ProgramFileSystemPath) (*
 }
 
 // ProgramSandboxFileCreate creates or truncates a program path inside root.
+// VIOLATION STRHOT-270: B, hands a path or text to Go or the OS, #412.
 func ProgramSandboxFileCreate(root *os.Root, programPath ProgramFileSystemPath) (*os.File, *FileError) {
 	if fileError := programSandboxRootCheck(root, FileOperationCreate, programPath); fileError != nil {
 		return nil, fileError
@@ -135,6 +138,7 @@ func ProgramSandboxFileRead(root *os.Root, programPath ProgramFileSystemPath) ([
 	return content, nil
 }
 
+// VIOLATION STRHOT-271: B, hands a path or text to Go or the OS, #412.
 func programSandboxFileError(operation FileOperationCode, programPath ProgramFileSystemPath, err error) *FileError {
 	fileError := fileErrorFromFileSystemError(operation, programPath.programFileSystemPathText, err)
 	if logFile {

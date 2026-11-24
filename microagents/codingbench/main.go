@@ -188,7 +188,7 @@ func recordOne(c *config, task, agent string) (result, error) {
 	if err != nil {
 		return r, err
 	}
-	args := append(ports, "++mode=record", "++tape=tape.txt", "++inbound=inbound.txt",
+	args := append(append([]string{cxEnable}, ports...), "++mode=record", "++tape=tape.txt", "++inbound=inbound.txt",
 		"++client="+c.backendstore, "++backend="+store.url)
 	start := time.Now()
 	output, runErr := runIn(work, c.cx, args...)
@@ -268,7 +268,7 @@ func replayOne(c *config, task, agent, saveDir string) (result, error) {
 		return r, err
 	}
 	start := time.Now()
-	output, err := runIn(work, c.cx, append(ports, "++mode=replay", "++tape=tape.txt", "++apply=1")...)
+	output, err := runIn(work, c.cx, append(append([]string{cxEnable}, ports...), "++mode=replay", "++tape=tape.txt", "++apply=1")...)
 	r.wall = time.Since(start)
 	if err != nil {
 		return r, fmt.Errorf("port replay: %v: %s", err, lastLine(output))
@@ -317,6 +317,11 @@ func setupFiles(taskDir, dst string) error {
 	src := filepath.Join(taskDir, "files")
 	if err := os.MkdirAll(filepath.Join(dst, "sessions"), 0o755); err != nil {
 		return err
+	}
+	// A task that starts from no files has no files/, as git keeps no
+	// empty folder.
+	if _, err := os.Stat(src); errors.Is(err, fs.ErrNotExist) {
+		return nil
 	}
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -539,3 +544,7 @@ func renderTable(results []result, replay bool) string {
 	b.WriteString("zclaw is not run: it has no file tools.\n")
 	return b.String()
 }
+
+// cxEnable enables the system libraries the ports call: files, the network
+// and os.Run for the model client. skycoin-cx disables them by default.
+const cxEnable = "--enable=file,net,process"

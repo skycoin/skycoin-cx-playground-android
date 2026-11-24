@@ -25,8 +25,8 @@ Recorded: 2026-11-23 12:20 UTC
 | raise-the-limit | mimiclaw | yes | 2 | 1 | 15155 | 599 | 1.6 s |  |
 | remove-debug-print | femtoclaw | yes | 2 | 1 | 17932 | 608 | 2.0 s |  |
 | remove-debug-print | mimiclaw | yes | 2 | 1 | 15098 | 608 | 1.4 s |  |
-| rename-across-files | femtoclaw | yes | 3 | 3 | 29122 | 1086 | 3.3 s |  |
-| rename-across-files | mimiclaw | yes | 3 | 3 | 24871 | 1086 | 2.4 s |  |
+| rename-across-files | femtoclaw | yes | 3 | 3 | 29206 | 1100 | 2.4 s |  |
+| rename-across-files | mimiclaw | yes | 3 | 3 | 24955 | 1100 | 2.4 s |  |
 | write-notes-file | femtoclaw | yes | 2 | 1 | 17749 | 553 | 1.6 s |  |
 | write-notes-file | mimiclaw | yes | 2 | 1 | 14915 | 553 | 1.7 s |  |
 

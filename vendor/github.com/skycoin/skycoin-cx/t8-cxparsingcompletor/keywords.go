@@ -3,6 +3,7 @@ package parsingcompletor
 var KeywordMap map[string]int = map[string]int{
 	"func":      FUNC,
 	"var":       VAR,
+	"global":    GLOBAL,
 	"package":   PACKAGE,
 	"if":        IF,
 	"else":      ELSE,

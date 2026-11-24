@@ -6,7 +6,7 @@ const serializeMagic = "CXPROGRM"
 
 // serializeFormatVersion is the layout of the bytes after serializeMagic.
 // It changes whenever a field is added, removed or reordered.
-const serializeFormatVersion uint32 = 5
+const serializeFormatVersion uint32 = 6
 
 // serializeHeaderSize is serializeMagic, the format version, the pointer size
 // and the language version, all fixed width little endian.

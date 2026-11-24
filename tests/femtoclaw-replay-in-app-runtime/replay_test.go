@@ -43,7 +43,7 @@ func TestBundledReplayMatchesHostReplay(t *testing.T) {
 	}
 	for _, replay := range []string{"first", "second"} {
 		var out, stderr bytes.Buffer
-		opts := cxrun.Options{Args: app.Manifest.Args, Dir: dir, Stderr: &stderr}
+		opts := cxrun.Options{Args: app.Manifest.Args, Dir: dir, Stderr: &stderr, Libraries: cxrun.LibrariesAll()}
 		if err := cxrun.RunWith(files, app.Manifest.Entry, opts, nil, &out); err != nil {
 			t.Fatalf("%s replay: %v\n%s%s", replay, err, out.String(), stderr.String())
 		}

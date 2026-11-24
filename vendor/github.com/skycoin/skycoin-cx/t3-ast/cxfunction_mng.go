@@ -23,6 +23,7 @@ type CXFunctionMng struct {
 }
 
 // CXFunctionMngInit sets the Cap and whether the grow boundary may grow it.
+// VIOLATION STRHOT-249: E, the assert text of a bad Init, built only when it fails, #412.
 func (manager *CXFunctionMng) CXFunctionMngInit(capacity int, growable bool) {
 	if manager.CXFunctionMngLen != 0 {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("CXFunctionMngInit on a manager holding %d objects", manager.CXFunctionMngLen))

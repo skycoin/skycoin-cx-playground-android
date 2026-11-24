@@ -57,9 +57,11 @@ type CXCallback struct {
 
 // init resolves the callback function when it is registered, so an event
 // calls it by index without a name lookup, see #432.
+// GCREACH: allocates on the heap, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
 func (cb *CXCallback) init(prgrm *ast.CXProgram, inputs []ast.CXValue, packageNameGid stringpool.StringGid, packageFound bool) {
 	windowName := bytes.Clone(ast.ProgramStringBytesRead(prgrm, &inputs[0]))
-	var windowHeapPtr = types.AllocWrite_obj_data(prgrm, prgrm.Memory, windowName)
+	var windowHeapPtr = ast.AllocateStr(prgrm, string(windowName))
 	var windowNamePtr [types.POINTER_SIZE]byte
 	types.Write_ptr(windowNamePtr[:], 0, windowHeapPtr)
 	cb.windowNameBytes = windowNamePtr[:]

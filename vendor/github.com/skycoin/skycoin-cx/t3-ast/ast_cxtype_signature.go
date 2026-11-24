@@ -246,6 +246,7 @@ func (typeSignature *CXTypeSignature) GetType(prgrm *CXProgram) types.Code {
 	return atomicType
 }
 
+// VIOLATION STRHOT-279: P, builds the text of a printed value, #412.
 func (typeSignature *CXTypeSignature) GetTypeString(prgrm *CXProgram) string {
 	var typeString string
 
@@ -332,6 +333,7 @@ func (typeSignature *CXTypeSignature) GetTypeString(prgrm *CXProgram) string {
 
 // GetValueTypeName returns the type name printf gives an extra value, the
 // struct name for a struct and the element type name otherwise.
+// VIOLATION STRHOT-280: P, builds the text of a printed value, #412.
 func (typeSignature *CXTypeSignature) GetValueTypeName(prgrm *CXProgram) string {
 	switch typeSignature.Type {
 	case TYPE_CXARGUMENT_DEPRECATE:

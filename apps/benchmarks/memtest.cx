@@ -10,7 +10,7 @@ func fnv(h ui64, v ui64) (out ui64) {
 	out = (h ^ v) * 1099511628211UL
 }
 
-func main() {
+func main() { global mem
 	var h ui64
 	h = 14695981039346656037UL
 	var n i32

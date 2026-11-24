@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "name": "CX IR: key input",
+  "description": "Test demo: the key input program as a serialized CX program",
+  "kind": "gfx",
+  "form": "ir",
+  "entry": "main.cxir",
+  "chunk_size": 65536,
+  "files": [
+    {
+      "path": "main.cxir",
+      "size": 12649,
+      "sha256": "f6357735733d3a98963bf806c49e6b598ac995012a8f72dfee99f368b7f16b94",
+      "chunks": [
+        "f6357735733d3a98963bf806c49e6b598ac995012a8f72dfee99f368b7f16b94"
+      ]
+    }
+  ]
+}

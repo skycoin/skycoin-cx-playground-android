@@ -446,6 +446,8 @@ func opGlGIFFrameToTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs [
 	outputs[1].Set_i32(prgrm, disposal)
 }
 
+// GCREACH: allocates on the heap, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
 func opGlAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputSlicePointer := outputs[0].Offset
 	outputSliceOffset := types.Read_ptr(prgrm.Memory, outputSlicePointer)

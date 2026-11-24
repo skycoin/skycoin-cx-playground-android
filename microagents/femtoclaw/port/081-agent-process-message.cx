@@ -3,7 +3,7 @@ package main
 import "sys/string"
 
 // One pass of the while loop of agent_loop_task of agent/agent_loop.c.
-func agentProcessMessage(message InboundMessage, toolsJsonText str) {
+func agentProcessMessage(message InboundMessage, toolsJsonText str) { global FemtoAgentMaxHistory, FemtoAgentMaxToolIterations, FemtoChannelSystem
 	var systemPrompt str = contextBuildSystemPrompt()
 	systemPrompt = agentTurnContext(systemPrompt, message)
 	var messages []str = sessionHistoryMessages(message.chatId, FemtoAgentMaxHistory)

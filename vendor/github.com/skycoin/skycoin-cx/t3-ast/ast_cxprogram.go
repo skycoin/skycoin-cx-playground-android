@@ -7,8 +7,10 @@ import (
 	"io"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
+	"github.com/skycoin/skycoin-cx/t1-constants"
 	objmodel "github.com/skycoin/skycoin-cx/t1-cx-core-objmodel"
 	stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
+	gc "github.com/skycoin/skycoin-cx/t2-cx-runtime-gc"
 )
 
 type StackSegmentStruct struct {
@@ -22,29 +24,21 @@ type DataSegmentStruct struct {
 	StartsAt types.Pointer // Offset at which the data segment starts in a CX program's memory
 }
 
-// HeapVisit is a pointer or slice the mark followed, and its GCType.
-type HeapVisit struct {
-	HeapVisitAddress types.Pointer
-	HeapVisitType    *GCType
-}
-
 type HeapSegmentStruct struct {
 	Size     types.Pointer // This field stores the size of a CX program's heap
 	StartsAt types.Pointer // Offset at which the heap starts in a CX program's memory (normally the stack size)
 	Pointer  types.Pointer // At what offset a CX program can insert a new object to the heap
-	// ObjectStarts lists the address of each object, for the collection running.
-	ObjectStarts []types.Pointer
-	// Slots lists the address of each reference the mark read.
-	Slots []types.Pointer
-	// Visited holds the pointers and slices the mark followed.
-	Visited map[HeapVisit]bool
-	// Work holds the pointers and slices the mark has yet to follow.
-	Work []HeapVisit
-	// Pinned is an address inside an object that Go code holds across an
-	// allocation, or 0. The collection keeps its object and moves it.
-	Pinned types.Pointer
+	// Pressure is the bytes allocated since the last collection.
+	Pressure types.Pointer
+	// PressureLimit is the free heap after the last collection. The next
+	// GarbageCollectorCheck past it asks for a collection.
+	PressureLimit types.Pointer
 	// Types holds the GCTypes of the roots, built by the first collection.
 	Types *GCTypeCache
+	// Roots is the root table of the collection running, kept for reuse.
+	Roots gc.GCRootTable
+	// Collector is the scratch memory of the collector.
+	Collector gc.GCState
 }
 
 // ----------------------------------------------------------------
@@ -77,6 +71,7 @@ func (cxprogram *CXProgram) AddPackageInArray(pkg *CXPackage) CXPackageIndex {
 	return CXPackageIndex(pkg.Index)
 }
 
+// VIOLATION STRHOT-231: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetPackageFromArray(index CXPackageIndex) (*CXPackage, error) {
 	if int(index) > (len(cxprogram.CXPackages) - 1) {
 		return nil, fmt.Errorf("error: CXPackages[%d]: index out of bounds", index)
@@ -141,11 +136,16 @@ func nativeArgCopy(arg *CXArgument) *CXArgument {
 }
 
 func (cxprogram *CXProgram) AddNativeFunctionInArray(fn *CXNativeFunction) CXFunctionIndex {
+	if fn.AtomicOPCode == constants.OP_LIBRARY_CALL {
+		cxprogram.ProgramLibrariesUsed[fn.LibraryNumber] = true
+	}
 	// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 	// Now a heap literal, site S0194.
 	fnNative := &CXFunction{
-		Index:        len(cxprogram.CXFunctions),
-		AtomicOPCode: fn.AtomicOPCode,
+		Index:                 len(cxprogram.CXFunctions),
+		AtomicOPCode:          fn.AtomicOPCode,
+		LibraryNumber:         fn.LibraryNumber,
+		LibraryFunctionNumber: fn.LibraryFunctionNumber,
 		// OBJMODEL: state.CXStructMng.CXStructAlloc(), phase 4 #336.
 		// Now a heap literal, site S0195.
 		Inputs: &CXStruct{},
@@ -197,6 +197,7 @@ func (cxprogram *CXProgram) AddNativeFunctionInArray(fn *CXNativeFunction) CXFun
 	return CXFunctionIndex(fnNative.Index)
 }
 
+// VIOLATION STRHOT-232: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetFunctionFromArray(index CXFunctionIndex) *CXFunction {
 	if index == -1 {
 		return nil
@@ -244,6 +245,7 @@ func (cxprogram *CXProgram) GetStructFromArray(index CXStructIndex) *CXStruct {
 
 // GetCXLine returns the line in slot index of the program's CXLineMng. An
 // expression keeps the slot index, not the Gid, until phase 5 of CXLine.
+// VIOLATION STRHOT-233: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetCXLine(index int) (*CXLine, error) {
 	manager := &cxprogram.CxIrState.CXLineMng
 	if index < 0 || index >= int(manager.CXLineMngNext) {
@@ -257,6 +259,7 @@ func (cxprogram *CXProgram) GetCXLine(index int) (*CXLine, error) {
 // GetCXArg returns the argument in slot index of the program's
 // CXArgumentMng. An argument is named by its slot index, not its Gid, until
 // phase 5 of CXArgument.
+// VIOLATION STRHOT-234: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetCXArg(index CXArgumentIndex) *CXArgument {
 	manager := &cxprogram.CxIrState.CXArgumentMng
 	if index < 0 || int(index) >= int(manager.CXArgumentMngNext) {
@@ -267,6 +270,7 @@ func (cxprogram *CXProgram) GetCXArg(index CXArgumentIndex) *CXArgument {
 	return manager.CXArgumentGet(CXArgumentGid(gid))
 }
 
+// VIOLATION STRHOT-235: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetCXAtomicOp(index int) (*CXAtomicOperator, error) {
 	if index > (len(cxprogram.CXAtomicOps) - 1) {
 		return nil, fmt.Errorf("error: CXAtomicOps[%d]: index out of bounds", index)
@@ -327,6 +331,7 @@ func (cxprogram *CXProgram) AllocCXTypeSignatureCopy(src *CXTypeSignature) (CXTy
 // GetCXTypeSignatureFromArray returns the type signature in slot index of
 // the program's CXTypeSignatureMng, or nil for -1. A type signature is named
 // by its slot index, not its Gid, until phase 5 of CXTypeSignature.
+// VIOLATION STRHOT-236: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetCXTypeSignatureFromArray(index CXTypeSignatureIndex) *CXTypeSignature {
 	if index == -1 {
 		return nil
@@ -349,6 +354,7 @@ func (cxprogram *CXProgram) GetCXTypeSignatureFromArray(index CXTypeSignatureInd
 // of the program's CXTypeSignature_ArrayMng, or nil for -1. A type signature's
 // Meta keeps the slot index, not the Gid, until phase 5 of
 // CXTypeSignature_Array.
+// VIOLATION STRHOT-237: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetCXTypeSignatureArrayFromArray(index int) *CXTypeSignature_Array {
 	if index == -1 {
 		return nil
@@ -371,6 +377,7 @@ func (cxprogram *CXProgram) GetCXTypeSignatureArrayFromArray(index int) *CXTypeS
 // of the program's CXTypeSignature_StructMng, or nil for -1. A type
 // signature's Meta keeps the slot index, not the Gid, until phase 5 of
 // CXTypeSignature_Struct.
+// VIOLATION STRHOT-238: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetCXTypeSignatureStructFromArray(index int) *CXTypeSignature_Struct {
 	if index == -1 {
 		return nil
@@ -567,6 +574,7 @@ func (cxprogram *CXProgram) AddPointerArgsToTypeSignaturesArray(cxArgs []*CXArgu
 // ----------------------------------------------------------------
 //                             `CXProgram` Getters
 
+// VIOLATION STRHOT-239: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetOperation(expr *CXExpression) (*CXAtomicOperator, *CXLine, error) {
 	switch expr.Type {
 	case CX_ATOMIC_OPERATOR:
@@ -601,6 +609,7 @@ func (cxprogram *CXProgram) GetOperation(expr *CXExpression) (*CXAtomicOperator,
 	return &CXAtomicOperator{}, nil, fmt.Errorf("operation type is not found.")
 }
 
+// VIOLATION STRHOT-240: E, error or assert text, built on a failure branch only, #412.
 func (cxprogram *CXProgram) GetPreviousCXLine(exprs []CXExpression, currIndex int) (*CXLine, error) {
 	// A runtime error while the inputs of an empty function are copied stops at
 	// line 0 of a call with no expressions.

@@ -6,7 +6,7 @@ import "sys/os"
 // wrapperInit chooses the wrapper implementation from the command line:
 // ++mode=live|record|replay, ++tape=FILE, ++inbound=FILE, ++client=COMMAND
 // and ++backend=URL.
-func wrapperInit() {
+func wrapperInit() { global gWrapperState, WrapperModeReplay, WrapperModeRecord, WrapperModeLive
 	gWrapperState.byteStrings = byteTable()
 	var mode str = wrapperArgument("mode", "replay")
 	gWrapperState.tapePath = wrapperArgument("tape", "tape.txt")

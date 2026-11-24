@@ -4,6 +4,8 @@ import (
 	"os"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
+	// GCREACH: t3-ast owns the heap and the GC roots. Callback runs a nested old loop
+	// inside a native opcode, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 

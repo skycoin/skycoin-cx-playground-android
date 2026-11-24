@@ -102,7 +102,7 @@
 %token  <f32>           FLOAT_LITERAL
 %token  <f64>           DOUBLE_LITERAL
 %token  <tok>           FUNC OP LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK IDENTIFIER
-                        VAR COMMA PERIOD COMMENT STRING_LITERAL PACKAGE IF ELSE FOR TYPSTRUCT STRUCT
+                        VAR GLOBAL COMMA PERIOD COMMENT STRING_LITERAL PACKAGE IF ELSE FOR TYPSTRUCT STRUCT
                         SEMICOLON NEWLINE
                         ASSIGN CASSIGN IMPORT RETURN GOTO GT_OP LT_OP GTEQ_OP LTEQ_OP EQUAL COLON NEW
                         EQUALWORD GTHANWORD LTHANWORD
@@ -276,7 +276,37 @@ package_declaration:
 import_declaration:
                 IMPORT STRING_LITERAL SEMICOLON
                 {
-			actions.DeclareImport(Program,$2, CurrentFile, lineNo)
+			actions.DeclareImportAt(Program,$2, CurrentFile, lineNo, $<column>2)
+                }
+        // The imports into scope of #487: import . "p", import file . "p",
+        // import (a, b) "p" and import file (a, b) "p".
+        |       IMPORT PERIOD STRING_LITERAL SEMICOLON
+                {
+			actions.DeclareImportScoped(Program, $3, "", 0, 0, nil, CurrentFile, $<line>3, $<column>3)
+                }
+        |       IMPORT IDENTIFIER PERIOD STRING_LITERAL SEMICOLON
+                {
+			actions.DeclareImportScoped(Program, $4, $2, $<line>2, $<column>2, nil, CurrentFile, $<line>4, $<column>4)
+                }
+        |       IMPORT LPAREN import_names RPAREN STRING_LITERAL SEMICOLON
+                {
+			actions.DeclareImportScoped(Program, $5, "", 0, 0, actions.ImportScopedNamesTake(), CurrentFile, $<line>5, $<column>5)
+                }
+        |       IMPORT IDENTIFIER LPAREN import_names RPAREN STRING_LITERAL SEMICOLON
+                {
+			actions.DeclareImportScoped(Program, $6, $2, $<line>2, $<column>2, actions.ImportScopedNamesTake(), CurrentFile, $<line>6, $<column>6)
+                }
+                ;
+
+import_names:
+                IDENTIFIER
+                {
+			actions.ImportScopedNamesTake()
+			actions.ImportScopedNamesAdd($1, $<line>1, $<column>1)
+                }
+        |       import_names COMMA IDENTIFIER
+                {
+			actions.ImportScopedNamesAdd($3, $<line>3, $<column>3)
                 }
                 ;
 
@@ -338,6 +368,10 @@ function_results:
                 {
 			$$ = actions.FunctionResultsUnnamed(Program, $2)
                 }
+        |       LPAREN result_type_list COMMA RPAREN
+                {
+			$$ = actions.FunctionResultsUnnamed(Program, $2)
+                }
         ;
 
 result_type_list:
@@ -369,6 +403,7 @@ function_declaration:
 parameter_type_list:
                 //parameter_list COMMA ELLIPSIS
 		parameter_list
+	|	parameter_list COMMA
                 ;
 
 parameter_list:
@@ -521,7 +556,7 @@ array_element:
                 {
 			$$ = actions.DeclarationSpecifiersStruct(Program,$3, types.Code($1).Name(), true, CurrentFile, $<line>1, $<column>1)
                 }
-        |       MUL_OP array_element
+        |       MUL_OP declaration_specifiers
                 {
 			$$ = actions.DeclarationSpecifiers($2, []types.Pointer{0}, constants.DECL_POINTER)
                 }
@@ -582,11 +617,18 @@ literal_element_list:
 	|       literal_element_list COMMA literal_element
                 ;
 
+// A list of elements or fields may end in a comma, which Go requires when the
+// closing brace is on the next line (https://go.dev/ref/spec#Semicolons).
+list_end:
+                RBRACE
+        |       COMMA RBRACE
+                ;
+
 // An elided element, {1, 2} or {x: 1}, takes the element type of its literal.
 literal_element:
 		assignment_expression
-        |       LBRACE literal_element_list RBRACE
-        |       LBRACE struct_literal_fields RBRACE
+        |       LBRACE literal_element_list list_end
+        |       LBRACE struct_literal_fields list_end
                 ;
 
 indexing_literal:
@@ -613,17 +655,31 @@ indexing_slice_literal:
 
 // expressions
 array_literal_expression:
-                indexing_literal IDENTIFIER LBRACE literal_element_list RBRACE
+                indexing_literal IDENTIFIER LBRACE literal_element_list list_end
         |       indexing_literal IDENTIFIER LBRACE RBRACE
-        |       indexing_literal type_specifier LBRACE literal_element_list RBRACE
+        |       indexing_literal type_specifier LBRACE literal_element_list list_end
         |       indexing_literal type_specifier LBRACE RBRACE
         ;
 
 slice_literal_expression:
-                indexing_slice_literal IDENTIFIER LBRACE literal_element_list RBRACE
+                indexing_slice_literal IDENTIFIER LBRACE literal_element_list list_end
         |       indexing_slice_literal IDENTIFIER LBRACE RBRACE
-        |       indexing_slice_literal type_specifier LBRACE literal_element_list RBRACE
+        |       indexing_slice_literal type_specifier LBRACE literal_element_list list_end
         |       indexing_slice_literal type_specifier LBRACE RBRACE
+                ;
+
+// A literal of a type with a pointer or with both array and slice
+// dimensions, such as []*T or [2][]i32.
+compound_literal_type:
+                indexing_literal MUL_OP declaration_specifiers
+        |       indexing_literal LBRACK RBRACK declaration_specifiers
+        |       indexing_slice_literal MUL_OP declaration_specifiers
+        |       indexing_slice_literal indexing_literal array_element
+                ;
+
+compound_literal_expression:
+                compound_literal_type LBRACE literal_element_list list_end
+        |       compound_literal_type LBRACE RBRACE
                 ;
 
 
@@ -684,6 +740,7 @@ primary_expression:
         |       LPAREN expression RPAREN
         |       array_literal_expression
         |       slice_literal_expression
+        |       compound_literal_expression
                 ;
 
 after_period:   type_specifier
@@ -699,14 +756,15 @@ postfix_expression:
         |       type_specifier PERIOD after_period
 	|       postfix_expression LPAREN RPAREN
 	|       postfix_expression LPAREN argument_expression_list RPAREN
+	|       postfix_expression LPAREN argument_expression_list COMMA RPAREN
 	|       postfix_expression INC_OP
         |       postfix_expression DEC_OP
         |       postfix_expression PERIOD IDENTIFIER
                 ;
 
 struct_literal_value:
-		IDENTIFIER LBRACE struct_literal_fields RBRACE
-        |       postfix_expression PERIOD IDENTIFIER LBRACE struct_literal_fields RBRACE
+		IDENTIFIER LBRACE struct_literal_fields list_end
+        |       postfix_expression PERIOD IDENTIFIER LBRACE struct_literal_fields list_end
         ;
 
 argument_expression_list:
@@ -782,6 +840,7 @@ postfix_nc:
         |       type_specifier PERIOD after_period
 	|       postfix_nc LPAREN RPAREN
 	|       postfix_nc LPAREN argument_expression_list RPAREN
+	|       postfix_nc LPAREN argument_expression_list COMMA RPAREN
 	|       postfix_nc INC_OP
         |       postfix_nc DEC_OP
         |       postfix_nc PERIOD IDENTIFIER
@@ -924,6 +983,17 @@ block_item_list:
 block_item:
         |       declaration
         |       statement
+        |       GLOBAL global_names
+                ;
+
+global_names:
+                global_name
+        |       global_names COMMA global_name
+                ;
+
+global_name:
+                IDENTIFIER
+        |       IDENTIFIER PERIOD IDENTIFIER
                 ;
 
 expression_statement:

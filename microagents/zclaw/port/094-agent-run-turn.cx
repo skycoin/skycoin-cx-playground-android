@@ -5,7 +5,7 @@ import "sys/string"
 // The model part of process_message of agent.c: add the message to the
 // history, then up to MAX_TOOL_ROUNDS rounds of request, retry, parse and
 // tool call. It returns false when the turn ended early with an error.
-func agentRunTurn(message InboundMessage, chatId i64) (completed bool) {
+func agentRunTurn(message InboundMessage, chatId i64) (completed bool) { global gAgentState, ZclawMaxToolRounds, ZclawLlmMaxRetries
 	completed = false
 	var turnStart i32 = len(gAgentState.history)
 	var cronTrigger bool = agentIsCronTrigger(message.text)

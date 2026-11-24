@@ -4,7 +4,7 @@ import "sys/string"
 
 // One pass of the while loop of agent_loop_task of agent/agent_loop.c. The
 // working status starts with U+1F431, written as octal bytes.
-func agentProcessMessage(message InboundMessage, toolsJsonText str) {
+func agentProcessMessage(message InboundMessage, toolsJsonText str) { global MimiAgentMaxHistory, MimiAgentMaxToolIterations, MimiChannelSystem
 	var systemPrompt str = contextBuildSystemPrompt()
 	systemPrompt = agentTurnContext(systemPrompt, message)
 	var messages []str = sessionHistoryMessages(message.chatId, MimiAgentMaxHistory)

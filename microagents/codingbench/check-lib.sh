@@ -8,7 +8,7 @@ expect_output() {
 	expected=$1
 	shift
 	for f in "$@"; do [ -f "$f" ] || fail "$f is missing"; done
-	got=$("$CX" "$@" 2> cx-stderr.txt) || fail "cx $* failed: $(grep -v '^warning' cx-stderr.txt | head -3)"
+	got=$("$CX" --enable=file,net,process "$@" 2> cx-stderr.txt) || fail "cx $* failed: $(grep -v '^warning' cx-stderr.txt | head -3)"
 	rm -f cx-stderr.txt
 	[ "$got" = "$expected" ] || fail "cx $* printed '$got', want '$expected'"
 }

@@ -20,6 +20,7 @@ import (
 const AssertExitCode = 3
 
 // AssertPreconditionTrue crashes when a function's input breaks its contract.
+// VIOLATION STRHOT-223: E, error or assert text, built on a failure branch only, #412.
 func AssertPreconditionTrue(condition bool, message string) {
 	if !condition {
 		assertCrash("precondition", message)
@@ -27,6 +28,7 @@ func AssertPreconditionTrue(condition bool, message string) {
 }
 
 // AssertInvariantTrue crashes when a state that must always hold does not.
+// VIOLATION STRHOT-224: E, error or assert text, built on a failure branch only, #412.
 func AssertInvariantTrue(condition bool, message string) {
 	if !condition {
 		assertCrash("invariant", message)
@@ -48,6 +50,7 @@ func AssertUnreachable(message string) {
 
 // assertCrash must be called directly by an exported Assert function, so that
 // runtime.Caller(2) is the caller of that function.
+// VIOLATION STRHOT-225: E, error or assert text, built on a failure branch only, #412.
 func assertCrash(kind string, message string) {
 	location := "unknown location"
 	if _, file, line, ok := runtime.Caller(2); ok {

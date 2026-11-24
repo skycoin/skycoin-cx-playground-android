@@ -1,0 +1,40 @@
+package main
+
+import "sys/string"
+import "sys/os"
+
+// wrapperInit chooses the wrapper implementation from the command line:
+// ++mode=live|record|replay, ++tape=FILE, ++inbound=FILE, ++client=COMMAND
+// and ++backend=URL. ++apply=1 makes a replay also apply the recorded file
+// writes, so the final files of a recording can be rebuilt from its tape.
+func wrapperInit() { global gWrapperState, WrapperModeReplay, WrapperModeRecord, WrapperModeLive
+	gWrapperState.byteStrings = byteTable()
+	var mode str = wrapperArgument("mode", "replay")
+	gWrapperState.tapePath = wrapperArgument("tape", "tape.txt")
+	gWrapperState.clientCommand = wrapperArgument("client", "backendstore")
+	gWrapperState.backendUrl = wrapperArgument("backend", "http://127.0.0.1:18080")
+	gWrapperState.recordedTape = ""
+	gWrapperState.applyWrites = string.EqualityByByteValue(wrapperArgument("apply", "0"), "1")
+	if string.EqualityByByteValue(mode, "replay") {
+		gWrapperState.mode = WrapperModeReplay
+		tapeText, tapeFound := os.ReadAllText(gWrapperState.tapePath)
+		if !tapeFound {
+			fatalStop(joinStrings([]str{"cannot read tape ", gWrapperState.tapePath}))
+		}
+		gWrapperState.tapeLines = splitLines(tapeText)
+		return
+	}
+	if string.EqualityByByteValue(mode, "record") {
+		gWrapperState.mode = WrapperModeRecord
+	} else if string.EqualityByByteValue(mode, "live") {
+		gWrapperState.mode = WrapperModeLive
+	} else {
+		fatalStop(joinStrings([]str{"unknown mode ", mode}))
+	}
+	var inboundPath str = wrapperArgument("inbound", "inbound.txt")
+	inboundText, inboundFound := os.ReadAllText(inboundPath)
+	if !inboundFound {
+		fatalStop(joinStrings([]str{"cannot read inbound messages ", inboundPath}))
+	}
+	gWrapperState.inboundLines = splitLines(inboundText)
+}

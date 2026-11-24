@@ -35,6 +35,7 @@ type StringPool struct {
 
 // StringPoolInit sets up an empty pool with room for slotCap strings and
 // arenaCap bytes before the first growth.
+// VIOLATION STRHOT-276: B, name text for compiler code run by an opcode, #412.
 func (pool *StringPool) StringPoolInit(slotCap int, arenaCap int) {
 	pool.StringPoolArena = make([]byte, 0, arenaCap)
 	pool.StringPoolOffsets = make([]uint32, 0, slotCap)
@@ -45,6 +46,7 @@ func (pool *StringPool) StringPoolInit(slotCap int, arenaCap int) {
 
 // StringPoolIntern returns the Gid of bytes, interning them on first use.
 // The empty string is StringGidNil. It asserts on a frozen pool.
+// VIOLATION STRHOT-277: B, name text for compiler code run by an opcode, #412.
 func (pool *StringPool) StringPoolIntern(bytes []byte) StringGid {
 	if pool.StringPoolFrozen {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("StringPoolIntern of %q on a frozen pool", string(bytes)))
@@ -73,6 +75,7 @@ func (pool *StringPool) StringPoolIntern(bytes []byte) StringGid {
 // StringPoolFind returns the Gid of bytes without interning them, and false
 // when they were never interned. On a frozen pool it scans every slot, so it is
 // for rare run time lookups by text such as affordances.
+// VIOLATION STRHOT-275: B, name text for compiler code run by an opcode, #412.
 func (pool *StringPool) StringPoolFind(text []byte) (StringGid, bool) {
 	if len(text) == 0 {
 		return StringGidNil, true
@@ -98,6 +101,7 @@ func (pool *StringPool) StringPoolFreeze() {
 
 // StringPoolBytes returns a view into the arena of the string gid names. The
 // caller must not write to it. StringGidNil gives an empty slice.
+// VIOLATION STRHOT-274: E, error or assert text, built on a failure branch only, #412.
 func (pool *StringPool) StringPoolBytes(gid StringGid) []byte {
 	if gid == StringGidNil {
 		return nil
@@ -125,6 +129,7 @@ func (pool *StringPool) StringPoolLen() int {
 // arena, so it does not allocate. Arena bytes are never written again, which
 // keeps the view valid for as long as it is held. It is for boundary code
 // that still takes strings, such as diagnostics and the string keyed maps.
+// VIOLATION STRHOT-278: B, name text for compiler code run by an opcode, #412.
 func (pool *StringPool) StringPoolText(gid StringGid) string {
 	bytes := pool.StringPoolBytes(gid)
 	if len(bytes) == 0 {

@@ -4,7 +4,7 @@ import "sys/string"
 import "sys/os"
 
 // wrapperArgument returns the value of ++name=value on the command line.
-func wrapperArgument(name str, fallback str) (value str) {
+func wrapperArgument(name str, fallback str) (value str) { global os.Args
 	value = fallback
 	var prefix str = string.Concatenation(string.Concatenation("++", name), "=")
 	var prefixLength i32 = string.ByteLength(prefix)

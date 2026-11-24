@@ -11,6 +11,7 @@ import (
 // printerStackValueBadIndex is printed for a value whose index is out of range.
 const printerStackValueBadIndex = "<index out of range>"
 
+// VIOLATION STRHOT-266: P, builds the text of a printed value, #412.
 func printerStackValueHeader(fileName string, fileLine int) string {
 	return fmt.Sprintf("%s:%d", fileName, fileLine)
 }
@@ -18,6 +19,7 @@ func printerStackValueHeader(fileName string, fileLine int) string {
 // printerStackValuePrintable is ast.GetPrintableValue for the call stack of a runtime
 // error. A value whose index is bad, often the one that failed, prints as a
 // placeholder instead of panicking again.
+// VIOLATION STRHOT-320: P, builds the text of a printed value, #412.
 func printerStackValuePrintable(prgrm *ast.CXProgram, fp types.Pointer, argTypeSig *ast.CXTypeSignature) string {
 	if offset, valid := ast.FinalOffsetChecked(prgrm, fp, argTypeSig); !valid || int(offset) >= len(prgrm.Memory) {
 		return printerStackValueBadIndex
@@ -27,6 +29,7 @@ func printerStackValuePrintable(prgrm *ast.CXProgram, fp types.Pointer, argTypeS
 
 // PrinterStackPrint prints the CX call stack of cxprogram from the current
 // call down to the entry point, with the values of its arguments.
+// VIOLATION STRHOT-267: P, builds the text of a printed value, #412.
 func PrinterStackPrint(cxprogram *ast.CXProgram) {
 	fmt.Println()
 	fmt.Println("===Callstack===")

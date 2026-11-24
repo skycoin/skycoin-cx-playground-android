@@ -5,7 +5,7 @@ import "sys/os"
 
 // liveNetHead sends a HEAD request through the backendstore client, which
 // prints "ok" and the Date header, or "error".
-func liveNetHead(url str) (succeeded bool, date str) {
+func liveNetHead(url str) (succeeded bool, date str) { global gWrapperState
 	succeeded = false
 	date = ""
 	var command str = joinStrings([]str{gWrapperState.clientCommand, " head -url ", url})

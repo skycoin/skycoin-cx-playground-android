@@ -50,6 +50,8 @@ func finalOffsetEscapedPointer(prgrm *CXProgram, fp types.Pointer, argTypeSig *C
 
 // EscapedAllocate gives the escaped local at offset in the frame at fp a new
 // zeroed heap object of size bytes, as its declaration runs.
+// GCREACH: allocates the object of an escaped local, which adds to
+// the GC pressure, see docs/GarbageCollector.md.
 func EscapedAllocate(prgrm *CXProgram, fp types.Pointer, offset types.Pointer, size types.Pointer) {
 	objectSize := types.OBJECT_HEADER_SIZE + size
 	object := AllocateSeq(prgrm, objectSize)

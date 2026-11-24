@@ -229,10 +229,12 @@ func opGlfwSetShouldClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	windows[inputs[0].Get_str(prgrm)].SetShouldClose(shouldClose)
 }
 
+// GCREACH: allocates on the heap, which adds to the GC pressure,
+// see docs/GarbageCollector.md.
 func getWindowName(prgrm *ast.CXProgram, w *glfw.Window) []byte {
 	for key, win := range windows {
 		if w == win {
-			var windowHeapPtr = types.AllocWrite_obj_data(prgrm, prgrm.Memory, []byte(key))
+			var windowHeapPtr = ast.AllocateStr(prgrm, key)
 			var windowName [types.POINTER_SIZE]byte
 			types.Write_ptr(windowName[:], 0, windowHeapPtr)
 			return windowName[:]

@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of tool_send_message_execute of tools/tool_send_message.c. The
 // channel and chat id are cut to the char arrays of femto_msg_t.
-func toolSendMessage(inputJson str) (output str) {
+func toolSendMessage(inputJson str) (output str) { global FemtoChannelTelegram, FemtoMessageChannelLength, FemtoMessageChatIdLength
 	chatId, chatIdFound := jsonStringField(inputJson, 0, "chat_id")
 	message, messageFound := jsonStringField(inputJson, 0, "message")
 	channel, channelFound := jsonStringField(inputJson, 0, "channel")

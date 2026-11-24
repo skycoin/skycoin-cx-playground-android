@@ -97,7 +97,7 @@ func lucasLehmer(p ui64) (prime bool) {
 	prime = s == 0UL
 }
 
-func main() {
+func main() { global sieve
 	var h ui64
 	h = 14695981039346656037UL
 	var ok bool

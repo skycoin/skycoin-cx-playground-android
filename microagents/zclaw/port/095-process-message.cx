@@ -6,7 +6,7 @@ import "sys/string"
 // response_chat_id_for_source. Local admin commands on the serial console
 // (/gpio, /diag, /reboot, /wifi, /bootcount, /factory-reset) drive the
 // hardware and are not ported; from Telegram they are refused, as in C.
-func processMessage(message InboundMessage) {
+func processMessage(message InboundMessage) { global ZclawSourceTelegram, gAgentState, ZclawSourceChannel, ZclawStartCooldownMs, ZclawMessageReplayCooldownMs, ZclawChannelReceiveBufferSize
 	var text str = message.text
 	var chatId i64 = 0L
 	if string.EqualityByByteValue(message.source, ZclawSourceTelegram) {

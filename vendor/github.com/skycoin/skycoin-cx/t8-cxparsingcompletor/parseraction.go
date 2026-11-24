@@ -10,6 +10,9 @@ import (
 // ParserActionAssignmentExpression is the action of an assignment, shared by
 // assignment_expression and the for clauses.
 func ParserActionAssignmentExpression(left []ast.CXExpression, operator string, right []ast.CXExpression) []ast.CXExpression {
+	if operator == ":=" {
+		left = actions.ImportScopedShortDeclaration(actions.AST, left)
+	}
 	result := left
 
 	if right == nil {
@@ -103,7 +106,7 @@ func ParserActionExpressionStatement(exprs []ast.CXExpression) []ast.CXExpressio
 	// Now an arena getter, site S1498.
 	lastFirstAtomicOpOperator := actions.AST.GetFunctionFromArray(lastFirstAtomicOp.Operator)
 
-	if len(exprs) > 0 && lastFirstAtomicOpOperator == nil && !exprs[len(exprs)-1].IsMethodCall() {
+	if len(exprs) > 0 && lastFirstAtomicOpOperator == nil && !exprs[len(exprs)-1].IsMethodCall() && !actions.ExpressionsDeclareInvalid(actions.AST, exprs) {
 		outs := lastFirstAtomicOp.GetOutputs(actions.AST)
 
 		if len(outs) > 0 {
@@ -168,16 +171,28 @@ func ParserActionLabeledStatement(label string, exprs []ast.CXExpression) []ast.
 // ParserActionMultipleAssignment is the action of a, b = x, y and a, b := x, y.
 // Every value is held in a variable before any target is assigned, as in Go.
 func ParserActionMultipleAssignment(targets [][]ast.CXExpression, operator string, values [][]ast.CXExpression) []ast.CXExpression {
+	if operator == ":=" {
+		for index := range targets {
+			targets[index] = actions.ImportScopedShortDeclaration(actions.AST, targets[index])
+		}
+	}
 	for _, exprs := range append(append([][]ast.CXExpression(nil), targets...), values...) {
 		if len(exprs) == 0 {
 			return nil
 		}
 	}
 	if len(values) == 1 {
-		return actions.MultipleAssignmentCall(actions.AST, targets, operator, values[0])
+		result := actions.MultipleAssignmentCall(actions.AST, targets, operator, values[0])
+		if operator == ":=" {
+			actions.ShortDeclarationShare(actions.AST, targets, result)
+		}
+		return result
 	}
 	if len(values) != len(targets) {
 		actions.AST.CXProgramCompileErrorAdd(ast.CompileErrorCodeAssignmentCount, actions.CurrentFile, actions.LineNo, ast.CompileErrorOperands{int64(len(targets)), int64(len(values))})
+		if operator == ":=" {
+			return actions.ShortDeclarationTargetsInvalid(actions.AST, targets)
+		}
 		return nil
 	}
 
@@ -185,10 +200,15 @@ func ParserActionMultipleAssignment(targets [][]ast.CXExpression, operator strin
 	names := make([]stringpool.StringGid, len(values))
 	for i, value := range values {
 		names[i] = actions.MultipleValueName(actions.AST)
+		actions.SingleValueCheck(actions.AST, value)
 		result = append(result, ParserActionAssignmentExpression(actions.MultipleValueRead(actions.AST, names[i]), ":=", value)...)
 	}
+	start := len(result)
 	for i, target := range targets {
 		result = append(result, ParserActionAssignmentExpression(target, operator, actions.MultipleValueRead(actions.AST, names[i]))...)
+	}
+	if operator == ":=" {
+		actions.ShortDeclarationShare(actions.AST, targets, result[start:])
 	}
 	return result
 }
@@ -197,6 +217,7 @@ func ParserActionMultipleAssignment(targets [][]ast.CXExpression, operator strin
 // x, y, which evaluates every value before it assigns any, as in Go. A spec
 // without a type, var a, b = x, y, is a, b := x, y.
 func ParserActionDeclareLocals(names []*ast.CXArgument, spec *ast.CXArgument, values [][]ast.CXExpression, initialized bool) []ast.CXExpression {
+	actions.ImportScopedLocalsDeclare(actions.AST, names)
 	if spec != nil && (!initialized || len(names) == 1 && len(values) == 1) {
 		var result []ast.CXExpression
 		for i, name := range names {
@@ -251,4 +272,12 @@ func ParserActionDeclareLocals(names []*ast.CXArgument, spec *ast.CXArgument, va
 		result = append(result, actions.DeclareLocal(actions.AST, name, actions.DeclarationSpecifiersBasic(actions.AST, types.INVALID), nil, false)...)
 	}
 	return result
+}
+
+// ParserActionStructLiteralComma reports T{,}, a struct literal with no
+// fields that ends in a comma, which Go does not allow.
+func ParserActionStructLiteralComma(fields []ast.CXExpression, comma bool) {
+	if comma && len(fields) == 0 {
+		actions.AST.CXProgramCompileErrorAddLine(ast.CompileErrorCodeSyntax, actions.CurrentFile, actions.LineNo, ast.CompileErrorOperands{actions.AST.CXProgramCompileErrorText("unexpected comma, expected name")})
+	}
 }

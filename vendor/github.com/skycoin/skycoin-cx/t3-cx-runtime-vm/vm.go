@@ -34,6 +34,9 @@ const (
 	// StopAddressInvalid is a computed address or a str outside the stack
 	// and data segment. The machine has no heap.
 	StopAddressInvalid
+	// StopLibraryDisabled is an OpcodeLibraryCall into a system library the
+	// run did not enable.
+	StopLibraryDisabled
 	// StopCount is one past the last Stop.
 	StopCount
 )
@@ -45,14 +48,15 @@ const stopSlow = StopCount
 // StopExitCodes is the process exit code of each Stop, the code the old loop
 // exits with for the same failure. Read only.
 var StopExitCodes = [StopCount]int32{
-	StopReturn:         types.CX_SUCCESS,
-	StopOutputFull:     types.CX_SUCCESS,
-	StopTestFailed:     types.CX_SUCCESS,
-	StopDivideByZero:   types.CX_RUNTIME_ERROR,
-	StopStackOverflow:  types.CX_RUNTIME_STACK_OVERFLOW_ERROR,
-	StopOpcodeInvalid:  types.CX_RUNTIME_NOT_IMPLEMENTED,
-	StopIndexNegative:  types.CX_RUNTIME_INVALID_CAST,
-	StopAddressInvalid: types.CX_RUNTIME_ERROR,
+	StopReturn:          types.CX_SUCCESS,
+	StopOutputFull:      types.CX_SUCCESS,
+	StopTestFailed:      types.CX_SUCCESS,
+	StopDivideByZero:    types.CX_RUNTIME_ERROR,
+	StopStackOverflow:   types.CX_RUNTIME_STACK_OVERFLOW_ERROR,
+	StopOpcodeInvalid:   types.CX_RUNTIME_NOT_IMPLEMENTED,
+	StopIndexNegative:   types.CX_RUNTIME_INVALID_CAST,
+	StopAddressInvalid:  types.CX_RUNTIME_ERROR,
+	StopLibraryDisabled: types.CX_RUNTIME_LIBRARY_DISABLED,
 }
 
 // Resumable reports whether the caller may Resume after stop.

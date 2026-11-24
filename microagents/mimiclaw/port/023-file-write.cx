@@ -5,7 +5,7 @@ import "sys/string"
 // fileWrite is the file system wrapper for replacing a whole file, the port
 // of fopen with "w" and fwrite. A replay checks the write against the tape
 // and returns the recorded result; with ++apply=1 it also writes the file.
-func fileWrite(path str, content str) (written bool) {
+func fileWrite(path str, content str) (written bool) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
 	if gWrapperState.mode == WrapperModeReplay {
 		var fields []str = tapeNext("file-write", 4)
 		if !string.EqualityByByteValue(fields[1], path) {

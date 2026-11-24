@@ -6,7 +6,7 @@ import "sys/string"
 // cJSON_PrintUnformatted prints it. The user message is already in the
 // history. The user tools of the host mock follow the built-in tools. A tool_use input that cJSON_Parse
 // would reject, because history_add cut it, is sent as {}.
-func jsonBuildRequest(systemPrompt str, history []ConversationMessage, tools []ToolDefinition) (request str) {
+func jsonBuildRequest(systemPrompt str, history []ConversationMessage, tools []ToolDefinition) (request str) { global ZclawModel, ZclawMaxTokens, gAgentState
 	request = joinStrings([]str{"{\"model\":", jsonEscapeString(ZclawModel), ",\"max_tokens\":", i32.str(ZclawMaxTokens), ",\"system\":", jsonEscapeString(systemPrompt), ",\"messages\":["})
 	var written i32 = 0
 	for i := 0; i < len(history); i++ {

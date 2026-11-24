@@ -264,7 +264,7 @@ func (u *ui) start(a *store.App) {
 				return
 			}
 		}
-		opts := cxrun.Options{Args: m.Args, Stderr: out}
+		opts := cxrun.Options{Args: m.Args, Stderr: out, Libraries: cxrun.LibrariesAll()}
 		if opts.Dir, err = writeDataFiles(*a, files); err != nil {
 			fmt.Fprintf(out, "data files: %v\n", err)
 			return

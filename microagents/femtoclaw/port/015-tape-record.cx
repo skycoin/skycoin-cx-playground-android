@@ -2,7 +2,7 @@ package main
 
 import "sys/string"
 
-func tapeRecord(fields []str) {
+func tapeRecord(fields []str) { global gWrapperState
 	var line str = ""
 	for i := 0; i < len(fields); i++ {
 		if i > 0 {

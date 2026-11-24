@@ -2,7 +2,7 @@ package main
 
 import "sys/string"
 
-func main() {
+func main() { global Limit
 	for i := 1; i <= Limit; i++ {
 		string.PrintLine(i32.str(i))
 	}

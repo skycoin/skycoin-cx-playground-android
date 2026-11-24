@@ -42,6 +42,7 @@ func opOsLogFile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	util.CXLogFile(inputs[0].Get_bool(prgrm))
 }
 
+// VIOLATION STRHOT-131: B, hands a path or text to Go or the OS, #412.
 func opOsReadAllText(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 
@@ -92,9 +93,13 @@ func opOsCreate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 }
 
 func opOsClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	success := false
+	outputs[0].Set_bool(prgrm, fileClose(inputs[0].Get_i32(prgrm)))
+}
 
-	handle := inputs[0].Get_i32(prgrm)
+// fileClose closes the file of handle and frees the handle. It returns
+// false for a handle that is not open or a failed close.
+func fileClose(handle int32) bool {
+	success := false
 	if file := ValidFile(handle); file != nil {
 		if err := file.Close(); err == nil {
 			success = true
@@ -103,21 +108,41 @@ func opOsClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue
 		openFiles[handle] = nil
 		freeFiles = append(freeFiles, handle)
 	}
+	return success
+}
 
-	outputs[0].Set_bool(prgrm, success)
+// libraryFileCloseVm is os.Close on vm, an i32 at block and the bool after it.
+func libraryFileCloseVm(memory []byte, block uint32) {
+	closed := fileClose(types.Read_i32(memory, types.Pointer(block)))
+	types.Write_bool(memory, types.Pointer(block+4), closed)
 }
 
 func opOsSeek(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	offset := int64(-1)
-	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
-		var err error
-		if offset, err = file.Seek(inputs[1].Get_i64(prgrm), int(inputs[2].Get_i32(prgrm))); err != nil {
-			offset = -1
-		}
-	}
-	outputs[0].Set_i64(prgrm, offset)
+	outputs[0].Set_i64(prgrm, fileSeek(inputs[0].Get_i32(prgrm), inputs[1].Get_i64(prgrm), inputs[2].Get_i32(prgrm)))
 }
 
+// fileSeek moves the file of handle to offset from whence and returns the
+// new offset, -1 for a handle that is not open or a failed seek.
+func fileSeek(handle int32, offset int64, whence int32) int64 {
+	file := ValidFile(handle)
+	if file == nil {
+		return -1
+	}
+	position, err := file.Seek(offset, int(whence))
+	if err != nil {
+		return -1
+	}
+	return position
+}
+
+// libraryFileSeekVm is os.Seek on vm, an i32, an i64 and an i32 from block
+// and the i64 after them.
+func libraryFileSeekVm(memory []byte, block uint32) {
+	position := fileSeek(types.Read_i32(memory, types.Pointer(block)), types.Read_i64(memory, types.Pointer(block+4)), types.Read_i32(memory, types.Pointer(block+12)))
+	types.Write_i64(memory, types.Pointer(block+16), position)
+}
+
+// VIOLATION STRHOT-134: B, hands a path or text to Go or the OS, #412.
 func opOsReadStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var len uint64
 	var value string
@@ -278,6 +303,7 @@ func opOsReadBOOL(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[1].Set_bool(prgrm, success)
 }
 
+// VIOLATION STRHOT-135: B, hands a path or text to Go or the OS, #412.
 func opOsWriteStr(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	success := false
 	if file := ValidFile(inputs[0].Get_i32(prgrm)); file != nil {
@@ -794,6 +820,7 @@ func opOsWriteI8Slice(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	outputs[0].Set_bool(prgrm, success)
 }
 
+// VIOLATION STRHOT-136: B, hands a path or text to Go or the OS, #412.
 func opOsGetWorkingDirectory(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	wd, err := os.Getwd()
 	if err == nil && !strings.HasSuffix(wd, string(os.PathSeparator)) {
@@ -802,11 +829,7 @@ func opOsGetWorkingDirectory(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs
 	outputs[0].Set_str(prgrm, wd)
 }
 
-func opOsExit(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
-	exitCode := inputs[0].Get_i32(prgrm)
-	os.Exit(int(exitCode))
-}
-
+// VIOLATION STRHOT-137: B, hands a path or text to Go or the OS, #412.
 func opOsRun(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var runError int32 = OS_RUN_SUCCESS
 
@@ -881,6 +904,7 @@ func opOsRun(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) 
 // splitCommand splits an os.Run command into words at spaces and tabs.
 // Single or double quotes group a word. Backslashes are literal, so
 // Windows paths need no escaping.
+// VIOLATION STRHOT-138: B, hands a path or text to Go or the OS, #412.
 func splitCommand(command string) ([]string, error) {
 	var args []string
 	var word strings.Builder

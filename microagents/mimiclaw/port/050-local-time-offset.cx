@@ -7,7 +7,7 @@ import "sys/string"
 // UTC0 and PST8PDT,M3.2.0,M11.1.0 are ported: daylight time runs from 02:00
 // standard time on the second Sunday of March to 02:00 daylight time on the
 // first Sunday of November.
-func localTimeOffset(epoch i64) (offset i64, name str) {
+func localTimeOffset(epoch i64) (offset i64, name str) { global gLocalTimezone, MimiTimezone
 	offset = 0L
 	name = "UTC"
 	if !string.EqualityByByteValue(gLocalTimezone, MimiTimezone) {

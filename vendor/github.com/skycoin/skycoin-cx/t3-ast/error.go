@@ -45,6 +45,8 @@ func errorCode(r interface{}) int {
 	switch v := r.(type) {
 	case int:
 		return int(v)
+	case RuntimeLibraryDisabled:
+		return types.CX_RUNTIME_LIBRARY_DISABLED
 	default:
 		return types.CX_RUNTIME_ERROR
 	}

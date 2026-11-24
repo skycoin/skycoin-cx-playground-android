@@ -3,7 +3,6 @@ package tcp
 import (
 	"context"
 	"net"
-	"net/rpc"
 	"time"
 
 	"github.com/skycoin/skycoin-cx/t3-ast"
@@ -18,11 +17,7 @@ var lc net.ListenConfig
 // VIOLATION: state outside State. Owner: t5-tcp; moves to TCPConnMng in phase 1.
 var conn net.Conn
 
-// VIOLATION: init chaining. Init 3: the tcp package RPC server, called from Go
-// package init.
-// VIOLATION: state outside State. Owner: t5-tcp; moves to RPCServerMng in phase 1.
-var DefaultServer = rpc.NewServer()
-
+// VIOLATION STRHOT-145: B, hands a path or text to Go or the OS, #412.
 func errString(err error) string {
 	if err == nil {
 		return ""
@@ -30,6 +25,7 @@ func errString(err error) string {
 	return err.Error()
 }
 
+// VIOLATION STRHOT-146: B, hands a path or text to Go or the OS, #412.
 func opTCPDial(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	c, err := net.Dial(inputs[0].Get_str(prgrm), inputs[1].Get_str(prgrm))
 	if err == nil {
@@ -42,6 +38,16 @@ func opTCPDial(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue
 }
 
 func opTCPClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+	tcpClose()
+}
+
+// libraryNetCloseVm is tcp.Close on vm, which has no inputs or outputs.
+func libraryNetCloseVm(memory []byte, block uint32) {
+	tcpClose()
+}
+
+// tcpClose closes the listener and the connection.
+func tcpClose() {
 	if ln != nil {
 		ln.Close()
 		ln = nil
@@ -52,6 +58,7 @@ func opTCPClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	}
 }
 
+// VIOLATION STRHOT-147: B, hands a path or text to Go or the OS, #412.
 func opTCPAccept(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	if ln == nil {
 		outputs[0].Set_str(prgrm, "tcp: not listening")
@@ -67,6 +74,7 @@ func opTCPAccept(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVal
 	outputs[0].Set_str(prgrm, errString(err))
 }
 
+// VIOLATION STRHOT-148: B, hands a path or text to Go or the OS, #412.
 func opTCPListen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

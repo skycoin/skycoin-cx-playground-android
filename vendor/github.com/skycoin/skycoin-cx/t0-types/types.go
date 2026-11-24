@@ -18,6 +18,7 @@ const (
 	CX_RUNTIME_SLICE_INDEX_OUT_OF_RANGE
 	CX_RUNTIME_NOT_IMPLEMENTED
 	CX_RUNTIME_INVALID_CAST
+	CX_RUNTIME_LIBRARY_DISABLED
 )
 
 const (
@@ -140,11 +141,6 @@ var definitions []Type = []Type{
 	{"ident", POINTER_SIZE, false}, // TODO:PTR use InvalidPointer to track addressing issues.
 	{"invalid type", 0, false},
 }
-
-type AllocatorHandler func(interface{}, Pointer) Pointer
-
-// VIOLATION: state outside State. Owner: t0-types; moves to CXProgramMng in phase 2.
-var Allocator AllocatorHandler
 
 func debugPanicIf(condition bool, error int) {
 	if condition {

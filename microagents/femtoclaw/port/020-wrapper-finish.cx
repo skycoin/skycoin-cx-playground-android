@@ -1,7 +1,7 @@
 package main
 
 // wrapperFinish writes the recorded tape, or checks that a replay read all of it.
-func wrapperFinish() {
+func wrapperFinish() { global gWrapperState, WrapperModeRecord, WrapperModeReplay
 	if gWrapperState.mode == WrapperModeRecord {
 		if !liveFileWrite(gWrapperState.tapePath, gWrapperState.recordedTape) {
 			fatalStop(joinStrings([]str{"cannot write tape ", gWrapperState.tapePath}))

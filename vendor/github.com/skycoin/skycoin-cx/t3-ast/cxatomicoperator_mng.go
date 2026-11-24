@@ -23,6 +23,7 @@ type CXAtomicOperatorMng struct {
 }
 
 // CXAtomicOperatorMngInit sets the Cap and whether the grow boundary may grow it.
+// VIOLATION STRHOT-246: E, the assert text of a bad Init, built only when it fails, #412.
 func (manager *CXAtomicOperatorMng) CXAtomicOperatorMngInit(capacity int, growable bool) {
 	if manager.CXAtomicOperatorMngLen != 0 {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("CXAtomicOperatorMngInit on a manager holding %d objects", manager.CXAtomicOperatorMngLen))

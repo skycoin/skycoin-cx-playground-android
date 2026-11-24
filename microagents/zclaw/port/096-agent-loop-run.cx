@@ -3,7 +3,7 @@ package main
 // Port of agent_task of agent.c, with the state agent_test_reset and the
 // static initializers of agent.c and ratelimit.c give. It returns when the
 // input queue is empty instead of blocking.
-func agentLoopRun() {
+func agentLoopRun() { global gAgentState
 	gAgentState.persona = "neutral"
 	gAgentState.paused = false
 	gAgentState.lastStartResponseUs = 0L

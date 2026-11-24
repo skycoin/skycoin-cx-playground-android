@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/skycoin/skycoin-cx/t0-types"
+	// GCREACH: t3-ast owns the heap and the GC roots. This file allocates strs, which
+	// adds to the GC pressure, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -17,6 +19,7 @@ func AssertFailed() bool {
 }
 
 // TODO: Rework
+// VIOLATION STRHOT-118: O, the opcode works on Go string copies of CX strs, #412.
 func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (same bool) {
 	var byts1, byts2 []byte
 	var inp0 *ast.CXArgument
@@ -126,6 +129,7 @@ func opPanicIfNot(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	panicIf(prgrm, inputs, outputs, false)
 }
 
+// VIOLATION STRHOT-120: B, the text of an error code, #412.
 func opStrError(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_str(prgrm, ast.ErrorString(int(inputs[0].Get_i32(prgrm))))
 }

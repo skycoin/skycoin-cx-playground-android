@@ -38,6 +38,7 @@ const (
 )
 
 // GidCompose builds a Gid. It asserts the tag, generation and index ranges.
+// VIOLATION STRHOT-228: E, error or assert text, built on a failure branch only, #412.
 func GidCompose(typeTag TypeTag, generation uint32, index uint32) int64 {
 	if typeTag < GidTypeTagFirst || typeTag > GidTypeTagLast {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("Gid type tag %#x outside %#x to %#x", typeTag, GidTypeTagFirst, GidTypeTagLast))
@@ -67,6 +68,7 @@ func GidTypeTag(gid int64) TypeTag {
 // the first failed check of gid and returns when gid is positive, carries
 // typeTag and indexes a slot below capacity, so the manager then reports a
 // slot that is not live or a stale generation.
+// VIOLATION STRHOT-273: E, error or assert text, built on a failure branch only, #412.
 //
 //go:noinline
 func GidAssertFailure(gid int64, typeTag TypeTag, capacity int) {

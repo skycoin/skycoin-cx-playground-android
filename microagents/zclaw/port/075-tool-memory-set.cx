@@ -3,7 +3,7 @@ package main
 import "sys/string"
 
 // Port of tools_memory_set_handler of tools_memory.c.
-func toolMemorySet(inputJson str) (ok bool, result str) {
+func toolMemorySet(inputJson str) (ok bool, result str) { global ZclawNvsMaxValueLength
 	ok = false
 	key, keyFound := jsonStringField(inputJson, 0, "key")
 	if !keyFound {

@@ -11,7 +11,7 @@ test_dir=$(cd "$1" && pwd)
 port_dir=$(cd "$(dirname "$0")/port" && pwd)
 : "${CX:?set CX to the cx binary}"
 : "${BACKENDSTORE:?set BACKENDSTORE to the backendstore binary}"
-[ -x "$CX" ] && [ -x "$BACKENDSTORE" ] || { echo "record: CX and BACKENDSTORE must be executable files" >&2; exit 1; }
+[ -x "$CX" --enable=file,net,process ] && [ -x "$BACKENDSTORE" ] || { echo "record: CX and BACKENDSTORE must be executable files" >&2; exit 1; }
 
 run_dir=$(mktemp -d)
 cleanup() { [ -n "$run_dir" ] && rm -rf "$run_dir"; }
@@ -30,7 +30,7 @@ fi
 while [ ! -s store.url ]; do sleep 0.1; done
 
 status=0
-"$CX" "$port_dir"/*.cx ++mode=record ++tape=tape.txt ++inbound=inbound.txt \
+"$CX" --enable=file,net,process "$port_dir"/*.cx ++mode=record ++tape=tape.txt ++inbound=inbound.txt \
 	"++client=$BACKENDSTORE" "++backend=$(cat store.url)" > output.txt 2> cx-stderr.txt || status=$?
 "$BACKENDSTORE" stop -url "$(cat store.url)"
 [ -s stub.url ] && "$BACKENDSTORE" stop -url "$(cat stub.url)"

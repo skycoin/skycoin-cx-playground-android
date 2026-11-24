@@ -2,7 +2,7 @@ package main
 
 // Port of update_time_window of ratelimit.c. localtime_r runs in UTC, the
 // default timezone; set_timezone is not ported.
-func ratelimitUpdateTimeWindow() {
+func ratelimitUpdateTimeWindow() { global gAgentState
 	var now i64 = clockNow()
 	var days i64 = now / 86400L
 	year, month, day := civilDate(days)

@@ -1,7 +1,7 @@
 package main
 
 // Port of memory_delete of memory.h, as test/host/mock_memory.c implements it.
-func memoryDelete(key str) (deleted bool) {
+func memoryDelete(key str) (deleted bool) { global gAgentState
 	deleted = false
 	var index i32 = memoryFind(key)
 	if index < 0 {

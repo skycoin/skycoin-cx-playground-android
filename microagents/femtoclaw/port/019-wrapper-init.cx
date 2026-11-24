@@ -7,7 +7,7 @@ import "sys/os"
 // ++mode=live|record|replay, ++tape=FILE, ++inbound=FILE, ++client=COMMAND
 // and ++backend=URL. ++apply=1 makes a replay also apply the recorded file
 // writes, so the final files of a recording can be rebuilt from its tape.
-func wrapperInit() {
+func wrapperInit() { global gWrapperState, WrapperModeReplay, WrapperModeRecord, WrapperModeLive
 	gWrapperState.byteStrings = byteTable()
 	var mode str = wrapperArgument("mode", "replay")
 	gWrapperState.tapePath = wrapperArgument("tape", "tape.txt")

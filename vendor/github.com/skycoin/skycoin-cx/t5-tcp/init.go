@@ -1,10 +1,13 @@
 package tcp
 
 import (
+	"github.com/skycoin/skycoin-cx/t1-constants"
 	"github.com/skycoin/skycoin-cx/t3-ast"
-	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only In, Out, RegisterFunction; registration API, keep
+	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only In, Out, RegisterLibraryFunction; registration API, keep
 )
 
+// RegisterPackage adds the tcp package to prgrm and registers the net
+// library, the functions of sys/tcp.
 func RegisterPackage(prgrm *ast.CXProgram) {
 
 	// OBJMODEL: state.CXPackageMng.CXPackageAlloc(), phase 4 #361.
@@ -22,8 +25,9 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	dialerStrct := ast.MakeStruct(prgrm.CXProgramNameIntern("Dialer"))
 	netPkg.AddStruct(prgrm, dialerStrct)
 
-	opcodes.RegisterFunction(prgrm, "tcp.Dial", opTCPDial, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR))
-	opcodes.RegisterFunction(prgrm, "tcp.Listen", opTCPListen, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR))
-	opcodes.RegisterFunction(prgrm, "tcp.Accept", opTCPAccept, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR))
-	opcodes.RegisterFunction(prgrm, "tcp.Close", opTCPClose, nil, nil)
+	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberNet, "tcp.Dial", opTCPDial, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR))
+	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberNet, "tcp.Listen", opTCPListen, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR))
+	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberNet, "tcp.Accept", opTCPAccept, opcodes.In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), opcodes.Out(ast.ConstCxArg_STR))
+	opcodes.RegisterLibraryFunction(prgrm, constants.LibraryNumberNet, "tcp.Close", opTCPClose, nil, nil)
+	opcodes.RegisterLibraryFunctionVm(constants.LibraryNumberNet, "tcp.Close", libraryNetCloseVm)
 }

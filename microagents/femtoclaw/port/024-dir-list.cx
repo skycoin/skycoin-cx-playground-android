@@ -6,7 +6,7 @@ import "sys/os"
 // dirList is the file system wrapper for listing the files of /spiffs, the
 // port of opendir and readdir. SPIFFS is flat, so the names are the file
 // paths below /spiffs in byte order. backendstore listdir lists them live.
-func dirList() (names []str, found bool) {
+func dirList() (names []str, found bool) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
 	var listing str = ""
 	if gWrapperState.mode == WrapperModeReplay {
 		var fields []str = tapeNext("dir-list", 4)

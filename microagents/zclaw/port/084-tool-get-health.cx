@@ -2,7 +2,7 @@ package main
 
 // Port of tools_get_health_handler of tools_system.c. A TEST_BUILD reports
 // 0 bytes of heap, and the host mock of cron says the clock is synced in UTC.
-func toolGetHealth(inputJson str) (ok bool, result str) {
+func toolGetHealth(inputJson str) (ok bool, result str) { global gAgentState, ZclawMockVersion
 	result = joinStrings([]str{"Health: OK | Heap: 0 free, 0 min | Requests: ", i32.str(gAgentState.requestsThisHour), "/hr, ", i32.str(gAgentState.requestsToday), "/day | Time: synced | TZ: UTC0 (UTC) | Version: ", ZclawMockVersion})
 	ok = true
 }

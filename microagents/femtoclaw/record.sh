@@ -29,7 +29,7 @@ fi
 while [ ! -s store.url ]; do sleep 0.1; done
 
 status=0
-"$CX" "$port_dir"/*.cx ++mode=record ++tape=tape.txt ++inbound=inbound.txt \
+"$CX" --enable=file,net,process "$port_dir"/*.cx ++mode=record ++tape=tape.txt ++inbound=inbound.txt \
 	"++client=$BACKENDSTORE" "++backend=$(cat store.url)" > output.txt 2> cx-stderr.txt || status=$?
 "$BACKENDSTORE" stop -url "$(cat store.url)"
 [ -s stub.url ] && "$BACKENDSTORE" stop -url "$(cat stub.url)"

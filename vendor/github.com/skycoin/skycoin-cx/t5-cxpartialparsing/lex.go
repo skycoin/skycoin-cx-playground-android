@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -780,13 +781,15 @@ func (s *Lexer) lineComment() {
 	}
 }
 
+// rawString reads a raw string literal. As Go, its value drops the carriage
+// returns (https://go.dev/ref/spec#String_literals).
 func (s *Lexer) rawString() {
 	s.stop()
 	s.nextch()
 	s.start()
 	for {
 		if s.ch == '`' {
-			s.tok.tok = string(s.segment())
+			s.tok.tok = strings.ReplaceAll(string(s.segment()), "\r", "")
 			s.nextch()
 			break
 		}
@@ -796,15 +799,15 @@ func (s *Lexer) rawString() {
 		}
 		s.nextch()
 	}
-	// We leave CRs in the string since they are part of the
-	// literal (even though they are not part of the literal
-	// value).
 
 	s.tok.yys = STRING_LITERAL
 	s.nlsemi = true
 }
 
+// stdString reads an interpreted string literal, whose escapes follow
+// https://go.dev/ref/spec#Rune_literals.
 func (s *Lexer) stdString() {
+	valid := true
 	s.nextch()
 
 	for {
@@ -815,7 +818,7 @@ func (s *Lexer) stdString() {
 		if s.ch == '\\' {
 			s.nextch()
 			if !s.escape('"') {
-
+				valid = false
 			}
 			continue
 		}
@@ -836,15 +839,22 @@ func (s *Lexer) stdString() {
 		s.nextch()
 	}
 
-	var err error
 	s.tok.yys = STRING_LITERAL
+	s.nlsemi = true
+	if !valid {
+		// The escape is reported, and Unquote would only report it again.
+		s.tok.tok = ""
+		return
+	}
+	var err error
 	s.tok.tok, err = strconv.Unquote(string(s.segment()))
 	if err != nil {
 		s.errorf("invalid string literal: " + err.Error())
 	}
-	s.nlsemi = true
 }
 
+// escape reads the escape after a backslash as the Go scanner does, quote
+// being the quote of the literal, and reports whether it is valid.
 func (s *Lexer) escape(quote rune) bool {
 	var n int
 	var base, max uint32
@@ -887,7 +897,6 @@ func (s *Lexer) escape(quote rune) bool {
 			s.errorf(fmt.Sprintf("invalid character %q in %s escape", s.ch, baseName(int(base))))
 			return false
 		}
-		// d < base
 		x = x*base + d
 		s.nextch()
 	}

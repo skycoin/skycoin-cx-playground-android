@@ -1,7 +1,7 @@
 package main
 
 // Port of history_rollback_to of agent.c.
-func historyRollback(marker i32) {
+func historyRollback(marker i32) { global gAgentState
 	if marker < 0 || marker >= len(gAgentState.history) {
 		return
 	}

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	packages "github.com/skycoin/skycoin-cx/t0-packages"
-	types "github.com/skycoin/skycoin-cx/t0-types"
 	util "github.com/skycoin/skycoin-cx/t0-util"
 	constants "github.com/skycoin/skycoin-cx/t1-constants"
 	globals "github.com/skycoin/skycoin-cx/t2-globals"
@@ -92,10 +91,9 @@ var (
 )
 
 func init() {
-	types.Allocator = cxast.AllocateSeq
 	packages.DefaultPackages = append(packages.DefaultPackages, "app")
 	actions.InitConstants()
-	cxos.InitConstants()
+	cxos.InitConstants(actions.AddConstI32)
 	resetCompiler()
 }
 
@@ -106,7 +104,7 @@ func resetCompiler() {
 	cxinit.RegisterPackages(actions.AST)
 	opcodes.RegisterOpcodes(actions.AST)
 	register(actions.AST)
-	cxast.OpcodeHandlers[cxast.OpCodes["os.Exit"]] = opExit
+	cxast.OpcodeHandlers[opcodes.OpcodeNumber("os.Exit")] = opExit
 	globals.FoundCompileErrors = false
 	actions.LineNo = 0
 	actions.TemporaryVariableCounter = 0
@@ -138,6 +136,10 @@ type Options struct {
 	// Stderr receives the program's standard error. Nil sends it to the
 	// output with standard output.
 	Stderr io.Writer
+	// Libraries names the system libraries the program may call, from
+	// LibrariesAll. A call into another one stops the program with
+	// CX_RUNTIME_LIBRARY_DISABLED.
+	Libraries []string
 }
 
 // RunWith is Run with options.
@@ -214,6 +216,9 @@ func compileWith(files map[string][]byte, entry string, opts Options, h Host, ou
 		return errors.New("no main function in package main")
 	}
 	if err := cxparsing.AddInitFunction(actions.AST); err != nil {
+		return err
+	}
+	if actions.AST.ProgramLibrariesEnabled, err = librariesEnabled(opts.Libraries); err != nil {
 		return err
 	}
 	return then()

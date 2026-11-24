@@ -15,6 +15,7 @@ import (
 var openProfiles = make(map[string]func() error)
 
 // opStartProfile writes a CPU profile to a program path in the sandbox.
+// VIOLATION STRHOT-139: B, hands a path or text to Go or the OS, #412.
 func opStartProfile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	programPath, fileError := ast.ProgramFileSystemPathRead(prgrm, &inputs[0])
 	if fileError != nil {
@@ -38,6 +39,7 @@ func opStartProfile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CX
 	openProfiles[programPath.ProgramFileSystemPathText()] = stop
 }
 
+// VIOLATION STRHOT-140: B, hands a path or text to Go or the OS, #412.
 func opStopProfile(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	programPath, fileError := ast.ProgramFileSystemPathRead(prgrm, &inputs[0])
 	if fileError != nil {

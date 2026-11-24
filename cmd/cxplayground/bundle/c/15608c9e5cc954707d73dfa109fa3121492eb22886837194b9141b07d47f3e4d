@@ -1,0 +1,19 @@
+package main
+
+import "sys/string"
+
+// Port of memory_read_recent of memory/memory_store.c.
+func memoryReadRecent(days i32) (notes str) { global FemtoSpiffsMemoryDirectory
+	notes = ""
+	for i := 0; i < days; i++ {
+		var date str = memoryDateString(i)
+		var path str = joinStrings([]str{FemtoSpiffsMemoryDirectory, "/", date, ".md"})
+		content, found := fileRead(path)
+		if found {
+			if string.ByteLength(notes) > 0 {
+				notes = string.Concatenation(notes, "\n---\n")
+			}
+			notes = string.Concatenation(notes, content)
+		}
+	}
+}

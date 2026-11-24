@@ -4,7 +4,7 @@ import "sys/string"
 
 // netPost is the network wrapper for one HTTP POST to the model backend.
 // A replay checks that the request is byte for byte the recorded one.
-func netPost(url str, body str) (status i32, reply str) {
+func netPost(url str, body str) (status i32, reply str) { global gWrapperState, WrapperModeReplay, WrapperModeRecord
 	if gWrapperState.mode == WrapperModeReplay {
 		var request []str = tapeNext("net-request", 3)
 		if !string.EqualityByByteValue(request[1], url) {

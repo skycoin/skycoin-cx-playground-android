@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of tools_execute of tools.c. The handler writes into a result
 // buffer of TOOL_RESULT_BUF_SIZE bytes.
-func toolsExecute(name str, inputJson str) (ok bool, result str) {
+func toolsExecute(name str, inputJson str) (ok bool, result str) { global ZclawToolResultBufferSize
 	var definitions []ToolDefinition = toolDefinitions()
 	for i := 0; i < len(definitions); i++ {
 		if string.EqualityByByteValue(definitions[i].name, name) {

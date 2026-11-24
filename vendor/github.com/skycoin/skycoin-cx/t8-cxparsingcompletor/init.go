@@ -16,7 +16,7 @@ var Initialized bool
 func InitCXCore() {
 	if !Initialized {
 		actions.InitConstants()
-		cxos.InitConstants()
+		cxos.InitConstants(actions.AddConstI32)
 		cxfx.InitConstants()
 		if actions.AST == nil {
 			// OBJMODEL: state.CXProgramMng.CXProgramAlloc(), phase 4 #371.

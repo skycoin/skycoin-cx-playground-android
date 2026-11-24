@@ -1,0 +1,124 @@
+package main
+
+// A memtest86 style test of a 128 KiB ui32 array: address in address, walking
+// ones over the first 2 Ki words and moving inversions with four patterns.
+// Each test folds its mismatch count and the sum of the words it read.
+
+var mem [32768]ui32
+
+func fnv(h ui64, v ui64) (out ui64) {
+	out = (h ^ v) * 1099511628211UL
+}
+
+func main() { global mem
+	var h ui64
+	h = 14695981039346656037UL
+	var n i32
+	n = 32768
+	var walk i32
+	walk = 2048
+	var i i32
+	var bad i32
+	var total i32
+	var read ui32
+	var sum ui64
+	var all ui32
+	all = 4294967295U
+
+	bad = 0
+	sum = 0UL
+	for i = 0; i < n; i++ {
+		mem[i] = i32.ui32(i)
+	}
+	for i = 0; i < n; i++ {
+		read = mem[i]
+		if read != i32.ui32(i) {
+			bad++
+		}
+		sum = sum + ui32.ui64(read)
+	}
+	for i = 0; i < n; i++ {
+		mem[i] = i32.ui32(i) ^ all
+	}
+	for i = 0; i < n; i++ {
+		read = mem[i]
+		if read != (i32.ui32(i) ^ all) {
+			bad++
+		}
+		sum = sum + ui32.ui64(read)
+	}
+	h = fnv(h, i32.ui64(bad))
+	h = fnv(h, sum)
+	total = bad
+
+	var bit ui32
+	var pattern ui32
+	for bit = 0U; bit < 32U; bit++ {
+		pattern = 1U << bit
+		bad = 0
+		sum = 0UL
+		for i = 0; i < walk; i++ {
+			mem[i] = pattern
+		}
+		for i = 0; i < walk; i++ {
+			read = mem[i]
+			if read != pattern {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+		}
+		h = fnv(h, i32.ui64(bad))
+		h = fnv(h, sum)
+		total = total + bad
+	}
+
+	var patterns [4]ui32
+	patterns[0] = 0U
+	patterns[1] = 4294967295U
+	patterns[2] = 1431655765U
+	patterns[3] = 2863311530U
+	var k i32
+	var inverse ui32
+	for k = 0; k < 4; k++ {
+		pattern = patterns[k]
+		inverse = pattern ^ all
+		bad = 0
+		sum = 0UL
+		for i = 0; i < n; i++ {
+			mem[i] = pattern
+		}
+		for i = 0; i < n; i++ {
+			read = mem[i]
+			if read != pattern {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+			mem[i] = inverse
+		}
+		for i = n - 1; i >= 0; i-- {
+			read = mem[i]
+			if read != inverse {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+			mem[i] = pattern
+		}
+		for i = 0; i < n; i++ {
+			read = mem[i]
+			if read != pattern {
+				bad++
+			}
+			sum = sum + ui32.ui64(read)
+		}
+		h = fnv(h, i32.ui64(bad))
+		h = fnv(h, sum)
+		total = total + bad
+	}
+
+	ui64.print(h)
+	if total == 0 {
+		printf("memtest pass\n")
+	} else {
+		printf("memtest FAIL\n")
+	}
+}

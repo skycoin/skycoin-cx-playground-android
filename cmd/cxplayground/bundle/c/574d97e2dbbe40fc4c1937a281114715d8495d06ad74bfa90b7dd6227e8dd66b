@@ -1,6 +1,0 @@
-package main
-
-// Port of memory_read_long_term of memory/memory_store.c.
-func memoryReadLongTerm() (content str, found bool) {
-	content, found = fileRead(FemtoMemoryFile)
-}

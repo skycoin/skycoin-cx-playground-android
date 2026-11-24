@@ -24,7 +24,7 @@ mkdir "$run_dir/before"
 cd "$run_dir"
 
 for replay in first second; do
-	"$CX" "$port_dir"/*.cx ++mode=replay ++tape=tape.txt > "$replay.txt" 2> "$replay-stderr.txt" || {
+	"$CX" --enable=file,net,process "$port_dir"/*.cx ++mode=replay ++tape=tape.txt > "$replay.txt" 2> "$replay-stderr.txt" || {
 		cat "$replay.txt"; echo "$replay replay of the port failed" >&2; exit 1; }
 done
 cmp first.txt second.txt

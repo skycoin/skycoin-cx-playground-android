@@ -3,6 +3,8 @@ package opcodes
 import (
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
+	// GCREACH: t3-ast owns the heap and the GC roots. This file registers opcodes
+	// and allocates nothing, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -30,6 +32,7 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterOpCode(prgrm, constants.OP_BREAK, "break", opBreak, nil, nil)
 	RegisterOpCode(prgrm, constants.OP_CONTINUE, "continue", opContinue, nil, nil)
 	RegisterOpCode(prgrm, constants.OP_NOP, "nop", opNop, nil, nil)
+	registerLibraryCall()
 
 	RegisterOpCode(prgrm, constants.OP_JMP, "jmp", opJmp, In(ast.ConstCxArg_BOOL), nil)
 	RegisterOpCode(prgrm, constants.OP_ABS_JMP, "absjmp", opAbsJmp, In(ast.ConstCxArg_BOOL), nil)
@@ -79,16 +82,16 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 
 	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
 	// Now a constructor call, site S1353.
-	RegisterFunction(prgrm, "resize", opSliceResize, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32), Out(ast.Slice(types.UNDEFINED)))
+	RegisterOpCode(prgrm, constants.OP_RESIZE, "resize", opSliceResize, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32), Out(ast.Slice(types.UNDEFINED)))
 	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
 	// Now a constructor call, site S1354.
-	RegisterFunction(prgrm, "insert", opSliceInsertElement, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32, ast.ConstCxArg_UND_TYPE), Out(ast.Slice(types.UNDEFINED)))
+	RegisterOpCode(prgrm, constants.OP_INSERT, "insert", opSliceInsertElement, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32, ast.ConstCxArg_UND_TYPE), Out(ast.Slice(types.UNDEFINED)))
 	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
 	// Now a constructor call, site S1355.
-	RegisterFunction(prgrm, "remove", opSliceRemoveElement, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32), Out(ast.Slice(types.UNDEFINED)))
+	RegisterOpCode(prgrm, constants.OP_REMOVE, "remove", opSliceRemoveElement, In(ast.Slice(types.UNDEFINED), ast.ConstCxArg_I32), Out(ast.Slice(types.UNDEFINED)))
 	// OBJMODEL: state.CXArgumentMng.CXArgumentAlloc(), phase 4 #326.
 	// Now a constructor call, site S1356.
-	RegisterFunction(prgrm, "copy", opSliceCopy, In(ast.Slice(types.UNDEFINED), ast.Slice(types.UNDEFINED)), Out(ast.ConstCxArg_I32))
+	RegisterOpCode(prgrm, constants.OP_COPY, "copy", opSliceCopy, In(ast.Slice(types.UNDEFINED), ast.Slice(types.UNDEFINED)), Out(ast.ConstCxArg_I32))
 
 	RegisterFunction(prgrm, "len", opSliceLen, In(ast.ConstCxArg_UND_TYPE), Out(ast.ConstCxArg_I32))
 
@@ -489,6 +492,8 @@ func RegisterOpcodes(prgrm *ast.CXProgram) {
 	RegisterFunction(prgrm, "string.ByteIndexOfLastSubstring", opStrLastIndex, In(ast.ConstCxArg_STR, ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
 	RegisterFunction(prgrm, "string.TrimSurroundingWhitespace", opStrTrimSpace, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_STR))
 	RegisterFunction(prgrm, "string.ByteLength", opStrByteLength, In(ast.ConstCxArg_STR), Out(ast.ConstCxArg_I32))
+	RegisterFunction(prgrm, "string.BytesOfString", opStrBytesOfString, In(ast.ConstCxArg_STR), Out(ast.Slice(types.UI8)))
+	RegisterFunction(prgrm, "string.StringOfBytes", opStrStringOfBytes, In(ast.Slice(types.UI8)), Out(ast.ConstCxArg_STR))
 
 	RegisterOperator(prgrm, "ptr.eq", opPtrEq, In(ast.ConstCxArg_PTR, ast.ConstCxArg_PTR), Out(ast.ConstCxArg_BOOL), types.POINTER, constants.OP_EQUAL)
 	RegisterOperator(prgrm, "ptr.uneq", opPtrUneq, In(ast.ConstCxArg_PTR, ast.ConstCxArg_PTR), Out(ast.ConstCxArg_BOOL), types.POINTER, constants.OP_UNEQUAL)

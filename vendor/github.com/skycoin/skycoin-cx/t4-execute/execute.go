@@ -6,6 +6,8 @@ import (
 
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
+	// GCREACH: t3-ast owns the heap and the GC roots. The old loop runs opcodes that
+	// allocate, which adds to the GC pressure, see docs/GarbageCollector.md.
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
@@ -17,11 +19,16 @@ func RunCxAst(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall typ
 }
 
 // runLoop is RunCxAst without the deferred RuntimeError. A panic goes up to
-// the RunCxAst that runs the opcode which called Callback.
+// the RunCxAst that runs the opcode which called Callback. The outer loop
+// ticks the GC after each step. The loop Callback nests inside a native
+// opcode does not, so nothing moves under that opcode.
+// GCREACH: the GC tick, at a safe point where every root is in a slot,
+// see docs/GarbageCollector.md.
 func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall types.Pointer) error {
 	var inputs []ast.CXValue
 	var outputs []ast.CXValue
 	var opCount int = 0
+	gcTick := !untilCall.IsValid()
 	for !cxprogram.Terminated && (untilEnd || (opCount < maxOps)) && (!untilCall.IsValid() || cxprogram.CallCounter > untilCall) {
 		call := &cxprogram.CallStack[cxprogram.CallCounter]
 
@@ -36,11 +43,16 @@ func runLoop(cxprogram *ast.CXProgram, untilEnd bool, maxOps int, untilCall type
 		if err != nil {
 			return err
 		}
+		if gcTick && ast.GarbageCollectorCheck(cxprogram) {
+			ast.GarbageCollectorTrigger(cxprogram)
+		}
 	}
 
 	return nil
 }
 
+// runSysInitFunc runs *init, ticking the GC after each step as runLoop does.
+// GCREACH: the GC tick of *init, see docs/GarbageCollector.md.
 func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 	var inputs []ast.CXValue
 	var outputs []ast.CXValue
@@ -63,6 +75,9 @@ func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 		if err != nil {
 			return err
 		}
+		if ast.GarbageCollectorCheck(cxprogram) {
+			ast.GarbageCollectorTrigger(cxprogram)
+		}
 	}
 	// we reset call state
 	cxprogram.Terminated = false
@@ -72,6 +87,8 @@ func runSysInitFunc(cxprogram *ast.CXProgram, mod *ast.CXPackage) error {
 	return nil
 }
 
+// GCREACH: allocates the os.Args strs and slice, which adds to
+// the GC pressure, see docs/GarbageCollector.md.
 func feedOSArgs(cxprogram *ast.CXProgram, args []string) error {
 	if osPkg, err := cxprogram.SelectPackage(cxprogram.CxIrState.CxIrStateNameOs); err == nil {
 		argsOffset := types.Pointer(0)

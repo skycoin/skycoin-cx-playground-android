@@ -4,7 +4,7 @@ import "sys/string"
 
 // Port of llm_api_url of llm/llm_proxy.c for the anthropic provider with a
 // custom base URL, which here is the ++backend URL.
-func llmApiUrl() (url str) {
+func llmApiUrl() (url str) { global gWrapperState, FemtoApiPath
 	var base str = gWrapperState.backendUrl
 	var length i32 = string.ByteLength(base)
 	if length > 0 && string.EqualityByByteValue(string.SubstringByByteRange(base, length - 1, length), "/") {

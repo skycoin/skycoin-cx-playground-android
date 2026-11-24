@@ -2,7 +2,7 @@ package main
 
 import "sys/string"
 
-func main() {
+func main() { global gCount
 	gCount = gCount + 2
 	gCount = gCount * 10
 	string.PrintLine(i32.str(gCount))

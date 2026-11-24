@@ -3,7 +3,7 @@ package main
 import "sys/string"
 
 // utf8Encode returns the UTF-8 bytes of a code point.
-func utf8Encode(code i32) (encoded str) {
+func utf8Encode(code i32) (encoded str) { global gWrapperState
 	var table []str = gWrapperState.byteStrings
 	if code < 128 {
 		encoded = table[code]

@@ -8,7 +8,7 @@ import "sys/string"
 // TZ to MimiTimezone once the month is known, before it checks the time,
 // and formats in that zone. settimeofday is left out: the clock wrapper is
 // the clock.
-func timeParseHttpDate(date str) (formatted str, parsed bool) {
+func timeParseHttpDate(date str) (formatted str, parsed bool) { global gLocalTimezone, MimiTimezone
 	var months []str = []str{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 	formatted = ""
 	parsed = false

@@ -14,7 +14,7 @@ trap cleanup EXIT
 cp "$here/tape.txt" "$here/store.bolt" "$run_dir/"
 cd "$run_dir"
 
-"$CX" "$port_dir"/*.cx ++mode=replay ++tape=tape.txt > after.txt 2> after-stderr.txt || {
+"$CX" --enable=file,net,process "$port_dir"/*.cx ++mode=replay ++tape=tape.txt > after.txt 2> after-stderr.txt || {
 	cat after.txt; echo "port replay failed" >&2; exit 1; }
 
 mkdir before

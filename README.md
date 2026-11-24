@@ -53,7 +53,10 @@ relative to it, whose files `cxmanifest` adds under their base names, so an
 app can use sources kept elsewhere without a copy. The app writes the files
 of an app that are not CX sources to `app-files/<hash>/` in its files dir
 and makes that the program's sandbox root, which its `os` file operations
-resolve against. `os.Exit` ends the program, not the app.
+resolve against. `os.Exit` ends the program, not the app. skycoin-cx keeps
+its system libraries (file, net and process) disabled unless a run enables
+them, and the app enables all three for the bundled apps through
+`cxrun.Options.Libraries`.
 
 ### Program forms
 

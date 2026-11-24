@@ -53,13 +53,6 @@ func Make_obj(data []byte) []byte {
 	return obj
 }
 
-func AllocWrite_obj_data(prgrm interface{}, memory []byte, obj []byte) Pointer {
-	size := Compute_obj_size(obj)
-	heapOffset := Allocator(prgrm, size)
-	Write_obj_data(memory, heapOffset, size, obj)
-	return heapOffset
-}
-
 func Write_obj_data(memory []byte, offset Pointer, size Pointer, obj []byte) {
 	//size := Cast_int_to_ptr(len(obj))
 	Write_obj_size(memory, offset, size)
@@ -71,11 +64,6 @@ func Read_obj_data(memory []byte, offset Pointer) []byte {
 	size -= OBJECT_HEADER_SIZE
 	obj := GetSlice_byte(memory, offset+OBJECT_HEADER_SIZE, size)
 	return obj
-}
-
-func Write_obj(prgrm interface{}, memory []byte, offset Pointer, obj []byte) {
-	heapOffset := AllocWrite_obj_data(prgrm, memory, obj)
-	Write_ptr(memory, offset, heapOffset)
 }
 
 func Read_obj(memory []byte, offset Pointer) []byte {

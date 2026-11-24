@@ -23,6 +23,7 @@ type CXArgumentMng struct {
 }
 
 // CXArgumentMngInit sets the Cap and whether the grow boundary may grow it.
+// VIOLATION STRHOT-244: E, the assert text of a bad Init, built only when it fails, #412.
 func (manager *CXArgumentMng) CXArgumentMngInit(capacity int, growable bool) {
 	if manager.CXArgumentMngLen != 0 {
 		assert.AssertPreconditionTrue(false, fmt.Sprintf("CXArgumentMngInit on a manager holding %d objects", manager.CXArgumentMngLen))
@@ -92,6 +93,7 @@ func (manager *CXArgumentMng) CXArgumentRelease(gid CXArgumentGid) {
 
 // CXArgumentGet returns a borrowed pointer to the object. It is stale after the
 // next grow boundary or a Release of gid.
+// VIOLATION STRHOT-003: E, the assert text of a bad Gid, built only when the check fails, #412.
 func (manager *CXArgumentMng) CXArgumentGet(gid CXArgumentGid) *CXArgument {
 	index := objmodel.GidIndex(int64(gid))
 	if objmodel.GidTypeTag(int64(gid)) != CXArgumentGidTypeTag || uint64(index) >= uint64(len(manager.CXArgumentMngObjects)) ||

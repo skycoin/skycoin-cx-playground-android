@@ -1,7 +1,7 @@
 package main
 
 // Port of handle_settings_command of agent.c, cut to its 384 byte buffer.
-func handleSettingsCommand(chatId i64) {
+func handleSettingsCommand(chatId i64) { global gAgentState
 	var intake str = "active"
 	if gAgentState.paused {
 		intake = "paused"

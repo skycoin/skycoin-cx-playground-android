@@ -1,0 +1,6 @@
+package main
+
+// Port of session_path of memory/session_mgr.c.
+func sessionPath(chatId str) (path str) { global FemtoSpiffsSessionDirectory
+	path = joinStrings([]str{FemtoSpiffsSessionDirectory, "/tg_", chatId, ".jsonl"})
+}
