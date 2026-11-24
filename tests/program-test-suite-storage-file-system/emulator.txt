@@ -1,4 +1,7 @@
-# Method A: one file per block size written and read back through the file system.
+# Storage on Android is the file system only (D29): method A writes and
+# reads one file per block size through the file system, and a flipped
+# byte must be found. Direct block access (method B) is ESP32 only, so its
+# tests report skipped.
 app Test program: storage and serial
 ready start app="Test program: storage and serial"
 timeout 120

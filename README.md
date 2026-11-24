@@ -191,7 +191,6 @@ package with `import "sys/app"`.
 | `app.NetSend(conn i32, data str) (err str)` | writes data, one datagram for UDP |
 | `app.NetRecv(conn i32, timeoutMs i32) (data str, err str)` | what arrived, one datagram for UDP, `err` is `timeout` when nothing did |
 | `app.NetClose(conn i32)` | closes it, as the end of the program does |
-| `app.FileSync(file i32) (ok bool)` | flushes a file from `os.Open` or `os.Create` to storage, as the `os` package of skycoin-cx has no sync |
 
 Console output from `printf` and `string.PrintLine` is shown on screen, and so
 are compile and runtime errors.
@@ -330,8 +329,7 @@ suite at once with that many runs.
 | `program-test-suite-report-format` (go) | result lines read back unchanged, malformed ones are refused, and both test programs run from the bundle print only passing lines |
 | `program-test-suite-hash-known` | the SHA-256 and Merkle known answer tests of the hash and memory program |
 | `program-test-suite-memory-patterns` | the memory patterns and the flipped bit of the hash and memory program |
-| `program-test-suite-storage-file-system` | method A of the storage program at 512 to 4096 bytes |
-| `program-test-suite-storage-direct-block` | method B (D29) of the storage program at 512 to 4096 bytes, and the flipped byte |
+| `program-test-suite-storage-file-system` | method A of the storage program at 512 to 4096 bytes, the flipped byte, and the direct block tests reported `skipped` (D29) |
 | `program-test-suite-serial-skip-on-phone` | the four serial tests report `skipped` |
 
 ## Test programs
@@ -361,8 +359,8 @@ generation and the comparison of a storage test are left out.
 | `MemoryPatternRandomSeeded` | a seeded xorshift32 sequence written and generated again to compare |
 | `MemoryCorruptionDetectedBitFlip` | flips one bit after the write and passes when the read back finds exactly one word |
 | `StorageFileSystemWrite<size>`, `StorageFileSystemRead<size>` | method A: 64 blocks written one after another to one file per block size, then read back and verified |
-| `StorageDirectBlockWrite<size>`, `StorageDirectBlockRead<size>` | method B, decision D29: 64 blocks at fixed offsets of one preallocated file, with `app.FileSync` after every write, then read back and verified |
-| `StorageCorruptionDetectedByteFlip` | flips one byte of a written block on storage and passes when the read back finds exactly one |
+| `StorageDirectBlockWrite<size>`, `StorageDirectBlockRead<size>` | `skipped`, direct block access is ESP32 only (D29) |
+| `StorageCorruptionDetectedByteFlip` | flips one byte of a written file through the file system and passes when the read back finds exactly one |
 | `SerialUartRead`, `SerialUartWrite`, `SerialSpiRead`, `SerialSpiWrite` | `skipped`, the phone has no UART or SPI |
 
 The sizes are 512, 1024, 2048 and 4096 bytes. The files live in the app's

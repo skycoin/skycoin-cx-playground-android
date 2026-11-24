@@ -1,4 +1,0 @@
-wait-for out test program done
-wait-for stdout saved
-pull cxtest/stdout.txt stdout.txt
-screenshot end

@@ -51,7 +51,6 @@ func register(p *cxast.CXProgram) {
 	fn("NetSend", opNetSend, in(i32, str), in(str))
 	fn("NetRecv", opNetRecv, in(i32, i32), in(str, str))
 	fn("NetClose", opNetClose, in(i32), nil)
-	fn("FileSync", opFileSync, in(i32), in(boolean))
 
 	for i, c := range []struct {
 		name string

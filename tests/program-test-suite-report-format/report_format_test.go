@@ -1,7 +1,8 @@
 // Package programtestsuitereportformat checks the result line of the test
 // programs (#19): lines read back unchanged, malformed ones are refused, and
 // both bundled test programs, run as the app runs them, print only well
-// formed lines that pass.
+// formed lines that pass. On the phone the serial and the direct block
+// tests (D29, ESP32 only) report skipped.
 package programtestsuitereportformat
 
 import (
@@ -122,8 +123,8 @@ func TestBundledProgramsReport(t *testing.T) {
 			if !r.Passed() {
 				t.Errorf("%s", r)
 			}
-			if r.Verdict == testreport.VerdictSkipped && !r.Serial() {
-				t.Errorf("only the serial tests skip on the phone: %s", r)
+			if r.Verdict == testreport.VerdictSkipped && !r.Serial() && !strings.HasPrefix(r.Name, "StorageDirectBlock") {
+				t.Errorf("only the serial and direct block tests skip on the phone: %s", r)
 			}
 		}
 		slices.Sort(names)

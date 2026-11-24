@@ -1222,18 +1222,20 @@ method and block size:
   `MemoryPatternRandomSeeded`, `MemoryPatternWalkingOnes`,
   `MemoryPatternWalkingZeros`, `MemoryCorruptionDetectedBitFlip`;
 - `StorageFileSystemRead512` to `StorageFileSystemWrite4096` (method A),
-  `StorageDirectBlockRead512` to `StorageDirectBlockWrite4096` (method B),
+  `StorageDirectBlockRead512` to `StorageDirectBlockWrite4096` (method B,
+  skipped on the phone),
   `StorageCorruptionDetectedByteFlip`;
 - `SerialUartRead`, `SerialUartWrite`, `SerialSpiRead`, `SerialSpiWrite`.
 
 ### Phone
 
 The hash and memory program is CX and runs in the emulator rig with one
-test folder per test. On the phone, an app cannot open the block device, so
-method A is the file system (one file per block size) and method B is
-direct block access to one preallocated file with a sync after every write
-(decision D29). The phone has no UART or SPI, so the serial tests report
-that they are skipped.
+test folder per test. On Android storage is the file system only (D29):
+method A writes one file per block size, and the flipped byte test edits a
+file through the file system. Method B, direct block access, is ESP32 only,
+so its tests report skipped with the note "direct block access is ESP32
+only", and `app.FileSync`, which only method B used, is gone. The phone has
+no UART or SPI, so the serial tests report that they are skipped too.
 
 ### ESP32
 
@@ -1344,15 +1346,11 @@ D28 ProgramFetchClientPlacementDecision
   wait for new CX calls.
 
 D29 StorageDirectBlockMethodOnPhoneDecision
-- What exists now: Android apps cannot open the SD card block device without
-  root.
-- Question: what is method B, direct block access, on the phone?
-- Option a: reads and writes of 512 to 4096-byte blocks at fixed offsets in
-  one preallocated file, with a sync after each write.
-- Option b: skip method B on the phone and run it only on the ESP32.
-- Recommendation: option a, because it measures the cost of the file
-  system's metadata path against plain block writes, and it is the same test
-  code on both targets.
+- Decided 2026-11-24 (#40, msg 505): option b, "android uses file system,
+  esp32 uses sd card". Built: the storage program runs method A only on
+  the phone and reports the direct block tests skipped. The direct block
+  emulator folder and `app.FileSync` are removed. Method B is direct block
+  access to the SD card on the ESP32 (skycoin-cx-forth #11).
 
 D30 ProgramManifestCanonicalFormDecision
 - What exists now: the manifest has a binary form (`Manifest.Encode`,
@@ -1661,8 +1659,9 @@ dependencies and its test.
       emulator folder per test.
     - ProgramTestSuiteStorageFileSystem: method A at 512 and 4096. Test:
       emulator folder per test.
-    - ProgramTestSuiteStorageDirectBlock: method B (D29). Test: emulator
-      folder per test.
+    - ProgramTestSuiteStorageDirectBlock: method B (D29) is ESP32 only and
+      reports skipped on the phone. Test:
+      program-test-suite-storage-file-system.
     - ProgramTestSuiteSerialSkipOnPhone: serial tests report skipped on the
       phone. Test: emulator folder.
     - ProgramTestSuiteEsp32Storage: SD over FAT and raw SPI sectors

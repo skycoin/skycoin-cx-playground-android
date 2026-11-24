@@ -1,1 +1,1 @@
-{"name": "Test program: storage and serial", "description": "Block write, read and verify through the file system and at fixed offsets, serial tests, one result line each", "kind": "console"}
+{"name": "Test program: storage and serial", "description": "Block write, read and verify through the file system; direct block and serial tests skipped on the phone, one result line each", "kind": "console"}
