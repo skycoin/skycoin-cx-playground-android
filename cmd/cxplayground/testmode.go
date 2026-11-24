@@ -123,7 +123,9 @@ func (t *tracer) publishFile(path string, b []byte) {
 }
 
 // writeDataFiles writes the app's files that are not CX sources to a fresh
-// directory and returns it, or "" when the app has none.
+// directory and returns it. The directory is the program's sandbox root, so
+// it exists even when the app has no data files, for a program that writes
+// its own.
 func writeDataFiles(a store.App, files map[string][]byte) (string, error) {
 	dir, err := app.DataDir()
 	if err != nil {
@@ -133,9 +135,9 @@ func writeDataFiles(a store.App, files map[string][]byte) (string, error) {
 	if err := os.RemoveAll(dir); err != nil {
 		return "", err
 	}
-	wrote, err := store.WriteDataFiles(dir, files)
-	if !wrote {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
+	_, err = store.WriteDataFiles(dir, files)
 	return dir, err
 }
