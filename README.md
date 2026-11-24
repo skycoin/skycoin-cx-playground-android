@@ -184,7 +184,8 @@ Each folder under `tests/` is one test. A folder with an `app/` or an
 hold go tests. `app/` is the CX app, which `make bundle` adds to the APK.
 `input.txt` lists the steps and `expect.txt` the checks. Results go to
 `results/<time>/<test>/`: the PNGs, pulled files, the logcat and the timing
-table.
+table, and `results.txt` with the result lines of a test program, which
+the suite report repeats.
 
 | `input.txt` step | Does |
 | --- | --- |
@@ -214,6 +215,8 @@ overlays, which relaunches every app.
 | `screen-matches <name> [x y w h]` | the screenshot, or the region, matches `expected/<name>.png` within `-tolerance` per channel and `-max-diff` of the pixels |
 | `file-equals <pulled> <path>` | a pulled file equals a file of the repository, path relative to the test folder |
 | `file-contains <pulled> <text>` | a pulled file contains the text |
+| `result <name> <verdict>` | the test program printed the result line `name` with that verdict, see package `testreport` |
+| `results-pass` | every result line the program printed is `true` or `skipped`, and there is one |
 
 Regions keep the status bar clock and the top bar with the app hash out of
 the comparison. `suite -update-references` writes the captured regions to
@@ -294,6 +297,7 @@ suite at once with that many runs.
 | `program-loader-store-resume` (go) | a download stopped part way resumes from the kept blocks, asking only for the missing ones; an untrusted list is refused |
 | `program-loader-lister` (go) | `index.txt` of 10 and 1000 programs reads back row for row with the same number of allocations |
 | `program-loader-memory` (go) | load, unload and reload from RAM give the same files, a limit of one keeps the last program |
+| `program-test-suite-report-format` (go) | result lines read back unchanged, and malformed ones are refused |
 
 ## Benchmark suite
 

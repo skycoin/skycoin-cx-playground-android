@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -121,6 +122,8 @@ func parseSteps(r io.Reader) ([]inputStep, error) {
 //	screen-matches <name> [x y w h]    screenshot name, or its region, matches expected/<name>.png
 //	file-equals <pulled> <path>        a pulled file equals path, relative to the test folder
 //	file-contains <pulled> <text>      a pulled file contains text
+//	result <name> <verdict>            the test program printed result line name with verdict, see testreport
+//	results-pass                       every result line printed is true or skipped
 type expectation struct {
 	text   string
 	verb   string
@@ -162,6 +165,14 @@ func parseExpectations(r io.Reader) ([]expectation, error) {
 				return nil, fmt.Errorf("line %d: file-contains takes a pulled name and a text", n)
 			}
 			e.args = []string{name, text}
+		case "result":
+			if len(f) != 3 || !slices.Contains([]string{"true", "false", "skipped"}, f[2]) {
+				return nil, fmt.Errorf("line %d: result takes a test name and true, false or skipped", n)
+			}
+		case "results-pass":
+			if len(f) != 1 {
+				return nil, fmt.Errorf("line %d: results-pass takes nothing", n)
+			}
 		default:
 			e = expectation{text: line, source: line}
 		}

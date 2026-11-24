@@ -226,6 +226,16 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 		break
 	}
 	cancel()
+	results, err := programResults(w.traces())
+	if err != nil {
+		fail("result lines: %v", err)
+	}
+	if len(results) > 0 {
+		os.WriteFile(filepath.Join(out, resultsFile), []byte(resultsText(results)), 0o644)
+	}
+	for _, f := range checkResults(t.expect, results) {
+		fail("%s", f)
+	}
 	for _, e := range t.expect {
 		switch e.verb {
 		case "screen-changed":

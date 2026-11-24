@@ -228,6 +228,9 @@ func (o *options) suite(ctx context.Context, dirs []string, boot, stopAfter, ski
 		for _, f := range failures {
 			fmt.Fprintf(&report, "  %s\n", f)
 		}
+		if b, err := os.ReadFile(filepath.Join(s.results, t.name, resultsFile)); err == nil {
+			report.Write(b)
+		}
 		shared.rows = append(shared.rows, timingRow{step: "[" + t.name + "]"})
 		shared.rows = append(shared.rows, table.rows...)
 	}
