@@ -170,14 +170,14 @@ func TestParseSettings(t *testing.T) {
 		tf.before[0] != "settings put secure a 1" || tf.after[0] != "settings put secure a 0" || tf.timeout != 90*time.Second || !tf.untimedInput {
 		t.Fatalf("%+v", tf)
 	}
-	flood := testFolder{dir: "tests/x"}
-	if err := flood.parseSettings(strings.NewReader("flood-nodes 7010 3 publish a test seed\nflood-type medium\n")); err != nil {
+	nodes := testFolder{dir: "tests/x"}
+	if err := nodes.parseSettings(strings.NewReader("program-nodes 7010 3 publish a test seed\nprogram-node-type medium\n")); err != nil {
 		t.Fatal(err)
 	}
-	if n := flood.net; n.floodPort != 7010 || n.floodCount != 3 || n.floodDir != "tests/x/publish" || n.floodSeed != "a test seed" || n.floodType != "medium" || !n.used() {
-		t.Fatalf("flood-nodes: %+v", n)
+	if n := nodes.net; n.nodesPort != 7010 || n.nodesCount != 3 || n.nodesDir != "tests/x/publish" || n.nodesSeed != "a test seed" || n.nodesType != "medium" || !n.used() {
+		t.Fatalf("program-nodes: %+v", n)
 	}
-	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app", "input fast", "flood-nodes 7010 3 dir", "flood-nodes 7010 0 dir seed", "flood-type huge"} {
+	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app", "input fast", "program-nodes 7010 3 dir", "program-nodes 7010 0 dir seed", "program-node-type huge", "program-node-type thin"} {
 		if err := new(testFolder).parseSettings(strings.NewReader(bad)); err == nil {
 			t.Errorf("%q parsed", bad)
 		}

@@ -1,5 +1,0 @@
-This app holds no program. It runs a programnetwork node, subscribes to the
-nodes its args give, and waits for a have of the program its args name. It
-downloads the program from the node that announced it, checks the signer
-key of its args and every block hash, then runs the program.
-See "DHT prototype (#18)" in docs/ProgramDistribution.md.

@@ -1,7 +1,8 @@
 // Package programnetwork is the DHT prototype of #18: nodes that subscribe
-// to each other, announce the programs they hold with have packets, flood
-// new programs to every subscriber once, and share peers by class, group
-// and address scope. See "DHT prototype (#18)" in
+// to each other, announce the programs they hold with have packets, put
+// every have they receive in a have queue, request only what their policy
+// keeps (#42), and share peers by class, group and address scope. A thin
+// node is Get, a one-shot fetch (#44). See "DHT prototype (#18)" in
 // docs/ProgramDistribution.md.
 package programnetwork
 

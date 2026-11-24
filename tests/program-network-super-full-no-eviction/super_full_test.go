@@ -48,6 +48,7 @@ func startNode(t *testing.T, name, dir, addr string, trusted cipher.PubKey, sett
 	}
 	n.Logf = func(format string, args ...any) { t.Logf(name+": "+format, args...) }
 	go n.Run()
+	go n.RunUpdates(nil)
 	t.Cleanup(func() { n.Close() })
 	return n
 }

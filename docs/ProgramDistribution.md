@@ -592,11 +592,11 @@ bytes, 21 blocks and 8599 bytes of linear packing. A cell is the packets
 manifest list address for list manifests, the program manifest for get
 manifest, all 21 block entries for get block list, the whole linear packing
 for get blocks, and the whole program from list to verified files for fetch
-program. The DHT rows are one flood of the program from a node to its
-subscriber (subscribe, have, and the subscriber's download), and one get
-peers of five public peers, the last of them a 99-byte entry with a 64-byte
-address and a 32-byte group. Retransmissions are not counted, and there
-were none.
+program. The DHT rows are one announce and request of the program from
+a node to its subscriber (subscribe, have, and the subscriber's request
+and download), and one get peers of five public peers, the last of them a
+99-byte entry with a 64-byte address and a 32-byte group. Retransmissions
+are not counted, and there were none.
 
 | Operation | 1400 | 1200 | 1024 | 512 | 256 | 128 | 64 | 32 | 16 | Floor | Below the floor |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -612,8 +612,8 @@ were none.
 | fetch program, forms=short | 56/13093 | 56/13093 | 56/13093 | 92/13936 | 140/15058 | 238/17352 | 562/24933 | 1902/56231 | fails | 20 | get manifest by prefix |
 | subscribe 0x11 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 10 | request and reply: header 6, lease 4 |
 | have 0x10 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | fails | fails | 50 | request: header 6, 32-byte address, lengths 4 and 8 |
-| flood one program, forms=full | 14/11655 | 16/11749 | 21/11989 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
-| flood one program, forms=short | 27/11624 | 28/11647 | 28/11647 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
+| announce and request one program, forms=full | 14/11655 | 16/11749 | 21/11989 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
+| announce and request one program, forms=short | 27/11624 | 28/11647 | 28/11647 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
 | get peers 0x12, forms=full | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | fails | fails | fails | 110 | reply 11 plus the longest peer entry, 99 |
 | get peer part 0x13, forms=short | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 12/335 | 26/482 | 108/1343 | 13 | reply: header 6, total 2, index 2, length 1, offset 1, one byte |
 
@@ -628,8 +628,8 @@ Findings:
   list manifests, 47 for get manifest and 50 for have. Get block list also
   needs one 48-byte block entry in a reply, 92 bytes.
 - The full forms read whole units (D37). Get blocks needs a whole 512-byte
-  block in a reply, 560 bytes, so a program fetch and a flood in the full
-  forms work at 560 and up and fail with error 6 below.
+  block in a reply, 560 bytes, so a program fetch and a request after a
+  have in the full forms work at 560 and up and fail with error 6 below.
 - Get peers needs room for its longest entry, 110 bytes for a 99-byte
   entry. Get peer part reads an entry by range, down to 13 bytes, when the
   forms flag is short.
@@ -638,11 +638,11 @@ Findings:
   fields: 15 for list manifests prefix, 20 for get manifest by prefix and
   get block list bytes, 16 for get block part. A whole program fetch works
   down to 20 bytes, where 16 fails at get manifest by prefix.
-- The flood needs the have, so its floor in the short forms is 50 bytes
-  (D35).
+- Announce and request needs the have, so its floor in the short forms
+  is 50 bytes (D35).
 - In the short forms every operation works at 64 bytes and up. That is the
   practical floor. At 32 bytes a program can still be fetched from a
-  server, in 1902 packets instead of 56 at 1200, but a node cannot flood.
+  server, in 1902 packets instead of 56 at 1200, but a node cannot announce.
   At 16 no program can be fetched.
 - Cost: in the full forms fetching the program takes 28 packets and 13091
   bytes at 1200. In the short forms it takes 56 packets and 13093 bytes at
@@ -863,8 +863,9 @@ Have (0x10) announces that the sender holds a program. Request body:
 | 42 | 8 | u64 | linear packing length |
 
 The request is 50 bytes. The reply (0x90) acknowledges it with the 32-byte
-manifest address, 38 bytes in all. The sender sends the have again until the
-reply arrives, with the waits of #15, so a lost have does not end a flood.
+manifest address, 38 bytes in all. The sender sends the have again until
+the reply arrives, with the waits of #15, so a lost have does not stop
+a program spreading.
 
 Subscribe (0x11) asks the receiver to send have packets to the sender's
 address. Request body:
@@ -919,53 +920,71 @@ Reply (0x93) body:
 | 12 | n | bytes | entry bytes, at most packet size − 12 |
 
 `programnetwork.Node.Forms` is the node's forms flag, as in the client
-(D37). With `FormsFull` a node reads whole entries with get peers, and an
-entry that does not fit a reply is error 6 naming the flag. With
+(D37). With `FormsFull` a node reads whole entries with get peers,
+and an entry that does not fit a reply is error 6 naming the flag. With
 `FormsShort` it reads every entry with get peer part, down to 13 bytes. A
-node's downloads use the same flag, so in the short forms a flood works at
-every size the have fits, 50 bytes and up, and in the full forms at 560
-and up.
+node's downloads use the same flag, so in the short forms announce and
+request works at every size the have fits, 50 bytes and up, and in the
+full forms at 560 and up.
 
 A malformed request gets the error reply (0xFF) of #15. The download uses
 get manifest and get blocks of #15 against the node that sent the have.
 
-### Flood replication
+### Announce and request (#42)
 
-When a node receives a have for a manifest address it has not seen, it
-records the address as seen, acknowledges the have and downloads the
-program from the node that sent it. It fetches the manifest, checks the
-signer against its trusted keys and the lengths against the have, keeps the
-manifest and the blocks in its store as each is verified, and checks every
-file. Then it holds the program and sends its own have to every subscriber.
+There is no flood. A have never starts a download, and data moves only in
+reply to a request (get manifest, get blocks) that the program or the
+node's policy made.
 
-A node announces a program at most once, and a have for a seen address only
-counts as a duplicate, so a flood over any graph ends after one have per
-subscription and program. A download that fails is tried again from the
-other nodes that announced the program, three times in all, and then the
-address is no longer seen, so a later have starts over. A program from an
-untrusted signer, or one whose lengths differ from its have, is dropped and
-never forwarded.
+When a node receives a have, it acknowledges it, records the sender as a
+node that holds the program, and puts the have in its have queue
+(`programnetwork.HaveQueue`) with the sender and the time. No have is
+ignored or dropped: every one goes in the queue, duplicates too, and the
+program reads every one. `Node.Update` is the one step that reads the
+queue. It returns the haves in arrival order and applies the node type's
+policy to each: a medium node requests a pinned program or one that fits
+its budget, a super node one that fits its capacity, and neither requests a
+program it holds or already requested. `Node.RunUpdates` calls Update
+whenever haves wait. Because reading is a single step, the deterministic
+update of skycoin-cx #508 can take its place later (#37).
 
-A new subscriber gets a have for every program the node already holds
-(D34), so a node that joins late, such as a phone, catches up.
+A requested program is downloaded from a node that announced it. The node
+fetches the manifest, checks the signer against its trusted keys and the
+lengths against the have, keeps the manifest and the blocks in its store as
+each is verified, checks every file, and holds the program. A download that
+fails is tried again from the other nodes that announced the program, three
+times in all, and then a later have can request it again. A program from
+an untrusted signer, or one whose lengths differ from its have, is dropped
+and never relayed.
 
-Measured by `tests/program-network-flood-in-process` on the host, with each
-node subscribed to its two ring neighbours and the node three places on,
-and three programs published at node 0:
+A node that relays sends its own have for a program to every subscriber
+once, when it holds the program, and never again for that address (D55).
+A super node always relays, and a medium node only with its relay setting.
+So the haves over any graph end after one per subscription and program,
+and every have names a node that can serve the request. A new subscriber of
+a relaying node gets a have for every program the node holds (D34), so a
+node that joins late, such as a phone, catches up.
 
-| Nodes | All held after | Downloads | Haves received | Duplicates |
-|---|---|---|---|---|
-| 3 | 88 ms | 6 | 18 | 12 |
-| 8 | 389 ms | 21 | 72 | 51 |
-| 16 | 673 ms | 45 | 144 | 99 |
+Measured by `tests/program-network-announce-request-in-process` on the
+host, with super nodes each subscribed to its two ring neighbours and the
+node three places on, and three programs published at node 0:
 
-Every node downloads every program once, and the haves received are exactly
-one per subscription and program. `tests/program-network-flood-loss-tolerance`
-runs eight nodes whose sockets drop a share of every read and every write
-and send a tenth of the rest twice. With 20% dropped, which loses 59% of the
-have and subscribe round trips, every node held both programs after 12.8 s.
-With 30%, which loses 76% of them, it took 28.0 s. Each node still
-downloaded each program once.
+| Nodes | All held after | Requests | Downloads | Haves received and read | Duplicates |
+|---|---|---|---|---|---|
+| 3 | 85 ms | 6 | 6 | 18 | 12 |
+| 8 | 167 ms | 21 | 21 | 72 | 51 |
+| 16 | 343 ms | 45 | 45 | 144 | 99 |
+
+Every node reads every have and requests every program once, and the haves
+received are exactly one per subscription and program. The same test checks
+that a have alone starts nothing: a node that has not read its queue holds
+no program and made no request, and a medium node with no pin and no
+budget reads the have and requests nothing.
+`tests/program-network-announce-request-loss-tolerance` runs eight nodes
+whose sockets drop a share of every read and every write and send a tenth
+of the rest twice. With 20% dropped every node held both programs after
+3.9 s, with 30% after 17.2 s, and each node still requested and downloaded
+each program once.
 
 ### Peer list file
 
@@ -1034,73 +1053,90 @@ programnetwork peers -file peers.txt shared-with 203.0.113.9:7010
 `programnetwork node` runs a node: `-store` names its store, `-peers` its
 peer list, `-signer` the trusted keys, `-subscribe` the nodes it subscribes
 to, and `-publish DIR` with `-seed` or `-secret` publishes every program
-directory in DIR and floods it. `programnetwork getpeers HOST:PORT` prints
-what a node shares with the caller.
+directory in DIR, dated `-date` or now, and announces it. The node prints
+every have it reads from its queue. `programnetwork get` is the thin node,
+see "Node types". `programnetwork getpeers HOST:PORT` prints what a node
+shares with the caller.
 
 ### On the phone
 
-An app of kind `flood` runs a node on the phone with an empty store in the
-app's files dir. Its args are the nodes to subscribe to, the trusted signer
-key and the name in the wanted program's `cxapp.json`. It waits up to 30 s
-for that program to arrive by flood, then checks and runs it like a `fetch`
-app.
+An app of kind `subscribe` runs a super node on the phone with an empty
+store in the app's files dir. Its args are the nodes to subscribe to, the
+trusted signer key and the name in the wanted program's `cxapp.json`. It
+prints every have it reads from its queue, its policy requests each
+program, and it waits up to 30 s for the wanted one, then checks and runs
+it like a `fetch` app.
 
-`tests/program-network-flood-in-emulator` starts three nodes in the rig
-container with the `flood-nodes` setting of the emulator driver: 7010
-publishes `fib-and-primes`, 7011 subscribes to 7010 and 7012 to 7011, and
-the app starts once 7012 holds the program. The app subscribes to 10.0.2.2
-ports 7012 and 7011, gets a have from each (D34), downloads the program
-once, verifies every block and runs it. In the first run the program was
-held 27 ms after the app subscribed, with 2 haves received, 1 duplicate and
-1 download, and the whole test took 7.1 s including install and start.
+`tests/program-network-announce-request-in-emulator` starts three nodes in
+the rig container with the `program-nodes` setting of the emulator driver:
+7010 publishes `fib-and-primes`, 7011 subscribes to 7010 and 7012 to 7011,
+each requests what it reads, and the app starts once 7012 holds the
+program. The app subscribes to 10.0.2.2 ports 7012 and 7011, reads a have
+from each (D34), requests the program once, verifies every block and runs
+it. The driver publishes with `-date 2026-11-24T00:00:00Z`
+(`ProgramNodesPublishDate`), so the addresses are fixed.
 
-### Node types (#34)
+### Node types (#34, #44)
 
-A node has one of three types, which decide what it downloads, keeps,
-announces and serves. Only a node that holds a program announces it and
-serves it, so a have always names a node that can answer the download.
+A node has one of three types, which decide how it connects and what it
+requests, keeps and relays. Only a node that holds a program relays its
+have and serves it, so a have always names a node that can answer the
+request.
 
 | | Thin | Medium | Super |
 |---|---|---|---|
-| on a have | records it, downloads nothing | downloads when pinned or within the budget | downloads when it fits the capacity |
-| keeps for others | nothing | pinned programs and others within the budget | everything until full |
-| announces and serves | nothing | what it keeps | what it keeps |
-| subscribers | grants no lease | yes | yes |
+| connection | one get, then done | persistent subscription | persistent subscription |
+| haves | none, no subscription | every one, in the have queue | every one, in the have queue |
+| requests | the program it was asked for | pinned programs and others within the budget | everything that fits the capacity |
+| keeps | nothing | what it requested | everything until full |
+| relays and serves | nothing | what it keeps, relay a setting, off by default | what it keeps |
 | survives a restart | nothing | programs, subscriptions, subscribers | programs, subscriptions, subscribers |
 
-A thin node subscribes like any node, so it hears every have and knows
-which programs exist and which nodes hold them (D39). `Node.Known` lists
-them, and `Node.Fetch` downloads one on demand from the nodes that
-announced it or from nodes given by address. The thin node keeps what it
-fetched in its own store, for itself: it never adds the program to what it
-serves, never announces it, and answers a get manifest for it with error
-1. A second fetch of a cached program reads the store.
+A thin node is wget for the DHT (D39). `programnetwork.Get` connects to
+one node, downloads the program at a manifest address, verifies the signer
+and every block, and returns. An address prefix works with the short forms,
+since only get manifest by prefix (0x06) takes one. A thin node does not
+subscribe, has no have queue, receives no announces and keeps no state
+between runs; there is no `Node` of type thin and `Node.Known` is gone. The
+command is
 
-A medium node keeps every program its pin list names, and other programs
-while the bytes it holds stay within its budget (D38). The bytes are the
-manifest and the linear packing of each program held, which is what the
-store holds on disk. A download reserves its bytes when it starts, so haves
-that arrive together cannot overcommit the budget. Pinned programs count
-against the budget and are kept past it. With no budget a medium node keeps
-only pinned programs. The pin list is a text file, one manifest address or
-address prefix of 8 to 64 hex digits per line, `#` starting a comment line.
-The node reads it again whenever it changes, so a pin added while the node
-runs applies to the next have.
+```
+programnetwork get -signer PUBKEY [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE
+```
+
+which prints the program it got, or writes its files with `-out`.
+`programnetwork node -type thin` points at `get`.
+
+A medium node keeps a persistent subscription to its peers and reads every
+have from its queue. It requests every program its pin list names, and
+other programs while the bytes it holds stay within its budget (D38). The
+bytes are the manifest and the linear packing of each program held, which
+is what the store holds on disk. A request reserves its bytes when it is
+made, so haves read together cannot overcommit the budget. Pinned programs
+count against the budget and are kept past it. With no budget a medium node
+keeps only pinned programs. The pin list is a text file, one manifest
+address or address prefix of 8 to 64 hex digits per line, `#` starting a
+comment line. The node reads it again whenever it changes, so a pin added
+while the node runs applies to the next have it reads. Relaying to its own
+subscribers is the relay setting, off by default: without it the node
+grants no lease, and a node that subscribes to it is told so and stops
+asking.
 
 ```
 # pins.txt: one address or address prefix per line
 4bf42c1844ab4576
 ```
 
-A super node keeps every program it hears of while it fits the capacity,
-the `-budget` of a super node, and with no capacity until a write fails
-because the disk is full. There is no eviction. A program that does not
-fit is refused with a "storage full" log line and counted in
-`Stats.HavesRefusedFull`, and the node keeps serving what it holds (D40).
-A smaller program that still fits is taken. A write that fails with no
+A super node keeps a persistent subscription, requests every program it
+reads a have for while it fits the capacity, the `-budget` of a super node,
+and with no capacity until a write fails because the disk is full, and
+relays what it holds. There is no eviction. A program that does not fit is
+not requested, with a "storage full" log line, and is counted in
+`Stats.HavesRefusedFull`, and the node keeps serving what it holds (D40). A
+smaller program that still fits is requested. A write that fails with no
 space left drops the partial program from the store. Removing a program is
-manual, with `programnetwork store remove`; a running node keeps serving
-it from memory until it restarts.
+manual, with `programnetwork store remove`; a running node keeps serving it
+from memory until it restarts.
 
 A medium or super node keeps two files next to its store's `index.txt`:
 
@@ -1117,14 +1153,14 @@ reaches them before they renew, and subscribes again to every node of
 `subscriptions.txt`. Such a resumed subscription first ends the earlier one
 with a lease of 0, so the other node, which still counts this node as a
 subscriber, sends the catch-up haves of D34 for what was published while
-it was down. A thin node writes neither file.
+it was down.
 
-`programnetwork node -type thin|medium|super -budget BYTES -pins FILE`
-sets the type, super by default as before #34 (D41). `-config FILE` reads
-the same three settings from `type`, `budget` and `pins` lines, and a flag
-given on the command line overrides its line. `-fetch HASH,...` fetches
-programs on demand from the `-subscribe` nodes; a thin node exits after
-them. The pin list and the store have their own commands:
+`programnetwork node -type medium|super -budget BYTES -pins FILE -relay`
+sets the type, super by default (D41). `-config FILE` reads the same
+settings from `type`, `budget`, `pins` and `relay on|off` lines, and a flag
+given on the command line overrides its line. `-fetch HASH,...` requests
+programs on demand from the `-subscribe` nodes. The pin list and the store
+have their own commands:
 
 ```
 programnetwork pins -file pins.txt add 4bf42c1844ab4576
@@ -1141,18 +1177,19 @@ the index row.
 Tests, each over UDP on the host:
 
 - `tests/program-network-node-types-mixed`: a publisher, a super node, a
-  medium node with one pin, a medium node with a budget, a thin node, and a
-  super node subscribed only to the pinned medium node. After three
-  programs of 11071, 1225 and 2293 bytes, the super node holds all three,
-  the pinned medium node only its pin, the budget medium node one program
-  within its 2293 bytes, the node behind the pinned medium node only the
-  pinned program, and the thin node none while it knows all three. The
-  thin node then fetches one from the super node in about 30 ms, still
-  holds nothing, and serves nothing.
+  medium node with one pin and relay on, a medium node with a budget and
+  relay off, and a super node subscribed to both medium nodes. After three
+  programs of 11071, 1225 and 2293 bytes, every node has read every have,
+  the super node holds all three, the pinned medium node only its pin, the
+  budget medium node one program within its 2293 bytes and no subscriber,
+  and the node behind them only the pinned program. A thin get then
+  downloads one program by address from the super node in about 2 ms,
+  another by prefix in the short forms, refuses a prefix in the full forms
+  and refuses an untrusted signer.
 - `tests/program-network-super-full-no-eviction`: a super node with a
-  capacity of two programs keeps both, refuses the third, still serves the
-  first, and after a manual remove and a restart takes the removed one
-  again from the catch-up haves and still refuses the third.
+  capacity of two programs keeps both, does not request the third, still
+  serves the first, and after a manual remove and a restart requests the
+  removed one again from the catch-up haves and still not the third.
 - `tests/program-network-node-restart-persistence`: a super node and a
   medium node restart on their ports. Both hold what they held, the super
   node knows its subscriber before the medium node is back, neither calls
@@ -1164,18 +1201,15 @@ Tests, each over UDP on the host:
   held past it, the bytes counted equal the bytes on disk, and a restart
   counts the same.
 
-On the phone, an app of kind `thin` runs a thin node with an empty store
-in the app's files dir. Its args are those of a `flood` app. It subscribes
-to the nodes, fetches each program it hears of on demand until one has the
-wanted name, and checks and runs it like a `fetch` app. The emulator
-driver's `flood-type` setting gives the rig's flood nodes their `-type`.
+On the phone, an app of kind `thin` is a thin get. Its args are the node,
+the trusted signer key and the manifest address. It downloads the program,
+checks and runs it like a `fetch` app, and keeps nothing. The emulator
+driver's `program-node-type` setting gives the rig's nodes their `-type`.
 `tests/program-network-thin-fetch-in-emulator` runs one super node on port
-7020 in the rig container that publishes `fib-and-primes`. The app
-subscribes to it at 10.0.2.2, hears one have and ignores it, fetches the
-program on demand with one download, holds nothing for others, has no
-subscriber, verifies every block and runs it. In the first run the program
-was fetched 89 ms after the app subscribed, and the whole test took 5.4 s
-including install and start.
+7020 in the rig container that publishes `fib-and-primes` at the fixed
+date, so the app's args name its address. The app connects to 10.0.2.2,
+gets the program in one manifest request and one blocks request, verifies
+every block and runs it.
 
 ## Test programs (#19 and skycoin-cx-forth #11)
 
@@ -1292,9 +1326,9 @@ D26 ProgramPacketSizeDecision
 - Lead 2026-11-24: test 1400, 1024, 512, 256 and 128, then 64, 32 and 16,
   add partial-hash and sub-block requests, keep 1200 until the results.
 - Results (#31): "Packet size sweep" above. 1200 stays the default and the
-  size is a setting from 16 to 65507. Every operation works at 64 bytes and
-  up, a program fetch from a server works down to 20, and the flood down to
-  50. D35 to D37 ask the choices this left open.
+  size is a setting from 16 to 65507. Every operation works at 64 bytes
+  and up, a program fetch from a server works down to 20, and announce
+  and request down to 50. D35 to D37 ask the choices this left open.
 
 D27 ProgramTrustedSignerDecision
 - What exists now: nothing is signed, so nothing is trusted.
@@ -1427,7 +1461,7 @@ D34 FloodSubscribeCatchUpDecision
   operation.
 - Option c: no, a late node waits for the next new program.
 - Recommendation: option a, because it reuses the have and its download
-  path, a phone that starts the app after the flood still gets the
+  path, a phone that starts the app after a program spread still gets the
   programs, and it costs one 50-byte packet per program per new subscriber.
   Built: `Node.subscribe` in `programnetwork/node.go`.
 
@@ -1435,17 +1469,17 @@ D35 ProgramPacketSizeFloorDecision
 - What exists now: after #31 every operation works at 64 bytes and up. In
   the short forms a program fetch from a server works down to 20 bytes. The
   have (0x10) is 50 bytes because it carries the 32-byte manifest address,
-  so a flood needs 50 bytes. At 16 bytes no program can be fetched, because
-  the header, the shortest prefix and the offset and length fields of get
-  manifest by prefix are 19 bytes before the first manifest byte.
+  so announcing needs 50 bytes. At 16 bytes no program can be fetched,
+  because the header, the shortest prefix and the offset and length fields
+  of get manifest by prefix are 19 bytes before the first manifest byte.
 - Question: which packet size is the supported floor?
-- Option a: 64 bytes for every operation, the flood included, with the have
+- Option a: 64 bytes for every operation, announcing included, with the have
   kept as it is. 32 bytes works for fetching from a server but is not
-  promised for the flood.
-- Option b: 32 bytes for every operation, by adding a short have that names
-  the program by an address prefix. The receiver then fetches the manifest
-  by prefix and learns the full address only from its header, so the seen
-  set and the announcers are keyed by prefix until then.
+  promised for announcing.
+- Option b: 32 bytes for every operation, by adding a short have that
+  names the program by an address prefix. The receiver then fetches the
+  manifest by prefix and learns the full address only from its header,
+  so the requested set and the announcers are keyed by prefix until then.
 - Option c: 128 bytes, the networks with a 128-byte maximum that #31
   names, with the sizes below 128 left as untested extras.
 - Evidence: the sweep table. The smallest links named so far are 802.15.4
@@ -1453,7 +1487,7 @@ D35 ProgramPacketSizeFloorDecision
   and both carry the 50-byte have. A fetch at 32 bytes takes 1902 packets
   and 4.3 times the bytes of a fetch at 1200.
 - Recommendation: option a, because every link named so far carries 64
-  bytes, the have fits LoRa's 51 bytes, and option b changes how the flood
+  bytes, the have fits LoRa's 51 bytes, and option b changes how a node
   keys its state for links nobody has asked for. Built: the floors in
   `tests/program-packet-size-sweep`; nothing else needed.
 
@@ -1502,24 +1536,16 @@ D38 MediumNodePinBudgetDecision
 - Recommendation: option a, because the budget then bounds the disk the
   node gives to programs it was not asked for, a pin is the operator's
   explicit wish and is never refused, and one number in `Stats.StoredBytes`
-  answers both. Built: `Node.onHave` in `programnetwork/node.go`, tested by
-  `tests/program-network-node-budget-accounting`.
+  answers both. Built: `Node.applyPolicy` in `programnetwork/node.go`,
+  tested by `tests/program-network-node-budget-accounting`.
 
 D39 ThinNodeSubscribeAndCacheDecision
-- What exists now: #34 says a thin node gets data only and fetches what it
-  needs.
-- Question: does a thin node subscribe, and does it keep what it fetched?
-- Option a: it subscribes, so it hears every have and knows what exists and
-  where, downloads nothing on a have, and keeps what it fetches in its own
-  store for itself without serving or announcing it.
-- Option b: it never subscribes and fetches only from nodes given by
-  address, keeping nothing.
-- Option c: it subscribes, and keeps nothing after a run.
-- Recommendation: option a, because a have is 50 bytes per program and is
-  the only way a thin node learns what exists without a new list operation,
-  and a phone that runs a program twice should not download it twice.
-  Built: `Node.Known` and `Node.Fetch` in `programnetwork/node.go`, the
-  `thin` app kind on the phone.
+- Decided 2026-11-24 (#44): "Thin node connects. Downloads. Done. It's
+  wget for DHT. No persistent pubsub or notifications. Medium keeps pinned
+  content and option for relay. Persistent connection." Built:
+  `programnetwork.Get`, `programnetwork get`, the `thin` app kind as a
+  one-shot get, `Settings.Relay` and `-relay` for a medium node. The thin
+  subscription, its store and `Node.Known` are removed.
 
 D40 SuperNodeFullStorageDecision
 - What exists now: #34 says a super node keeps everything until its storage
@@ -1534,7 +1560,7 @@ D40 SuperNodeFullStorageDecision
 - Option c: no capacity setting, only a full disk.
 - Recommendation: option a, because a capacity keeps a super node from
   filling a disk it shares with other work, and taking a program that fits
-  is not eviction and wastes no space. Built: `Node.onHave` and
+  is not eviction and wastes no space. Built: `Node.applyPolicy` and
   `Node.dropFull` in `programnetwork/node.go`, tested by
   `tests/program-network-super-full-no-eviction`.
 
@@ -1542,14 +1568,48 @@ D41 NodeTypeDefaultDecision
 - What exists now: before #34 every node kept and forwarded every program,
   which is what a super node with no capacity does.
 - Question: which type does `programnetwork node` run without `-type`?
-- Option a: super, so every existing command, test and the flood app keep
-  their behaviour; the phone's new thin app runs a thin node.
+- Option a: super, so every existing command, test and the subscribe app
+  keep their behaviour.
 - Option b: medium with no budget and no pins, which keeps nothing until
   pins are given.
-- Option c: thin, so a node keeps nothing unless told to.
+- Option c: thin, so a node keeps nothing unless told to. Since #44 a thin
+  node is a one-shot get and cannot run as a node, so this option is gone.
 - Recommendation: option a, because nothing changes for existing setups
-  and a node that keeps nothing by default would end every flood at its
+  and a node that keeps nothing by default would stop every program at its
   first hop. Built: `NewNode` and the `-type` default.
+
+D55 NetworkAnnounceRelayDecision
+- Defaulted 2026-11-24 ("doesnt matter", msg 528): option a, a node relays
+  each new have once to its subscribers, deduplicated by address. Built:
+  `Node.relay` in `programnetwork/node.go`, see D69 for when.
+
+D69 AnnounceRelayTimingDecision
+- What exists now: D55 says a node relays each new have once, by address.
+  A have names the program but not the node that holds it, so a subscriber
+  requests the program from the node that sent the have.
+- Question: when does a node relay a have?
+- Option a: once it holds the program, after its own request and download,
+  so every have names a node that can serve it. A medium node with relay on
+  relays only what it keeps.
+- Option b: as soon as it reads the have, held or not. A subscriber that
+  requests from a relay that does not hold the program gets error 1 and
+  needs another node to ask.
+- Option c: as option b, and the relay also answers a request for a program
+  it does not hold by fetching it from the node that announced it.
+- Recommendation: option a, because no have then points at a node that
+  cannot answer, the have packet stays as it is, and a super node, which
+  requests everything, relays every program anyway. Built: `Node.relay` is
+  called from `Node.hold`.
+
+D70 MediumNodeRelayDefaultDecision
+- What exists now: #44 makes announce relay a medium node's option.
+- Question: is it off or on when the config does not say?
+- Option a: off, so a medium node grants no lease and relays nothing unless
+  `relay on` or `-relay` is given.
+- Option b: on, as a medium node was before #44.
+- Recommendation: option a, because #44 asks for relay as an option instead
+  of always on, and a medium node that keeps only its pins has little to
+  relay. Built: `Settings.Relay` false by default.
 
 ## Task breakdown
 
@@ -1625,8 +1685,10 @@ dependencies and its test.
   - ProgramNetwork (#18)
     - ProgramNetworkPacketHaveSubscribe: have and subscribe packets. Depends
       on PacketCodec. Test: codec sizes.
-    - ProgramNetworkFloodReplication: download on have and forward once.
-      Depends on HaveSubscribe and Client. Test: three nodes in one process.
+    - ProgramNetworkAnnounceRequest (#42): every have into the have queue,
+      requests by the node's policy, relay once (D55). Depends on
+      HaveSubscribe and Client. Test:
+      program-network-announce-request-in-process.
     - ProgramNetworkPeerGetPeers: the get-peers packet. Depends on PacketCodec.
       Test: reply fits one packet.
     - ProgramNetworkPeerListClasses: the five sharing classes. Depends on
@@ -1635,16 +1697,17 @@ dependencies and its test.
       ListClasses. Test: a LAN address is not given to a global peer.
     - ProgramNetworkPeerCommand: command-line peer list management. Depends
       on GroupsScopes. Test: round trip of the list file.
-    - ProgramNetworkEmulatorFlood: the phone receives a program by flood.
-      Depends on FloodReplication. Test: emulator test.
-    - ProgramNetworkNodeTypes (#34): thin, medium and super nodes, the pin
+    - ProgramNetworkEmulatorAnnounceRequest: the phone reads the haves and
+      requests a program. Depends on AnnounceRequest. Test:
+      program-network-announce-request-in-emulator.
+    - ProgramNetworkNodeTypes (#34, #44): medium and super nodes, the pin
       list, the budget, persistence and `store remove`. Depends on
-      FloodReplication. Test: program-network-node-types-mixed,
+      AnnounceRequest. Test: program-network-node-types-mixed,
       program-network-super-full-no-eviction,
       program-network-node-restart-persistence and
       program-network-node-budget-accounting.
-    - ProgramNetworkEmulatorThin (#34): the phone as a thin node fetches
-      from a super node. Depends on NodeTypes. Test:
+    - ProgramNetworkEmulatorThin (#34, #44): the phone gets a program as a
+      thin node from a super node. Depends on NodeTypes. Test:
       program-network-thin-fetch-in-emulator.
   - ProgramTestSuite (#19, skycoin-cx-forth #11)
     - ProgramTestSuiteReportFormat: the result line. Test: parse round trip.

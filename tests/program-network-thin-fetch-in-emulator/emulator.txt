@@ -1,8 +1,9 @@
 # One super programnetwork node runs in the rig container, which the
-# emulator reaches as 10.0.2.2. Node 7020 publishes fib-and-primes. The app
-# runs a thin node, subscribes to 7020, hears its have, fetches the program
-# on demand, holds nothing for others, verifies it and runs it.
-ready start app="Programs: fetch as a thin node"
-flood-nodes 7020 1 publish cx playground test signer
-flood-type super
+# emulator reaches as 10.0.2.2. Node 7020 publishes fib-and-primes dated
+# 2026-11-24, so its manifest address is fixed. The app is a thin node
+# (#44): it connects to 7020, downloads the program by address, verifies it,
+# runs it and keeps nothing, with no subscription.
+ready start app="Programs: get as a thin node"
+program-nodes 7020 1 publish cx playground test signer
+program-node-type super
 timeout 60

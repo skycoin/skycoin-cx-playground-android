@@ -15,7 +15,7 @@ import (
 
 // nodeSettings reads the config file, if any, and lets the flags set on
 // the command line override it.
-func nodeSettings(fl *flag.FlagSet, configFile, typeName string, budget int64, pinsFile string) (programnetwork.Settings, error) {
+func nodeSettings(fl *flag.FlagSet, configFile, typeName string, budget int64, pinsFile string, relay bool) (programnetwork.Settings, error) {
 	values := map[string]string{}
 	if configFile != "" {
 		lines, err := programstore.ReadLines(configFile)
@@ -31,27 +31,24 @@ func nodeSettings(fl *flag.FlagSet, configFile, typeName string, budget int64, p
 			key, value, _ := strings.Cut(l, " ")
 			value = strings.TrimSpace(value)
 			switch key {
-			case "type", "budget", "pins":
+			case "type", "budget", "pins", "relay":
 				values[key] = value
 			default:
-				return programnetwork.Settings{}, fmt.Errorf("%s entry %d: unknown setting %q, want type, budget or pins", configFile, i+1, key)
+				return programnetwork.Settings{}, fmt.Errorf("%s entry %d: unknown setting %q, want type, budget, pins or relay", configFile, i+1, key)
 			}
 		}
 	}
 	fl.Visit(func(f *flag.Flag) {
 		switch f.Name {
-		case "type", "budget", "pins":
+		case "type", "budget", "pins", "relay":
 			values[f.Name] = f.Value.String()
 		}
 	})
-	if _, ok := values["type"]; !ok {
-		values["type"] = typeName
-	}
-	if _, ok := values["budget"]; !ok {
-		values["budget"] = strconv.FormatInt(budget, 10)
-	}
-	if _, ok := values["pins"]; !ok {
-		values["pins"] = pinsFile
+	defaults := map[string]string{"type": typeName, "budget": strconv.FormatInt(budget, 10), "pins": pinsFile, "relay": strconv.FormatBool(relay)}
+	for k, v := range defaults {
+		if _, ok := values[k]; !ok {
+			values[k] = v
+		}
 	}
 	t, err := programnetwork.ParseNodeType(values["type"])
 	if err != nil {
@@ -61,7 +58,15 @@ func nodeSettings(fl *flag.FlagSet, configFile, typeName string, budget int64, p
 	if err != nil || b < 0 {
 		return programnetwork.Settings{}, fmt.Errorf("budget %q: want bytes, 0 or more", values["budget"])
 	}
-	return programnetwork.Settings{Type: t, Budget: b, PinsFile: values["pins"]}, nil
+	var r bool
+	switch values["relay"] {
+	case "on", "true":
+		r = true
+	case "off", "false":
+	default:
+		return programnetwork.Settings{}, fmt.Errorf("relay %q: want on or off", values["relay"])
+	}
+	return programnetwork.Settings{Type: t, Budget: b, PinsFile: values["pins"], Relay: r}, nil
 }
 
 func pins(args []string) error {

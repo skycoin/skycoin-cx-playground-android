@@ -23,7 +23,7 @@ import (
 //	                           clear it after the test
 //	before <shell command>     run on the device before the start
 //	after <shell command>      run on the device after the test
-//	echo-server, program-server, program-packet, flood-nodes, flood-type, netem, capture see net.go
+//	echo-server, program-server, program-packet, program-nodes, program-node-type, netem, capture see net.go
 //	input untimed              send input.txt events without timing them, for
 //	                           a screen of the app that is not a program canvas
 //	timeout <seconds>          for wait-for steps and the expected output,
@@ -144,23 +144,23 @@ func (t *testFolder) parseSettings(r io.Reader) error {
 				return fmt.Errorf("line %d: program-packet takes a packet size of 16 to 65507 bytes", n)
 			}
 			t.net.programPacket = rest
-		case "flood-nodes":
+		case "program-nodes":
 			f := strings.Fields(rest)
 			if len(f) < 4 {
-				return fmt.Errorf("line %d: flood-nodes takes a first port, a count, a directory and a seed", n)
+				return fmt.Errorf("line %d: program-nodes takes a first port, a count, a directory and a seed", n)
 			}
 			port, err := strconv.Atoi(f[0])
 			count, cerr := strconv.Atoi(f[1])
 			if err != nil || cerr != nil || port <= 0 || count < 1 || port+count > 65536 {
-				return fmt.Errorf("line %d: flood-nodes takes a port and a node count", n)
+				return fmt.Errorf("line %d: program-nodes takes a port and a node count", n)
 			}
-			t.net.floodPort, t.net.floodCount, t.net.floodDir = port, count, filepath.Join(t.dir, f[2])
-			t.net.floodSeed = strings.Join(f[3:], " ")
-		case "flood-type":
-			if rest != "thin" && rest != "medium" && rest != "super" {
-				return fmt.Errorf("line %d: flood-type takes thin, medium or super", n)
+			t.net.nodesPort, t.net.nodesCount, t.net.nodesDir = port, count, filepath.Join(t.dir, f[2])
+			t.net.nodesSeed = strings.Join(f[3:], " ")
+		case "program-node-type":
+			if rest != "medium" && rest != "super" {
+				return fmt.Errorf("line %d: program-node-type takes medium or super", n)
 			}
-			t.net.floodType = rest
+			t.net.nodesType = rest
 		case "input":
 			if rest != "untimed" {
 				return fmt.Errorf("line %d: input takes untimed", n)

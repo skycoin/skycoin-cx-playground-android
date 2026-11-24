@@ -261,17 +261,17 @@ func (u *ui) start(a *store.App) {
 			}
 			return checkedProgram(m, files, out)
 		}
-		if a.Manifest.Kind == floodKind {
-			m, files, err := floodProgram(a.Manifest, out)
+		if a.Manifest.Kind == subscribeKind {
+			m, files, err := subscribeProgram(a.Manifest, out)
 			if err != nil {
-				return nil, fmt.Errorf("flood failed: %v", err)
+				return nil, fmt.Errorf("announce and request failed: %v", err)
 			}
 			return checkedProgram(m, files, out)
 		}
 		if a.Manifest.Kind == thinKind {
 			m, files, err := thinProgram(a.Manifest, out)
 			if err != nil {
-				return nil, fmt.Errorf("thin fetch failed: %v", err)
+				return nil, fmt.Errorf("thin get failed: %v", err)
 			}
 			return checkedProgram(m, files, out)
 		}

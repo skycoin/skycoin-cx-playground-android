@@ -1,12 +1,10 @@
 package programnetwork
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net"
-	"slices"
 	"sync"
 	"syscall"
 	"time"
@@ -17,32 +15,36 @@ import (
 	"github.com/skycoin/skycoin-cx-playground-android/programstore"
 )
 
-// Node defaults, see "Flood replication" in docs/ProgramDistribution.md.
+// Node defaults, see "Announce and request" in docs/ProgramDistribution.md.
 const (
 	DefaultLease = 10 * time.Minute
-	// DownloadAttempts is how many times a node tries to download a program
-	// it heard of, cycling through the nodes that announced it.
+	// DownloadAttempts is how many times a node tries a download it
+	// requested, cycling through the nodes that announced the program.
 	DownloadAttempts = 3
 )
 
 // ErrClosed is returned by requests of a node that was closed.
 var ErrClosed = errors.New("node closed")
 
-// Node is one node of the network. It holds programs in a programstore,
-// serves them with the operations of programblocks, accepts subscribers,
-// and floods every new program to them with a have packet, once.
+// Node is a medium or super node of the network (#44). It holds programs
+// in a programstore, serves them with the operations of programblocks,
+// keeps a persistent subscription to its peers, and puts every have it
+// receives in its have queue (#42). A have never starts a download: Update
+// reads the queue and the node type's policy requests what it keeps. A
+// node relays a have to its subscribers once, when it holds the program
+// (D55). A thin node is Get, not a Node.
 type Node struct {
 	// PacketSize bounds every packet the node sends, 1200 by default.
 	PacketSize int
-	// Forms selects the request forms of the node's downloads and get
-	// peers, as in programblocks.Client.
+	// Forms is the forms flag of the node's downloads and get peers, as in
+	// programblocks.Client.
 	Forms programblocks.Forms
 	// Lease is the longest subscription the node grants.
 	Lease time.Duration
 	// Logf, when set, receives one line per event.
 	Logf func(format string, args ...any)
 	// OnHeld, when set, is called once for every program the node starts
-	// to hold, after it is verified and kept, before it is announced.
+	// to hold, after it is verified and kept, before it is relayed.
 	OnHeld func(Held)
 	// FirstTimeout, MaxTimeout and MaxTries set the retries of the node's
 	// requests and downloads, as in programblocks.Client.
@@ -54,13 +56,13 @@ type Node struct {
 	store    *programstore.Store
 	trusted  []cipher.PubKey
 	settings Settings
+	haves    *HaveQueue
 
 	mu          sync.Mutex
 	catalog     *programblocks.Catalog
-	seen        map[programblocks.Hash]bool
-	heard       map[programblocks.Hash]Have
+	requested   map[programblocks.Hash]bool
 	announcers  map[programblocks.Hash][]net.Addr
-	announced   map[programblocks.Hash]bool
+	relayed     map[programblocks.Hash]bool
 	subscribers map[string]subscriber
 	subscribing map[string]bool
 	pending     map[uint32]chan []byte
@@ -97,15 +99,16 @@ type Held struct {
 	Elapsed  time.Duration
 }
 
-// Stats counts the flood traffic of a node.
+// Stats counts the announce and request traffic of a node.
 type Stats struct {
-	HavesReceived       int   // have packets accepted
-	HavesDuplicate      int   // haves for a program already held or on its way
+	HavesReceived       int   // have packets put in the have queue
+	HavesRead           int   // haves the program read from the queue
+	HavesDuplicate      int   // haves read for a program held or requested
 	HavesSent           int   // haves a subscriber acknowledged
 	HavesUnacknowledged int   // haves given up after the retries
+	Requests            int   // downloads the node's policy requested
 	Downloads           int   // programs downloaded and verified
-	DownloadFailures    int   // programs given up after DownloadAttempts
-	HavesIgnored        int   // haves of programs the node type does not keep
+	DownloadFailures    int   // requests given up after DownloadAttempts
 	HavesRefusedFull    int   // haves of programs that do not fit the storage
 	Subscribers         int   // live subscribers
 	StoredBytes         int64 // manifest and packing bytes of the programs held
@@ -116,26 +119,25 @@ func NewNode(conn net.PacketConn, store *programstore.Store, trusted []cipher.Pu
 	return NewTypedNode(conn, store, trusted, Settings{Type: TypeSuper})
 }
 
-// NewTypedNode returns a node of the type of settings that answers on conn
-// and keeps programs in store. It downloads only programs signed by one of
-// trusted. A medium or super node starts out holding every cached program
-// of the store, with the subscribers of its subscribers.txt; a thin node
-// holds nothing.
+// NewTypedNode returns a medium or super node that answers on conn and
+// keeps programs in store. It downloads only programs signed by one of
+// trusted. It starts out holding every cached program of the store, with
+// the subscribers of its subscribers.txt.
 func NewTypedNode(conn net.PacketConn, store *programstore.Store, trusted []cipher.PubKey, settings Settings) (*Node, error) {
 	if _, err := ParseNodeType(string(settings.Type)); err != nil {
 		return nil, err
 	}
+	if settings.Type == TypeThin {
+		return nil, errors.New("a thin node is a one-shot get, not a running node")
+	}
 	n := &Node{
 		PacketSize: programblocks.DefaultPacketSize, Lease: DefaultLease,
 		FirstTimeout: programblocks.DefaultFirstTimeout, MaxTimeout: programblocks.DefaultMaxTimeout, MaxTries: programblocks.DefaultMaxTries,
-		conn: conn, store: store, trusted: trusted, settings: settings, pins: pinList{path: settings.PinsFile},
-		catalog: programblocks.EmptyCatalog(), seen: map[programblocks.Hash]bool{}, heard: map[programblocks.Hash]Have{},
-		announcers: map[programblocks.Hash][]net.Addr{}, announced: map[programblocks.Hash]bool{},
+		conn: conn, store: store, trusted: trusted, settings: settings, pins: pinList{path: settings.PinsFile}, haves: newHaveQueue(),
+		catalog: programblocks.EmptyCatalog(), requested: map[programblocks.Hash]bool{},
+		announcers: map[programblocks.Hash][]net.Addr{}, relayed: map[programblocks.Hash]bool{},
 		subscribers: map[string]subscriber{}, subscribing: map[string]bool{}, pending: map[uint32]chan []byte{},
 		nextID: rand.Uint32(), closed: make(chan struct{}),
-	}
-	if !settings.Type.keeps() {
-		return n, nil
 	}
 	subs, err := readSubscribers(n.subscribersPath(), time.Now())
 	if err != nil {
@@ -166,7 +168,7 @@ func NewTypedNode(conn net.PacketConn, store *programstore.Store, trusted []ciph
 		if _, err := n.catalog.AddVerified(encoded, packFromFiles(m, files)); err != nil {
 			return nil, fmt.Errorf("%s: %w", r.Name, err)
 		}
-		n.seen[addr] = true
+		n.relayed[addr] = true
 		n.stats.StoredBytes += int64(len(encoded)) + int64(m.PackLength)
 	}
 	return n, nil
@@ -187,18 +189,8 @@ func (n *Node) Stats() Stats {
 	return s
 }
 
-// Known returns a have for every program the node has heard of, held or
-// not, in address order. A thin node picks what to Fetch from these.
-func (n *Node) Known() []Have {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	out := make([]Have, 0, len(n.heard))
-	for _, h := range n.heard {
-		out = append(out, h)
-	}
-	slices.SortFunc(out, func(a, b Have) int { return bytes.Compare(a.Address[:], b.Address[:]) })
-	return out
-}
+// Haves is the node's have queue.
+func (n *Node) Haves() *HaveQueue { return n.haves }
 
 // Holds reports whether the node holds the program at addr.
 func (n *Node) Holds(addr programblocks.Hash) bool {
@@ -232,7 +224,7 @@ func (n *Node) Close() error {
 func (n *Node) saveSubscribersLater() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.stopping || !n.settings.Type.keeps() {
+	if n.stopping {
 		return
 	}
 	n.saves.Add(1)
@@ -247,15 +239,13 @@ func (n *Node) Run() error {
 	if err := programblocks.CheckPacketSize(n.PacketSize); err != nil {
 		return err
 	}
-	if n.settings.Type.keeps() {
-		subs, err := n.Subscriptions()
-		if err != nil {
-			return err
-		}
-		for _, s := range subs {
-			if err := n.startSubscription(s, true); err != nil {
-				n.logf("subscribe to %s from %s: %v", s, SubscriptionsFile, err)
-			}
+	subs, err := n.Subscriptions()
+	if err != nil {
+		return err
+	}
+	for _, s := range subs {
+		if err := n.startSubscription(s, true); err != nil {
+			n.logf("subscribe to %s from %s: %v", s, SubscriptionsFile, err)
 		}
 	}
 	buf := make([]byte, 65536)
@@ -369,10 +359,9 @@ func (n *Node) handle(b []byte, from net.Addr) {
 
 // subscribe records or renews a subscriber and returns the lease granted.
 // A lease of 0 ends the subscription. A new subscriber is sent a have for
-// every program held (D34). A thin node grants no lease, since it never
-// announces.
+// every program held (D34). A node that does not relay grants no lease.
 func (n *Node) subscribe(from net.Addr, leaseSeconds uint32) uint32 {
-	if !n.settings.Type.keeps() {
+	if !n.settings.relays() {
 		return 0
 	}
 	lease := min(time.Duration(leaseSeconds)*time.Second, n.Lease)
@@ -456,12 +445,12 @@ func (n *Node) request(to net.Addr, id uint32, packet []byte) ([]byte, error) {
 	return nil, fmt.Errorf("no reply from %s to operation %#x after %d tries", to, packet[1], n.MaxTries)
 }
 
-// Subscribe asks the node at address for have packets, in the background:
-// it tries until the node replies, then renews at half the lease, until
-// this node is closed. Only an address that does not resolve is an error.
-// A medium or super node adds address to its subscriptions.txt and
-// subscribes again after a restart. A second call for one node does
-// nothing.
+// Subscribe keeps a persistent subscription to the node at address, in
+// the background: it tries until the node replies, then renews at half the
+// lease, until this node is closed, and every have the node sends goes in
+// the have queue. Only an address that does not resolve is an error. The
+// node adds address to its subscriptions.txt and subscribes again after a
+// restart. A second call for one node does nothing.
 func (n *Node) Subscribe(address string) error { return n.startSubscription(address, false) }
 
 // startSubscription runs a subscription. A resumed one, from
@@ -492,6 +481,10 @@ func (n *Node) startSubscription(address string, resumed bool) error {
 			case err != nil:
 				n.logf("subscribe to %s: %v, trying again", address, err)
 			default:
+				if l == 0 {
+					n.logf("%s grants no subscription, it does not relay", address)
+					return
+				}
 				if lease == 0 {
 					n.logf("subscribed to %s for %d s", address, l)
 				}
@@ -624,15 +617,15 @@ func (n *Node) sendHave(to net.Addr, h Have) {
 	n.stats.HavesSent++
 }
 
-// announce sends a have for addr to every live subscriber, once per
-// program, which is what ends a flood.
-func (n *Node) announce(addr programblocks.Hash) {
+// relay sends a have for addr to every live subscriber, once per program
+// (D55), when the node relays.
+func (n *Node) relay(addr programblocks.Hash) {
 	n.mu.Lock()
-	if n.announced[addr] {
+	if n.relayed[addr] || !n.settings.relays() {
 		n.mu.Unlock()
 		return
 	}
-	n.announced[addr] = true
+	n.relayed[addr] = true
 	h := n.haveLocked(addr)
 	var to []net.Addr
 	now := time.Now()
@@ -649,7 +642,7 @@ func (n *Node) announce(addr programblocks.Hash) {
 	if expired {
 		n.saveSubscribersLater()
 	}
-	n.logf("announce %s to %d subscribers", addr, len(to))
+	n.logf("relay %s to %d subscribers", addr, len(to))
 	for _, a := range to {
 		go n.sendHave(a, h)
 	}
@@ -658,14 +651,11 @@ func (n *Node) announce(addr programblocks.Hash) {
 // size is the bytes a program of the have takes in a store.
 func (h Have) size() int64 { return int64(h.ManifestLength) + int64(h.PackLength) }
 
-// onHave records who announced a program and starts its download when the
-// node type keeps it: a thin node never, a medium node when it is pinned
-// or fits the budget, a super node when it fits the capacity.
+// onHave records who announced a program and puts the have in the have
+// queue. It never starts a download (#42).
 func (n *Node) onHave(h Have, from net.Addr) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	n.stats.HavesReceived++
-	n.heard[h.Address] = h
 	known := false
 	for _, a := range n.announcers[h.Address] {
 		known = known || a.String() == from.String()
@@ -673,39 +663,75 @@ func (n *Node) onHave(h Have, from net.Addr) {
 	if !known {
 		n.announcers[h.Address] = append(n.announcers[h.Address], from)
 	}
-	if n.seen[h.Address] {
+	n.mu.Unlock()
+	n.haves.push(QueuedHave{Have: h, From: from.String(), Received: time.Now()})
+}
+
+// Update reads every have in the queue, applies the node type's policy to
+// each, and returns them in arrival order so the program sees every one. A
+// medium node requests a program that is pinned or fits its budget, a super
+// node one that fits its capacity. A requested program is downloaded in the
+// background, held and relayed.
+func (n *Node) Update() []QueuedHave {
+	read := n.haves.Read()
+	for _, q := range read {
+		n.applyPolicy(q)
+	}
+	return read
+}
+
+// RunUpdates calls Update whenever haves wait, and seen with each have
+// read, until the node is closed.
+func (n *Node) RunUpdates(seen func(QueuedHave)) {
+	for {
+		select {
+		case <-n.closed:
+			return
+		case <-n.haves.Ready():
+		}
+		for _, q := range n.Update() {
+			if seen != nil {
+				seen(q)
+			}
+		}
+	}
+}
+
+func (n *Node) applyPolicy(q QueuedHave) {
+	h := q.Have
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.stats.HavesRead++
+	if n.requested[h.Address] || n.catalog.Holds(h.Address) {
 		n.stats.HavesDuplicate++
 		return
 	}
 	fits := n.settings.Budget == 0 || n.stats.StoredBytes+n.reservedBytes+h.size() <= n.settings.Budget
 	switch n.settings.Type {
-	case TypeThin:
-		n.stats.HavesIgnored++
-		return
 	case TypeMedium:
 		if !n.pins.pinned(h.Address, n.logf) && (n.settings.Budget == 0 || !fits) {
-			n.stats.HavesIgnored++
-			n.logf("have %s from %s, not pinned and no room in the budget for %d bytes", h.Address, from, h.size())
+			n.logf("have %s from %s read, not pinned and no room in the budget for %d bytes, not requested", h.Address, q.From, h.size())
 			return
 		}
 	case TypeSuper:
 		if !fits {
 			n.stats.HavesRefusedFull++
-			n.logf("storage full, not taking %s of %d bytes, %d of %d bytes held", h.Address, h.size(), n.stats.StoredBytes, n.settings.Budget)
+			n.logf("storage full, not requesting %s of %d bytes, %d of %d bytes held", h.Address, h.size(), n.stats.StoredBytes, n.settings.Budget)
 			return
 		}
 	}
-	n.seen[h.Address] = true
+	n.requested[h.Address] = true
 	n.reservedBytes += h.size()
-	n.logf("have %s from %s, %d manifest bytes, %d packing bytes", h.Address, from, h.ManifestLength, h.PackLength)
+	n.stats.Requests++
+	n.logf("have %s from %s read, requesting %d manifest bytes, %d packing bytes", h.Address, q.From, h.ManifestLength, h.PackLength)
 	go n.download(h)
 }
 
-// download fetches a program from the nodes that announced it, verifies
-// it, keeps it and announces it in turn. A program from an untrusted
-// signer, or one whose lengths differ from the have, is dropped for good.
-// A full disk drops the partial program. Any other failure lets a later
-// have start over.
+// download fetches a requested program from the nodes that announced it,
+// verifies it, keeps it and relays it. A program from an untrusted signer,
+// or one whose lengths differ from the have, is dropped for good. A full
+// disk drops the partial program. Any other failure lets a later have
+// request it again.
 func (n *Node) download(h Have) {
 	defer func() {
 		n.mu.Lock()
@@ -735,7 +761,7 @@ func (n *Node) download(h Have) {
 	}
 	n.mu.Lock()
 	n.stats.DownloadFailures++
-	delete(n.seen, h.Address)
+	delete(n.requested, h.Address)
 	n.mu.Unlock()
 }
 
@@ -747,7 +773,7 @@ func (n *Node) dropFull(addr programblocks.Hash) {
 	n.storeMu.Unlock()
 	n.mu.Lock()
 	n.stats.HavesRefusedFull++
-	delete(n.seen, addr)
+	delete(n.requested, addr)
 	n.mu.Unlock()
 	n.logf("storage full, dropped the partial %s: %v", addr, err)
 }
@@ -796,11 +822,10 @@ func (n *Node) fetchFrom(h Have, from net.Addr) (Held, []byte, error) {
 	return Held{Address: h.Address, Manifest: m, Files: files, Name: name, From: from.String(), Elapsed: time.Since(start)}, encoded, nil
 }
 
-// Fetch returns the program at addr, verified: from the store when it is
-// cached there, or else downloaded from the nodes given and then the ones
-// that announced it. A thin node keeps the program in its store for
-// itself only and neither serves nor announces it; a medium or super node
-// holds and announces it, pinned or not and over its budget or not.
+// Fetch requests the program at addr on demand and returns it verified:
+// from the store when it is cached there, or else downloaded from the nodes
+// given and then the ones that announced it. The node holds and relays
+// it, pinned or not and over its budget or not.
 func (n *Node) Fetch(addr programblocks.Hash, from ...string) (Held, error) {
 	n.storeMu.Lock()
 	row, err := n.store.FindRow(addr.String())
@@ -823,18 +848,14 @@ func (n *Node) Fetch(addr programblocks.Hash, from ...string) (Held, error) {
 	}
 	n.mu.Lock()
 	sources = append(sources, n.announcers[addr]...)
-	h, ok := n.heard[addr]
 	n.mu.Unlock()
-	if !ok {
-		h = Have{Address: addr}
-	}
 	if len(sources) == 0 {
 		return Held{}, fmt.Errorf("no node is known to hold %s", addr)
 	}
 	var last error
 	for attempt := range max(DownloadAttempts, len(sources)) {
 		from := sources[attempt%len(sources)]
-		p, encoded, err := n.fetchFrom(h, from)
+		p, encoded, err := n.fetchFrom(Have{Address: addr}, from)
 		if err == nil {
 			return p, n.keepFetched(p, encoded)
 		}
@@ -847,9 +868,9 @@ func (n *Node) Fetch(addr programblocks.Hash, from ...string) (Held, error) {
 	return Held{}, last
 }
 
-// keepFetched holds a fetched program on a medium or super node.
+// keepFetched holds a fetched program.
 func (n *Node) keepFetched(p Held, encoded []byte) error {
-	if !n.settings.Type.keeps() || n.Holds(p.Address) {
+	if n.Holds(p.Address) {
 		return nil
 	}
 	return n.hold(p, encoded)
@@ -862,13 +883,12 @@ func programName(files map[string][]byte, addr programblocks.Hash) string {
 	return addr.String()[:16]
 }
 
-// hold adds a verified program to the catalog, tells OnHeld and announces
-// it.
+// hold adds a verified program to the catalog, tells OnHeld and relays it.
 func (n *Node) hold(p Held, encoded []byte) error {
 	n.mu.Lock()
 	already := n.catalog.Holds(p.Address)
 	_, err := n.catalog.AddVerified(encoded, packFromFiles(p.Manifest, p.Files))
-	n.seen[p.Address] = true
+	n.requested[p.Address] = true
 	if err == nil && !already {
 		n.stats.StoredBytes += int64(len(encoded)) + int64(p.Manifest.PackLength)
 	}
@@ -880,7 +900,7 @@ func (n *Node) hold(p Held, encoded []byte) error {
 	if n.OnHeld != nil {
 		n.OnHeld(p)
 	}
-	n.announce(p.Address)
+	n.relay(p.Address)
 	return nil
 }
 
@@ -901,13 +921,10 @@ func (n *Node) setRow(addr programblocks.Hash, state string, length uint64, name
 	return n.store.WriteIndex(rows)
 }
 
-// Publish signs files as a new program with secret, keeps it, and floods
-// it to the subscribers. The signer must be one of the node's trusted keys.
-// A thin node does not publish, since it serves nothing.
+// Publish signs files as a new program with secret, keeps it, and
+// announces it to the subscribers. The signer must be one of the node's
+// trusted keys.
 func (n *Node) Publish(files map[string][]byte, secret cipher.SecKey, date time.Time) (programblocks.Hash, error) {
-	if !n.settings.Type.keeps() {
-		return programblocks.Hash{}, errors.New("a thin node does not publish")
-	}
 	m, pack, err := programblocks.Build(files, programblocks.DefaultBlockSize, date)
 	if err != nil {
 		return programblocks.Hash{}, err

@@ -1,8 +1,0 @@
-# Three programnetwork nodes run in the rig container, which the emulator
-# reaches as 10.0.2.2. Node 7010 publishes fib-and-primes, 7011 subscribes
-# to 7010 and 7012 to 7011, and the test starts once 7012 holds it. The app
-# runs a node, subscribes to 7012 and 7011, receives the program by flood,
-# downloads it once, verifies it and runs it.
-ready start app="Programs: receive by flood"
-flood-nodes 7010 3 publish cx playground test signer
-timeout 60

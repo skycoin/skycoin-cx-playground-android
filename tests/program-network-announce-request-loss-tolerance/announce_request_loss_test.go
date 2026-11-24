@@ -1,9 +1,9 @@
-// Package programnetworkfloodlosstolerance floods programs across eight
-// nodes whose sockets drop a share of every packet they read and send, and
-// send some packets twice. Subscribe, have and the downloads all retry, so
-// every node must still hold every program, verified, after downloading
-// each one exactly once.
-package programnetworkfloodlosstolerance
+// Package programnetworkannouncerequestlosstolerance announces programs
+// across eight nodes whose sockets drop a share of every packet they read
+// and send, and send some packets twice. Subscribe, have and the requested
+// downloads all retry, so every node must still hold every program,
+// verified, after requesting and downloading each one exactly once.
+package programnetworkannouncerequestlosstolerance
 
 import (
 	"fmt"
@@ -64,7 +64,7 @@ func (c *lossyConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	return c.PacketConn.WriteTo(b, addr)
 }
 
-func TestFloodSurvivesLoss(t *testing.T) {
+func TestAnnounceAndRequestSurvivesLoss(t *testing.T) {
 	pub, secret := cipher.MustGenerateDeterministicKeyPair([]byte("program network loss"))
 	var progs []map[string][]byte
 	for _, app := range []string{"benchmarks", "bench-fib"} {
@@ -93,6 +93,7 @@ func TestFloodSurvivesLoss(t *testing.T) {
 					t.Fatal(err)
 				}
 				go nodes[i].Run()
+				go nodes[i].RunUpdates(nil)
 				t.Cleanup(func() { nodes[i].Close() })
 			}
 			for i, n := range nodes {
@@ -131,8 +132,8 @@ func TestFloodSurvivesLoss(t *testing.T) {
 			var downloads, failures, haves, unacked, dropped, passed int
 			for i, n := range nodes {
 				s := n.Stats()
-				if i > 0 && s.Downloads != len(addrs) {
-					t.Errorf("node %d downloaded %d times for %d programs", i, s.Downloads, len(addrs))
+				if i > 0 && (s.Downloads != len(addrs) || s.Requests != len(addrs)) {
+					t.Errorf("node %d requested %d and downloaded %d times for %d programs", i, s.Requests, s.Downloads, len(addrs))
 				}
 				for _, a := range addrs {
 					if _, err := n.Store().Files(a); err != nil {

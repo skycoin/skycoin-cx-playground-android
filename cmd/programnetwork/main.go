@@ -1,12 +1,13 @@
-// Command programnetwork runs a node of the DHT prototype of #18 and
-// manages its peer list file, as described in "DHT prototype (#18)" in
-// docs/ProgramDistribution.md.
+// Command programnetwork runs a node of the DHT prototype of #18, gets one
+// program as a thin node, and manages its peer list file, as described in
+// "DHT prototype (#18)" in docs/ProgramDistribution.md.
 //
 //	programnetwork node [-addr :7010] [-store DIR] [-peers FILE] [-packet 1200] [-forms full]
 //	                    [-signer PUBKEY,...] [-subscribe HOST:PORT,...]
-//	                    [-publish DIR (-seed TEXT | -secret HEX)]
-//	                    [-config FILE] [-type thin|medium|super] [-budget BYTES]
-//	                    [-pins FILE] [-fetch HASH,...]
+//	                    [-publish DIR (-seed TEXT | -secret HEX) [-date RFC3339]]
+//	                    [-config FILE] [-type medium|super] [-budget BYTES]
+//	                    [-pins FILE] [-relay] [-fetch HASH,...]
+//	programnetwork get -signer PUBKEY [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE
 //	programnetwork getpeers HOST:PORT
 //	programnetwork pins [-file pins.txt] list
 //	programnetwork pins [-file pins.txt] add HASH-OR-PREFIX...
@@ -24,18 +25,24 @@
 //
 // A node downloads only programs signed by a -signer key or its own
 // publishing key. With -publish, every subdirectory of DIR is published as
-// a program and flooded to the subscribers. Classes are private,
+// a program and announced to the subscribers. Classes are private,
 // own-infrastructure, lan-group, user-shareable and public; scopes are
 // lan, internal and global.
 //
-// The node type, "Node types (#34)" in docs/ProgramDistribution.md, is
-// super by default. A thin node keeps nothing for others and fetches the
-// -fetch programs on demand. A medium node keeps the programs its -pins
-// file names and others within -budget. A super node keeps everything up
-// to -budget, 0 for no limit, and never evicts: `store remove` deletes a
-// program, and a running node keeps serving it until it restarts. -config
-// names a file of "type medium", "budget 1000000" and "pins pins.txt"
-// lines, which the flags override.
+// No have starts a download (#42). A node puts every have it receives in
+// its have queue, prints each one as it reads it, and its type's policy
+// requests what it keeps. The node type, "Node types (#34, #44)" in
+// docs/ProgramDistribution.md, is super by default. A thin node is the get
+// command: it connects to NODE, downloads ADDRESS (a whole address, or a
+// prefix with -forms short), verifies it and exits, with no subscription
+// and no state. A medium node keeps a subscription to its -subscribe
+// nodes, requests the programs its -pins file names and others within
+// -budget, and relays to its own subscribers only with -relay. A super node
+// requests everything up to -budget, 0 for no limit, never evicts, and
+// relays: `store remove` deletes a program, and a running node keeps
+// serving it until it restarts. -config names a file of "type medium",
+// "budget 1000000", "pins pins.txt" and "relay on" lines, which the flags
+// override.
 package main
 
 import (
@@ -63,6 +70,8 @@ func main() {
 	switch os.Args[1] {
 	case "node":
 		err = node(os.Args[2:])
+	case "get":
+		err = get(os.Args[2:])
 	case "getpeers":
 		err = getPeers(os.Args[2:])
 	case "peers":
@@ -81,7 +90,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: programnetwork node|getpeers|peers|pins|store, see go doc ./cmd/programnetwork")
+	fmt.Fprintln(os.Stderr, "usage: programnetwork node|get|getpeers|peers|pins|store, see go doc ./cmd/programnetwork")
 	os.Exit(2)
 }
 
@@ -107,15 +116,26 @@ func node(args []string) error {
 	publish := fl.String("publish", "", "directory of program directories to publish")
 	seed := fl.String("seed", "", "derive the publishing key from this seed (tests only when public)")
 	secretHex := fl.String("secret", "", "publishing secret key in hex")
-	configFile := fl.String("config", "", "file of type, budget and pins lines, overridden by the flags")
-	typeName := fl.String("type", string(programnetwork.TypeSuper), "node type: thin, medium or super")
+	configFile := fl.String("config", "", "file of type, budget, pins and relay lines, overridden by the flags")
+	typeName := fl.String("type", string(programnetwork.TypeSuper), "node type: medium or super; a thin node is the get command")
 	budget := fl.Int64("budget", 0, "bytes a medium node keeps besides its pins, or a super node's capacity, 0 for none")
 	pinsFile := fl.String("pins", "", "a medium node's pin list file, one hash or prefix per line")
-	fetch := fl.String("fetch", "", "comma separated manifest addresses to fetch on demand, from the -subscribe nodes")
+	fetch := fl.String("fetch", "", "comma separated manifest addresses to request on demand, from the -subscribe nodes")
+	relay := fl.Bool("relay", false, "a medium node accepts subscribers and relays the haves of what it holds; a super node always relays")
+	date := fl.String("date", "", "publish date in RFC 3339, now when empty")
 	fl.Parse(args)
-	settings, err := nodeSettings(fl, *configFile, *typeName, *budget, *pinsFile)
+	settings, err := nodeSettings(fl, *configFile, *typeName, *budget, *pinsFile, *relay)
 	if err != nil {
 		return err
+	}
+	if settings.Type == programnetwork.TypeThin {
+		return fmt.Errorf("a thin node connects, downloads and is done: use programnetwork get ADDRESS NODE")
+	}
+	publishDate := time.Now()
+	if *date != "" {
+		if publishDate, err = time.Parse(time.RFC3339, *date); err != nil {
+			return fmt.Errorf("-date: %v", err)
+		}
 	}
 	var trusted []cipher.PubKey
 	for _, s := range splitList(*signers) {
@@ -173,10 +193,13 @@ func node(args []string) error {
 		}
 		n.SetPeers(l)
 	}
-	fmt.Printf("node listening on %s, packet %d bytes, %d trusted signers, type %s, budget %d bytes, pins %q, %d bytes held\n",
-		conn.LocalAddr(), *packet, len(trusted), settings.Type, settings.Budget, settings.PinsFile, n.Stats().StoredBytes)
+	fmt.Printf("node listening on %s, packet %d bytes, forms %s, %d trusted signers, type %s, budget %d bytes, pins %q, relay %t, %d bytes held\n",
+		conn.LocalAddr(), *packet, n.Forms, len(trusted), settings.Type, settings.Budget, settings.PinsFile, settings.Relay, n.Stats().StoredBytes)
 	done := make(chan error, 1)
 	go func() { done <- n.Run() }()
+	go n.RunUpdates(func(q programnetwork.QueuedHave) {
+		n.Logf("have %s from %s, %d manifest bytes, %d packing bytes", q.Address, q.From, q.ManifestLength, q.PackLength)
+	})
 	for _, s := range splitList(*subscribe) {
 		if err := n.Subscribe(s); err != nil {
 			return fmt.Errorf("subscribe to %s: %v", s, err)
@@ -193,9 +216,6 @@ func node(args []string) error {
 		}
 		fmt.Printf("fetched %s %s, %d files, %d bytes\n", p.Name, p.Address, len(p.Files), p.Manifest.PackLength)
 	}
-	if *fetch != "" && settings.Type == programnetwork.TypeThin {
-		return n.Close()
-	}
 	if *publish != "" {
 		entries, err := os.ReadDir(*publish)
 		if err != nil {
@@ -209,7 +229,7 @@ func node(args []string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := n.Publish(files, secret, time.Now()); err != nil {
+			if _, err := n.Publish(files, secret, publishDate); err != nil {
 				return fmt.Errorf("publish %s: %v", e.Name(), err)
 			}
 		}
@@ -234,7 +254,7 @@ func getPeers(args []string) error {
 	if err != nil {
 		return err
 	}
-	n, err := programnetwork.NewTypedNode(conn, st, nil, programnetwork.Settings{Type: programnetwork.TypeThin})
+	n, err := programnetwork.NewTypedNode(conn, st, nil, programnetwork.Settings{Type: programnetwork.TypeMedium})
 	if err != nil {
 		return err
 	}
@@ -327,4 +347,48 @@ func peers(args []string) error {
 		return fmt.Errorf("unknown peers command %q, want one of %s", a[0], strings.Join(names, ", "))
 	}
 	return programnetwork.WritePeerList(*file, l)
+}
+
+// get is the thin node of #44: connect, download, verify, done.
+func get(args []string) error {
+	fl := flag.NewFlagSet("get", flag.ExitOnError)
+	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
+	formsName := fl.String("forms", "full", "request forms, full or short; an address prefix needs short")
+	signers := fl.String("signer", "", "comma separated public keys, hex, whose programs are accepted")
+	out := fl.String("out", "", "directory to write the program's files to")
+	fl.Parse(args)
+	if fl.NArg() != 2 || *signers == "" {
+		return fmt.Errorf("usage: programnetwork get -signer PUBKEY [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE")
+	}
+	o := programnetwork.GetOptions{PacketSize: *packet}
+	for _, s := range splitList(*signers) {
+		k, err := cipher.PubKeyFromHex(s)
+		if err != nil {
+			return fmt.Errorf("-signer %s: %v", s, err)
+		}
+		o.Trusted = append(o.Trusted, k)
+	}
+	var err error
+	if o.Forms, err = programblocks.ParseForms(*formsName); err != nil {
+		return err
+	}
+	p, stats, err := programnetwork.Get(fl.Arg(1), fl.Arg(0), o)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("got %s %s from %s in %d ms, %d files, %d bytes, verified, %d requests\n",
+		p.Name, p.Address, p.From, p.Elapsed.Milliseconds(), len(p.Files), p.Manifest.PackLength, stats.RequestsSent)
+	if *out == "" {
+		return nil
+	}
+	for path, b := range p.Files {
+		dst := filepath.Join(*out, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(dst, b, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }

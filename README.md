@@ -120,27 +120,32 @@ a stop. Validate shows the `programcheck` report, and run starts only a
 program the report allows, with the system libraries it allows. A `fetch`
 app shows the same report and refuses the same programs.
 
-### Programs by flood
+### Programs by announce and request
 
-`programnetwork` is the DHT prototype of #18. Nodes subscribe to each other,
-announce each program they hold with a have packet, and download and
-announce in turn what they lack, once per program, so a published program
-floods to every node. Each node keeps a peer list of groups and peers with
-sharing classes, and answers get peers with only the peers it may share.
-`cmd/programnetwork` runs a node and edits the peer list file.
+`programnetwork` is the DHT prototype of #18. Nodes subscribe to each other
+and announce each program they hold with a have packet. There is no flood:
+a node puts every have it receives in its have queue, reads every one, and
+requests only what its type keeps (#42). A super node requests everything
+and relays it once, a medium node its pins and what fits its budget, and a
+thin node is a one-shot get with no subscription (#44). Each node keeps a
+peer list of groups and peers with sharing classes, and answers get peers
+with only the peers it may share. `cmd/programnetwork` runs a node, gets a
+program and edits the peer list file.
 
 ```
 programnetwork node -addr :7010 -store DIR -publish PROGRAMS -seed "a test seed"
 programnetwork node -addr :7011 -store DIR -signer PUBKEY -subscribe HOST:7010
+programnetwork get -signer PUBKEY ADDRESS HOST:7010
 programnetwork peers -file peers.txt group-add lan1 lan moe moe home
 programnetwork peers -file peers.txt add 192.168.1.5:7010 lan1 lan-group
 programnetwork getpeers HOST:7010
 ```
 
-An app of kind `flood` runs a node on the phone: its `args` are the comma
-separated nodes to subscribe to, the trusted signer key and the name in the
-wanted program's `cxapp.json`. The app waits for the program to arrive by
-flood, verified block by block, then checks and runs it like a `fetch` app.
+An app of kind `subscribe` runs a node on the phone: its `args` are the
+comma separated nodes to subscribe to, the trusted signer key and the name
+in the wanted program's `cxapp.json`. It reads every have, requests the
+program, verified block by block, then checks and runs it like a `fetch`
+app. An app of kind `thin` gets one program by address from one node.
 
 ### Checking a program before it runs
 
@@ -257,7 +262,8 @@ the comparison. `suite -update-references` writes the captured regions to
 | `input untimed` | sends the `input.txt` events without timing them, for a screen of the app that is not a program canvas |
 | `echo-server <port>` | runs `net-echo-server` on that TCP and UDP port in the rig container, which the emulator reaches as 10.0.2.2 |
 | `program-server <port> <dir> <seed>` | runs `programblocks serve` on that UDP port in the rig container for the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>` |
-| `flood-nodes <port> <count> <dir> <seed>` | runs `count` `programnetwork` nodes on UDP ports `port` and up in the rig container: the first publishes the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>`, each other subscribes to the one before, and the app starts once the last node holds every program |
+| `program-nodes <port> <count> <dir> <seed>` | runs `count` `programnetwork` nodes on UDP ports `port` and up in the rig container: the first publishes the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>` and dated 2026-11-24, each other subscribes to the one before and requests what it reads in its have queue, and the app starts once the last node holds every program |
+| `program-node-type <type>` | the nodes' `-type`, `medium` or `super`, super by default |
 | `netem <args>` | `tc qdisc ... netem <args>` on the packets of that port in both directions, for example `delay 200ms loss 30%` |
 | `capture <file>` | `tcpdump` of the packets of that port, pulled as `<file>` for the `file-` checks |
 

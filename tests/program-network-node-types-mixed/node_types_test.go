@@ -1,13 +1,15 @@
-// Package programnetworknodetypesmixed floods programs through a network
-// of every node type and checks what each keeps: the super node holds all,
-// a medium node holds only its pinned program, another only what fits its
-// budget, a super node behind the pinned medium node gets only what that
-// node holds, and the thin node holds nothing yet fetches a program on
-// demand from the super node.
+// Package programnetworknodetypesmixed announces programs through a
+// network of medium and super nodes and checks what each requests and
+// keeps after reading every have from its queue: the super node holds all,
+// a medium node holds only its pinned program and relays it, another only
+// what fits its budget and relays nothing, a super node behind the pinned
+// medium node gets only what that node holds, and a thin get downloads a
+// program by address or prefix from the super node and keeps nothing.
 package programnetworknodetypesmixed
 
 import (
 	"bytes"
+	"errors"
 	"net"
 	"path/filepath"
 	"slices"
@@ -66,6 +68,7 @@ func startNode(t *testing.T, name string, trusted cipher.PubKey, settings progra
 	}
 	n.Logf = func(format string, args ...any) { t.Logf(name+": "+format, args...) }
 	go n.Run()
+	go n.RunUpdates(nil)
 	t.Cleanup(func() { n.Close() })
 	return n
 }
@@ -111,7 +114,7 @@ func TestMixedNodeTypes(t *testing.T) {
 	slices.Sort(sorted)
 	// The budget is the middle size: it fits either of the two smaller
 	// programs alone, never both and never the largest, so the budget node
-	// keeps exactly one, whichever arrives first.
+	// keeps exactly one, whichever it reads first.
 	budget := sorted[1]
 	if sorted[2] == budget {
 		t.Fatalf("program sizes %v: two share the largest size", sizes)
@@ -123,19 +126,18 @@ func TestMixedNodeTypes(t *testing.T) {
 
 	publisher := startNode(t, "publisher", pub, programnetwork.Settings{Type: programnetwork.TypeSuper})
 	super := startNode(t, "super", pub, programnetwork.Settings{Type: programnetwork.TypeSuper})
-	pinned := startNode(t, "pinned", pub, programnetwork.Settings{Type: programnetwork.TypeMedium, PinsFile: pinsFile})
+	pinned := startNode(t, "pinned", pub, programnetwork.Settings{Type: programnetwork.TypeMedium, PinsFile: pinsFile, Relay: true})
 	budgeted := startNode(t, "budgeted", pub, programnetwork.Settings{Type: programnetwork.TypeMedium, Budget: budget})
-	thin := startNode(t, "thin", pub, programnetwork.Settings{Type: programnetwork.TypeThin})
 	behindPinned := startNode(t, "behind-pinned", pub, programnetwork.Settings{Type: programnetwork.TypeSuper})
 	subscribe(t, super, publisher)
-	for _, n := range []*programnetwork.Node{pinned, budgeted, thin} {
+	for _, n := range []*programnetwork.Node{pinned, budgeted} {
 		subscribe(t, n, super)
 	}
 	subscribe(t, behindPinned, pinned)
-	// A node that subscribes to the thin node gets no lease.
-	subscribe(t, behindPinned, thin)
+	// A medium node without relay grants no lease.
+	subscribe(t, behindPinned, budgeted)
 	waitFor(t, "subscriptions", 5*time.Second, func() bool {
-		return publisher.Stats().Subscribers == 1 && super.Stats().Subscribers == 3 && pinned.Stats().Subscribers == 1
+		return publisher.Stats().Subscribers == 1 && super.Stats().Subscribers == 2 && pinned.Stats().Subscribers == 1
 	})
 
 	for i, files := range progs {
@@ -147,9 +149,9 @@ func TestMixedNodeTypes(t *testing.T) {
 			t.Fatalf("program %d published at %s, planned %s", i, addr, addrs[i])
 		}
 	}
-	waitFor(t, "the flood", 10*time.Second, func() bool {
+	waitFor(t, "the requests", 10*time.Second, func() bool {
 		return len(heldIndexes(super, addrs)) == 3 && len(heldIndexes(pinned, addrs)) == 1 &&
-			len(heldIndexes(budgeted, addrs)) == 1 && len(heldIndexes(behindPinned, addrs)) == 1 && len(thin.Known()) == 3
+			len(heldIndexes(budgeted, addrs)) == 1 && len(heldIndexes(behindPinned, addrs)) == 1
 	})
 	time.Sleep(500 * time.Millisecond)
 
@@ -162,48 +164,42 @@ func TestMixedNodeTypes(t *testing.T) {
 	if got := heldIndexes(behindPinned, addrs); !slices.Equal(got, []int{1}) {
 		t.Errorf("the super node behind the pinned medium holds %v, want [1], only what that node holds", got)
 	}
-	if s := budgeted.Stats(); len(heldIndexes(budgeted, addrs)) != 1 || s.StoredBytes > budget || s.HavesIgnored != 2 {
-		t.Errorf("budget medium holds %v, %d of %d bytes, %d haves ignored: %+v", heldIndexes(budgeted, addrs), s.StoredBytes, budget, s.HavesIgnored, s)
+	if s := budgeted.Stats(); len(heldIndexes(budgeted, addrs)) != 1 || s.StoredBytes > budget || s.HavesRead != 3 || s.Requests != 1 || s.Subscribers != 0 {
+		t.Errorf("budget medium holds %v, %d of %d bytes: %+v, want 3 haves read, 1 request, no subscriber", heldIndexes(budgeted, addrs), s.StoredBytes, budget, s)
 	}
-	if s := pinned.Stats(); s.HavesIgnored != 2 || s.Downloads != 1 {
-		t.Errorf("pinned medium: %+v, want 2 haves ignored and 1 download", s)
+	if s := pinned.Stats(); s.HavesRead != 3 || s.Requests != 1 || s.Downloads != 1 {
+		t.Errorf("pinned medium: %+v, want 3 haves read, 1 request and 1 download", s)
 	}
-	ts := thin.Stats()
-	if got := heldIndexes(thin, addrs); len(got) != 0 || ts.Downloads != 0 || ts.HavesIgnored != 3 || ts.Subscribers != 0 {
-		t.Errorf("thin holds %v: %+v, want nothing held, no download, 3 haves ignored, no subscriber", got, ts)
+	for name, n := range map[string]*programnetwork.Node{"super": super, "pinned": pinned, "budgeted": budgeted, "behind-pinned": behindPinned} {
+		if s := n.Stats(); s.HavesRead != s.HavesReceived {
+			t.Errorf("%s read %d of %d haves", name, s.HavesRead, s.HavesReceived)
+		}
 	}
-	t.Logf("program sizes %v, budget %d: super holds %v, pinned medium %v, budget medium %v (%d bytes), behind pinned %v, thin %v and knows %d",
+	t.Logf("program sizes %v, budget %d: super holds %v, pinned medium %v, budget medium %v (%d bytes), behind pinned %v",
 		sizes, budget, heldIndexes(super, addrs), heldIndexes(pinned, addrs), heldIndexes(budgeted, addrs), budgeted.Stats().StoredBytes,
-		heldIndexes(behindPinned, addrs), heldIndexes(thin, addrs), len(thin.Known()))
+		heldIndexes(behindPinned, addrs))
 
-	// The thin node fetches on demand from the super node that announced
-	// the program, keeps it for itself, and still neither holds nor serves.
+	// A thin get connects to the super node, downloads one program by
+	// address, verifies it and is done.
 	start := time.Now()
-	p, err := thin.Fetch(addrs[2])
+	p, stats, err := programnetwork.Get(super.Addr().String(), addrs[2].String(), programnetwork.GetOptions{Trusted: []cipher.PubKey{pub}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	sameFiles(t, p.Files, progs[2])
-	if thin.Holds(addrs[2]) || thin.Stats().Downloads != 1 || thin.Stats().HavesSent != 0 {
-		t.Errorf("thin after a fetch: holds %v, %+v", thin.Holds(addrs[2]), thin.Stats())
+	t.Logf("thin get of %s from %s in %d ms, %d requests", p.Name, p.From, time.Since(start).Milliseconds(), stats.RequestsSent)
+	prefix := addrs[0].String()[:16]
+	if _, _, err := programnetwork.Get(super.Addr().String(), prefix, programnetwork.GetOptions{Trusted: []cipher.PubKey{pub}}); err == nil {
+		t.Error("a prefix get in the full forms worked, want an error naming the forms flag")
 	}
-	t.Logf("thin fetched %s from %s in %d ms", p.Name, p.From, time.Since(start).Milliseconds())
-	again, err := thin.Fetch(addrs[2])
-	if err != nil || again.From != "" || thin.Stats().Downloads != 1 {
-		t.Errorf("a second fetch should read the thin node's own store: from %q, %+v, %v", again.From, thin.Stats(), err)
+	p, _, err = programnetwork.Get(super.Addr().String(), prefix, programnetwork.GetOptions{Trusted: []cipher.PubKey{pub}, Forms: programblocks.FormsShort})
+	if err != nil || p.Address != addrs[0] {
+		t.Fatalf("thin get by prefix %s: %v, got %s", prefix, err, p.Address)
 	}
-	conn, err := net.Dial("udp", thin.Addr().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	c := programblocks.NewClient(conn, pub)
-	c.MaxTries = 2
-	if _, _, err := c.FetchManifest(addrs[2]); err == nil {
-		t.Error("the thin node served a manifest")
-	}
-	if _, err := thin.Publish(progs[0], secret, publishDate); err == nil {
-		t.Error("the thin node published")
+	sameFiles(t, p.Files, progs[0])
+	other, _ := cipher.MustGenerateDeterministicKeyPair([]byte("another signer"))
+	if _, _, err := programnetwork.Get(super.Addr().String(), addrs[1].String(), programnetwork.GetOptions{Trusted: []cipher.PubKey{other}, MaxTries: 2}); !errors.Is(err, programblocks.ErrUntrusted) {
+		t.Errorf("thin get from an untrusted signer: %v", err)
 	}
 }
 

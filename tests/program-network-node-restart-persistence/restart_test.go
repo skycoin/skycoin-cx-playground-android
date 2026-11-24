@@ -50,6 +50,7 @@ func startNode(t *testing.T, name, dir, addr string, trusted cipher.PubKey, sett
 	}
 	n.Logf = func(format string, args ...any) { t.Logf(name+": "+format, args...) }
 	go n.Run()
+	go n.RunUpdates(nil)
 	t.Cleanup(func() { n.Close() })
 	return n
 }
@@ -110,7 +111,7 @@ func TestRestartKeepsProgramsAndSubscriptions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	waitFor(t, "first flood", 5*time.Second, func() bool {
+	waitFor(t, "first requests", 5*time.Second, func() bool {
 		return super.Holds(addrs[0]) && super.Holds(addrs[1]) && medium.Holds(addrs[0])
 	})
 	superBytes, mediumBytes := super.Stats().StoredBytes, medium.Stats().StoredBytes
@@ -146,7 +147,7 @@ func TestRestartKeepsProgramsAndSubscriptions(t *testing.T) {
 	if _, err := publisher.Publish(progs[2], secret, publishDate); err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, "flood after the restart", 5*time.Second, func() bool { return super.Holds(addrs[2]) && medium.Holds(addrs[2]) })
+	waitFor(t, "requests after the restart", 5*time.Second, func() bool { return super.Holds(addrs[2]) && medium.Holds(addrs[2]) })
 	if s := medium.Stats(); medium.Holds(addrs[1]) || s.Downloads != 1 {
 		t.Errorf("restarted medium: %+v, want one new download, the newly pinned program", s)
 	}

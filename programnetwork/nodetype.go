@@ -14,19 +14,20 @@ import (
 	"github.com/skycoin/skycoin-cx-playground-android/programstore"
 )
 
-// NodeType decides what a node downloads, keeps, announces and serves, see
-// "Node types (#34)" in docs/ProgramDistribution.md.
+// NodeType decides what a node requests, keeps and relays, see "Node types
+// (#34, #44)" in docs/ProgramDistribution.md.
 type NodeType string
 
 // The node types.
 const (
-	// TypeThin fetches what it needs on demand, keeps it only for itself,
-	// and never announces or serves a program.
+	// TypeThin connects, downloads one program, verifies it and is done,
+	// wget for the DHT. It is Get, not a running Node.
 	TypeThin NodeType = "thin"
-	// TypeMedium keeps the pinned programs and others within its budget,
-	// and serves and announces what it keeps.
+	// TypeMedium keeps a persistent subscription, requests the pinned
+	// programs and others within its budget, and relays when Relay is set.
 	TypeMedium NodeType = "medium"
-	// TypeSuper keeps every program it hears of until its storage is full.
+	// TypeSuper keeps a persistent subscription, requests and keeps every
+	// program it hears of until its storage is full, and relays.
 	TypeSuper NodeType = "super"
 )
 
@@ -39,9 +40,6 @@ func ParseNodeType(s string) (NodeType, error) {
 	return "", fmt.Errorf("node type %q, want thin, medium or super", s)
 }
 
-// keeps reports whether the type keeps programs for others.
-func (t NodeType) keeps() bool { return t != TypeThin }
-
 // Settings are the type settings of a node.
 type Settings struct {
 	Type NodeType
@@ -53,7 +51,13 @@ type Settings struct {
 	// PinsFile is a medium node's pin list file, read again whenever it
 	// changes, so `programnetwork pins add` takes effect at once.
 	PinsFile string
+	// Relay makes a medium node accept subscribers and relay the haves of
+	// the programs it holds to them (D55). A super node always relays.
+	Relay bool
 }
+
+// relays reports whether the node accepts subscribers and relays haves.
+func (s Settings) relays() bool { return s.Type == TypeSuper || s.Relay }
 
 // The pin length bounds in hex digits: 4 to 32 bytes, as the prefixes of
 // the short forms (D36).
@@ -185,12 +189,9 @@ func (n *Node) subscriberLinesLocked() []string {
 	return lines
 }
 
-// saveSubscribers writes subscribers.txt for a node that keeps programs.
+// saveSubscribers writes subscribers.txt.
 // Writes are serialized, and each writes the list as it is then.
 func (n *Node) saveSubscribers() {
-	if !n.settings.Type.keeps() {
-		return
-	}
 	n.persistMu.Lock()
 	defer n.persistMu.Unlock()
 	n.mu.Lock()
@@ -201,12 +202,8 @@ func (n *Node) saveSubscribers() {
 	}
 }
 
-// rememberSubscription adds address to subscriptions.txt for a node that
-// keeps programs.
+// rememberSubscription adds address to subscriptions.txt.
 func (n *Node) rememberSubscription(address string) error {
-	if !n.settings.Type.keeps() {
-		return nil
-	}
 	n.persistMu.Lock()
 	defer n.persistMu.Unlock()
 	lines, err := programstore.ReadLines(n.subscriptionsPath())

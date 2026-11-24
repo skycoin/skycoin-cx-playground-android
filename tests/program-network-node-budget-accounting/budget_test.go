@@ -1,7 +1,7 @@
 // Package programnetworknodebudgetaccounting checks how a medium node
 // counts its budget: the bytes it counts are the manifest and packing
-// bytes on disk, haves that arrive together cannot overcommit the budget
-// because a download reserves its bytes when it starts, a pinned program
+// bytes on disk, haves read together cannot overcommit the budget
+// because a request reserves its bytes when it is made, a pinned program
 // is kept past the budget (D38), and a restart counts the same bytes from
 // the store.
 package programnetworknodebudgetaccounting
@@ -49,6 +49,7 @@ func startNode(t *testing.T, name, dir string, trusted cipher.PubKey, settings p
 	}
 	n.Logf = func(format string, args ...any) { t.Logf(name+": "+format, args...) }
 	go n.Run()
+	go n.RunUpdates(nil)
 	t.Cleanup(func() { n.Close() })
 	return n
 }
@@ -123,7 +124,7 @@ func TestMediumBudgetAccounting(t *testing.T) {
 	waitFor(t, "every have", 10*time.Second, func() bool { return medium.Stats().HavesReceived == len(apps) })
 	waitFor(t, "downloads", 10*time.Second, func() bool {
 		s := medium.Stats()
-		return s.Downloads+s.HavesIgnored == len(apps)
+		return s.HavesRead == len(apps) && s.Downloads == s.Requests
 	})
 	time.Sleep(300 * time.Millisecond)
 	s := medium.Stats()
@@ -147,8 +148,8 @@ func TestMediumBudgetAccounting(t *testing.T) {
 	if s.StoredBytes != expect || diskBytes(t, mediumDir) != expect {
 		t.Errorf("counted %d bytes, %d on disk, held programs take %d", s.StoredBytes, diskBytes(t, mediumDir), expect)
 	}
-	t.Logf("sizes %v, budget %d: holds %d programs, %d bytes, %d unpinned within the budget, pinned %d over it, %d haves ignored",
-		sizes, budget, held, s.StoredBytes, unpinned, sizes[largest], s.HavesIgnored)
+	t.Logf("sizes %v, budget %d: holds %d programs, %d bytes, %d unpinned within the budget, pinned %d over it, %d of %d haves read requested",
+		sizes, budget, held, s.StoredBytes, unpinned, sizes[largest], s.Requests, s.HavesRead)
 
 	medium.Close()
 	restarted := startNode(t, "medium restarted", mediumDir, pub, settings)

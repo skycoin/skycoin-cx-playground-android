@@ -1,6 +1,5 @@
-This app holds no program. It runs a thin programnetwork node, which
-stores nothing for others and announces nothing. It subscribes to the
-node its args give, hears its haves, and fetches the program its args name
-on demand. It checks the signer key of its args and every block hash, then
-runs the program.
-See "Node types (#34)" in docs/ProgramDistribution.md.
+This app holds no program. It is a thin programnetwork node: it connects
+to the node its args give, downloads the program at the manifest address
+its args give, checks the signer key of its args and every block hash, and
+is done, with no subscription and nothing kept. Then it runs the program.
+See "Node types (#34, #44)" in docs/ProgramDistribution.md.

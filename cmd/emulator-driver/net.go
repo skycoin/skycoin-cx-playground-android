@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// ProgramNodesPublishDate dates the programs the program nodes publish.
+const ProgramNodesPublishDate = "2026-11-24T00:00:00Z"
+
 // The network settings of emulator.txt work in the rig container, which is
 // the emulator's host: the emulator reaches it as 10.0.2.2 through its user
 // mode network, and that traffic reaches the echo server over the
@@ -25,14 +28,16 @@ import (
 //	                     signed with the key derived from <seed>
 //	program-packet <bytes>
 //	                     the program server's largest packet, 1200 by default
-//	flood-nodes <port> <count> <dir> <seed>
+//	program-nodes <port> <count> <dir> <seed>
 //	                     runs count programnetwork nodes on UDP ports port, port+1
 //	                     and on: the first publishes the program directories
-//	                     under <dir> signed with the key from <seed>, each
-//	                     other subscribes to the one before, and the test
-//	                     starts once every node holds every program
-//	flood-type <type>    the flood nodes' -type, thin, medium or super, super by
-//	                     default (#34)
+//	                     under <dir> signed with the key from <seed>, dated
+//	                     ProgramNodesPublishDate so the addresses are fixed,
+//	                     each other subscribes to the one before and requests
+//	                     what it reads in its have queue, and the test starts
+//	                     once every node holds every program
+//	program-node-type <type>
+//	                     the nodes' -type, medium or super, super by default (#34)
 //	netem <args>         tc netem on the port's packets, e.g. delay 200ms loss 30%
 //	capture <file>       tcpdump of the port's packets, pulled as <file>
 type netSettings struct {
@@ -41,17 +46,17 @@ type netSettings struct {
 	programDir    string
 	programSeed   string
 	programPacket string
-	floodPort     int
-	floodCount    int
-	floodDir      string
-	floodSeed     string
-	floodType     string
+	nodesPort     int
+	nodesCount    int
+	nodesDir      string
+	nodesSeed     string
+	nodesType     string
 	netem         string
 	capture       string
 }
 
 func (n netSettings) used() bool {
-	return n.echoPort != "" || n.programPort != "" || n.floodPort != 0 || n.netem != "" || n.capture != ""
+	return n.echoPort != "" || n.programPort != "" || n.nodesPort != 0 || n.netem != "" || n.capture != ""
 }
 
 // dockerExec runs a command in the rig container.
@@ -98,11 +103,11 @@ func (s *session) netSetup(ctx context.Context, t testFolder, out string) (func(
 	if port == "" {
 		port = n.programPort
 	}
-	if port == "" && n.floodPort != 0 {
-		port = strconv.Itoa(n.floodPort)
+	if port == "" && n.nodesPort != 0 {
+		port = strconv.Itoa(n.nodesPort)
 	}
 	if port == "" {
-		return nil, errors.New("netem and capture need echo-server <port>, program-server or flood-nodes")
+		return nil, errors.New("netem and capture need echo-server <port>, program-server or program-nodes")
 	}
 	var undo []func() error
 	stop := func() (string, error) {
@@ -143,8 +148,8 @@ func (s *session) netSetup(ctx context.Context, t testFolder, out string) (func(
 			return nil, err
 		}
 	}
-	if n.floodPort != 0 {
-		if err := s.startFloodNodes(ctx, n, &undo); err != nil {
+	if n.nodesPort != 0 {
+		if err := s.startProgramNodes(ctx, n, &undo); err != nil {
 			stop()
 			return nil, err
 		}
@@ -238,17 +243,17 @@ func (s *session) startProgramServer(ctx context.Context, n netSettings, undo *[
 	return nil
 }
 
-// startFloodNodes copies programnetwork and the test's program directories
-// into the container and starts the flood nodes: the first publishes the
+// startProgramNodes copies programnetwork and the test's program directories
+// into the container and starts the program nodes: the first publishes the
 // programs, each other subscribes to the one before. It returns once every
 // node holds every program, and the nodes are stopped when the test's
 // network settings are undone.
-func (s *session) startFloodNodes(ctx context.Context, n netSettings, undo *[]func() error) error {
+func (s *session) startProgramNodes(ctx context.Context, n netSettings, undo *[]func() error) error {
 	bin, err := s.hostBinary(ctx, "programnetwork")
 	if err != nil {
 		return err
 	}
-	entries, err := os.ReadDir(n.floodDir)
+	entries, err := os.ReadDir(n.nodesDir)
 	if err != nil {
 		return err
 	}
@@ -258,27 +263,27 @@ func (s *session) startFloodNodes(ctx context.Context, n netSettings, undo *[]fu
 			programs++
 		}
 	}
-	base := fmt.Sprintf("/tmp/flood-%d", n.floodPort)
+	base := fmt.Sprintf("/tmp/nodes-%d", n.nodesPort)
 	if _, err := s.dockerExec(ctx, false, "rm", "-rf", base); err != nil {
 		return err
 	}
 	if _, err := s.dockerExec(ctx, false, "mkdir", "-p", base); err != nil {
 		return err
 	}
-	for _, c := range [][2]string{{bin, "/tmp/programnetwork"}, {n.floodDir, base + "/publish"}} {
+	for _, c := range [][2]string{{bin, "/tmp/programnetwork"}, {n.nodesDir, base + "/publish"}} {
 		if b, err := exec.CommandContext(ctx, "docker", "cp", c[0], s.rig.name+":"+c[1]).CombinedOutput(); err != nil {
 			return fmt.Errorf("docker cp %s: %v: %s", c[0], err, b)
 		}
 	}
-	for i := range n.floodCount {
-		port := n.floodPort + i
+	for i := range n.nodesCount {
+		port := n.nodesPort + i
 		node := fmt.Sprintf("%s/node%d", base, port)
-		args := fmt.Sprintf("-addr 0.0.0.0:%d -store %s -seed %s", port, node, shellQuote(n.floodSeed))
-		if n.floodType != "" {
-			args += " -type " + n.floodType
+		args := fmt.Sprintf("-addr 0.0.0.0:%d -store %s -seed %s", port, node, shellQuote(n.nodesSeed))
+		if n.nodesType != "" {
+			args += " -type " + n.nodesType
 		}
 		if i == 0 {
-			args += " -publish " + base + "/publish"
+			args += " -publish " + base + "/publish -date " + ProgramNodesPublishDate
 		} else {
 			args += fmt.Sprintf(" -subscribe 127.0.0.1:%d", port-1)
 		}
@@ -292,13 +297,13 @@ func (s *session) startFloodNodes(ctx context.Context, n netSettings, undo *[]fu
 		})
 		if err := s.waitContainer(ctx, "grep -q listening "+node+".log"); err != nil {
 			log, _ := s.dockerExec(ctx, false, "cat", node+".log")
-			return fmt.Errorf("flood node %d did not start: %v: %s", port, err, log)
+			return fmt.Errorf("program node %d did not start: %v: %s", port, err, log)
 		}
 	}
-	last := fmt.Sprintf("%s/node%d.log", base, n.floodPort+n.floodCount-1)
+	last := fmt.Sprintf("%s/node%d.log", base, n.nodesPort+n.nodesCount-1)
 	if err := s.waitContainer(ctx, fmt.Sprintf("test $(grep -c holding %s) -ge %d", last, programs)); err != nil {
 		log, _ := s.dockerExec(ctx, false, "sh", "-c", "cat "+base+"/*.log")
-		return fmt.Errorf("the flood did not reach the last node: %v: %s", err, log)
+		return fmt.Errorf("the programs did not reach the last node: %v: %s", err, log)
 	}
 	return nil
 }

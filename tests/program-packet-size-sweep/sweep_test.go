@@ -185,18 +185,19 @@ func (f *fixture) node(t *testing.T, size int, forms programblocks.Forms, tl *ta
 	n.PacketSize, n.Forms = size, forms
 	n.FirstTimeout, n.MaxTimeout, n.MaxTries = 250*time.Millisecond, 500*time.Millisecond, 3
 	go n.Run()
+	go n.RunUpdates(nil)
 	t.Cleanup(func() { n.Close() })
 	return n, pc.LocalAddr().String()
 }
 
-// floodResult is one flood of the reference program from one node to a
-// subscriber.
-type floodResult struct {
+// announceResult is one have of the reference program from one node to a
+// subscriber, and the subscriber's request and download.
+type announceResult struct {
 	tally *tally
 	held  bool
 }
 
-func (f *fixture) flood(t *testing.T, size int, forms programblocks.Forms) floodResult {
+func (f *fixture) announce(t *testing.T, size int, forms programblocks.Forms) announceResult {
 	tl := newTally()
 	publisher, publisherAddr := f.node(t, size, forms, tl)
 	subscriber, _ := f.node(t, size, forms, tl)
@@ -207,7 +208,7 @@ func (f *fixture) flood(t *testing.T, size int, forms programblocks.Forms) flood
 	}
 	for deadline := time.Now().Add(5 * time.Second); publisher.Stats().Subscribers == 0; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
-			return floodResult{tally: tl}
+			return announceResult{tally: tl}
 		}
 	}
 	if _, err := publisher.Publish(f.files, f.secret, date); err != nil {
@@ -216,14 +217,14 @@ func (f *fixture) flood(t *testing.T, size int, forms programblocks.Forms) flood
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		select {
 		case <-held:
-			return floodResult{tally: tl, held: true}
+			return announceResult{tally: tl, held: true}
 		default:
 		}
 		if publisher.Stats().HavesUnacknowledged > 0 {
-			return floodResult{tally: tl}
+			return announceResult{tally: tl}
 		}
 	}
-	return floodResult{tally: tl}
+	return announceResult{tally: tl}
 }
 
 // operation is one row of the table. floor is the smallest packet size its
@@ -248,9 +249,9 @@ func clientRun(forms programblocks.Forms, fetch func(*programblocks.Client, *fix
 
 var errNotHeld = errors.New("the subscriber did not get the program")
 
-func floodRun(forms programblocks.Forms, ops ...byte) func(*testing.T, *fixture, int) (int, int, error) {
+func announceRun(forms programblocks.Forms, ops ...byte) func(*testing.T, *fixture, int) (int, int, error) {
 	return func(t *testing.T, f *fixture, size int) (int, int, error) {
-		r := f.floodAt(t, size, forms)
+		r := f.announceAt(t, size, forms)
 		p, b := r.tally.total(ops...)
 		if len(ops) == 1 && ops[0] == byte(programnetwork.OperationSubscribe) && p >= 2 {
 			return p, b, nil
@@ -280,19 +281,19 @@ func peersRun(forms programblocks.Forms) func(*testing.T, *fixture, int) (int, i
 	}
 }
 
-type floodKey struct {
+type announceKey struct {
 	size  int
 	forms programblocks.Forms
 }
 
-var floods = map[floodKey]floodResult{}
+var announces = map[announceKey]announceResult{}
 
-func (f *fixture) floodAt(t *testing.T, size int, forms programblocks.Forms) floodResult {
-	if r, ok := floods[floodKey{size, forms}]; ok {
+func (f *fixture) announceAt(t *testing.T, size int, forms programblocks.Forms) announceResult {
+	if r, ok := announces[announceKey{size, forms}]; ok {
 		return r
 	}
-	r := f.flood(t, size, forms)
-	floods[floodKey{size, forms}] = r
+	r := f.announce(t, size, forms)
+	announces[announceKey{size, forms}] = r
 	return r
 }
 
@@ -321,10 +322,10 @@ var operations = []operation{
 	{"get block part 0x08", 16, "reply: header 6, block prefix 1+4, offset 2, length 2, one byte", clientRun(short, fetchBlocks)},
 	{"fetch program, forms=full", 560, "get blocks", clientRun(full, fetchProgram)},
 	{"fetch program, forms=short", 20, "get manifest by prefix", clientRun(short, fetchProgram)},
-	{"subscribe 0x11", 10, "request and reply: header 6, lease 4", floodRun(short, byte(programnetwork.OperationSubscribe))},
-	{"have 0x10", 50, "request: header 6, 32-byte address, lengths 4 and 8", floodRun(short, byte(programnetwork.OperationHave))},
-	{"flood one program, forms=full", 560, "get blocks", floodRun(full)},
-	{"flood one program, forms=short", 50, "the have", floodRun(short)},
+	{"subscribe 0x11", 10, "request and reply: header 6, lease 4", announceRun(short, byte(programnetwork.OperationSubscribe))},
+	{"have 0x10", 50, "request: header 6, 32-byte address, lengths 4 and 8", announceRun(short, byte(programnetwork.OperationHave))},
+	{"announce and request one program, forms=full", 560, "get blocks", announceRun(full)},
+	{"announce and request one program, forms=short", 50, "the have", announceRun(short)},
 	{"get peers 0x12, forms=full", 110, "reply 11 plus the longest peer entry, 99", peersRun(full)},
 	{"get peer part 0x13, forms=short", 13, "reply: header 6, total 2, index 2, length 1, offset 1, one byte", peersRun(short)},
 }

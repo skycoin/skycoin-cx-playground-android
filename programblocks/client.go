@@ -307,6 +307,16 @@ func (c *Client) FetchManifest(addr Hash) (*Manifest, []byte, error) {
 	return m, b, err
 }
 
+// FetchManifestByPrefix fetches the manifest whose address starts with the
+// first n bytes of prefix and returns it with its full address. Only get
+// manifest by prefix (0x06) takes a prefix, so it needs the short forms.
+func (c *Client) FetchManifestByPrefix(prefix Hash, n int) (*Manifest, []byte, Hash, error) {
+	if c.Forms != FormsShort {
+		return nil, nil, Hash{}, errors.New("a manifest address prefix needs the short forms, set the forms flag to short or give the whole address")
+	}
+	return c.fetchManifest(prefix, n)
+}
+
 // fetchManifest fetches the manifest whose address starts with the first
 // known bytes of addr and returns it with its full address.
 func (c *Client) fetchManifest(addr Hash, known int) (*Manifest, []byte, Hash, error) {
