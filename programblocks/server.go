@@ -131,6 +131,79 @@ func (c *Catalog) Addresses() []Hash {
 	return out
 }
 
+// errorReply is the code and text of an error reply.
+type errorReply struct {
+	code ErrorCode
+	text string
+}
+
+// findManifest returns the manifest whose address starts with the first n
+// bytes of addr. A prefix that matches two manifests is refused.
+func (c *Catalog) findManifest(addr Hash, n int) (catalogManifest, *errorReply) {
+	if n == len(addr) {
+		if cm, ok := c.manifests[addr]; ok {
+			return cm, nil
+		}
+	} else {
+		var found []catalogManifest
+		for a, cm := range c.manifests {
+			if a.HasPrefix(addr, n) {
+				found = append(found, cm)
+			}
+		}
+		if len(found) > 1 {
+			return catalogManifest{}, &errorReply{ErrorCodeAmbiguousPrefix, fmt.Sprintf("%d manifests start with %x", len(found), addr[:n])}
+		}
+		if len(found) == 1 {
+			return found[0], nil
+		}
+	}
+	return catalogManifest{}, &errorReply{ErrorCodeUnknownManifest, fmt.Sprintf("unknown manifest %x", addr[:n])}
+}
+
+// findBlock returns the bytes of the block whose hash starts with the
+// block prefix of req, in the manifest req names by prefix or, with no
+// manifest prefix, in any manifest. Blocks with the same hash hold the
+// same bytes, so only a prefix matching two different hashes is refused.
+func (c *Catalog) findBlock(req Request) ([]byte, *errorReply) {
+	search := c.manifests
+	if req.PrefixLength > 0 {
+		cm, e := c.findManifest(req.Address, req.PrefixLength)
+		if e != nil {
+			return nil, e
+		}
+		search = map[Hash]catalogManifest{{}: cm}
+	}
+	var block []byte
+	var blockHash Hash
+	for _, cm := range search {
+		for i, e := range cm.manifest.Blocks {
+			if !e.BlockHash.HasPrefix(req.BlockHash, req.BlockPrefixLength) {
+				continue
+			}
+			if block != nil && e.BlockHash != blockHash {
+				return nil, &errorReply{ErrorCodeAmbiguousPrefix, fmt.Sprintf("two blocks start with %x", req.BlockHash[:req.BlockPrefixLength])}
+			}
+			p := cm.manifest.Packing[i]
+			block, blockHash = cm.pack[p.PackOffset:p.PackOffset+uint64(p.BlockLength)], e.BlockHash
+		}
+	}
+	if block == nil {
+		return nil, &errorReply{ErrorCodeUnknownManifest, fmt.Sprintf("no block starts with %x", req.BlockHash[:req.BlockPrefixLength])}
+	}
+	return block, nil
+}
+
+// blockListBytes returns the encoded block list array of cm.
+func blockListBytes(cm catalogManifest) []byte {
+	for _, e := range cm.manifest.Arrays {
+		if e.Kind == ArrayKindBlockList {
+			return cm.encoded[e.Offset : e.Offset+e.Length]
+		}
+	}
+	return nil
+}
+
 // Reply answers one request packet. The reply never exceeds packetSize. It
 // returns nil for a packet too short to answer.
 func (c *Catalog) Reply(packet []byte, packetSize int) []byte {
@@ -148,43 +221,85 @@ func (c *Catalog) Reply(packet []byte, packetSize int) []byte {
 		}
 		return fail(ErrorCodeMalformedRequest, err.Error())
 	}
-	rep := Reply{Operation: req.Operation | ReplyFlag, RequestID: req.RequestID, Address: req.Address, Offset: req.Offset}
-	if req.Operation == OperationListManifests {
+	tooSmall := func(room int) []byte {
+		return fail(ErrorCodePacketTooSmall, fmt.Sprintf("reply holds %d bytes", room))
+	}
+	// part returns at most room bytes of b from req.Offset.
+	part := func(b []byte, room int) ([]byte, *errorReply) {
+		if req.Offset >= uint64(len(b)) {
+			return nil, &errorReply{ErrorCodeRangeOutside, fmt.Sprintf("offset %d past %d bytes", req.Offset, len(b))}
+		}
+		n := min(uint64(req.Length), uint64(len(b))-req.Offset, uint64(room))
+		return b[req.Offset : req.Offset+n], nil
+	}
+	rep := Reply{Operation: req.Operation | ReplyFlag, RequestID: req.RequestID, Address: req.Address, PrefixLength: req.PrefixLength, Offset: req.Offset}
+	switch req.Operation {
+	case OperationListManifests, OperationListManifestsPrefix:
 		rep.Address, rep.Total = c.ListAddress, uint32(len(c.manifests[c.ListAddress].encoded))
-	} else {
-		cm, ok := c.manifests[req.Address]
-		if !ok {
-			return fail(ErrorCodeUnknownManifest, "unknown manifest "+req.Address.String())
+	case OperationGetBlockPart:
+		room := MaxBlockPartPayload(packetSize, req.BlockPrefixLength)
+		if room < 1 {
+			return tooSmall(room)
+		}
+		block, e := c.findBlock(req)
+		if e == nil && len(block) > 0xFFFF {
+			e = &errorReply{ErrorCodeMalformedRequest, "block longer than a get block part can name"}
+		}
+		if e == nil {
+			rep.Payload, e = part(block, room)
+		}
+		if e != nil {
+			return fail(e.code, e.text)
+		}
+		rep.BlockHash, rep.BlockPrefixLength, rep.Total = req.BlockHash, req.BlockPrefixLength, uint32(len(block))
+	default:
+		cm, e := c.findManifest(req.Address, req.PrefixLength)
+		if e != nil {
+			return fail(e.code, e.text)
 		}
 		switch req.Operation {
-		case OperationGetManifest:
-			b := cm.encoded
-			if req.Offset >= uint64(len(b)) {
-				return fail(ErrorCodeRangeOutside, "offset past the manifest")
+		case OperationGetManifest, OperationGetManifestByPrefix, OperationGetBlockListBytes:
+			b, room := cm.encoded, MaxManifestPayload(packetSize)
+			if req.Operation != OperationGetManifest {
+				room = MaxByPrefixPayload(packetSize, req.PrefixLength)
 			}
-			n := min(uint64(req.Length), uint64(len(b))-req.Offset, uint64(MaxManifestPayload(packetSize)))
-			rep.Total, rep.Payload = uint32(len(b)), b[req.Offset:req.Offset+n]
+			if req.Operation == OperationGetBlockListBytes {
+				b = blockListBytes(cm)
+			}
+			if room < 1 {
+				return tooSmall(room)
+			}
+			if rep.Payload, e = part(b, room); e != nil {
+				return fail(e.code, e.text)
+			}
+			rep.Total = uint32(len(b))
 		case OperationGetBlockList:
 			blocks := cm.manifest.Blocks
 			if req.Offset < 1 || req.Offset > uint64(len(blocks)) {
 				return fail(ErrorCodeRangeOutside, "block ID outside the manifest")
 			}
-			n := min(uint64(req.Length), uint64(len(blocks))-req.Offset+1, uint64(MaxBlockListEntries(packetSize)))
+			room := MaxBlockListEntries(packetSize)
+			if room < 1 {
+				return tooSmall(packetSize - blockListReplyFixed)
+			}
+			n := min(uint64(req.Length), uint64(len(blocks))-req.Offset+1, uint64(room))
 			rep.Length = uint16(n)
 			for _, e := range blocks[req.Offset-1 : req.Offset-1+n] {
 				rep.Payload = EncodeBlockEntry(rep.Payload, e)
 			}
 		case OperationGetBlocks:
-			if req.Offset >= uint64(len(cm.pack)) {
-				return fail(ErrorCodeRangeOutside, "offset past the linear packing")
+			room := MaxBlocksPayload(packetSize)
+			if room < 1 {
+				return tooSmall(room)
 			}
-			n := min(uint64(req.Length), uint64(len(cm.pack))-req.Offset, uint64(MaxBlocksPayload(packetSize)))
-			rep.Payload = cm.pack[req.Offset : req.Offset+n]
+			if rep.Payload, e = part(cm.pack, room); e != nil {
+				return fail(e.code, e.text)
+			}
 		}
 	}
 	b, err := EncodeReply(rep, packetSize)
 	if err != nil {
-		return fail(ErrorCodeMalformedRequest, err.Error())
+		return fail(ErrorCodePacketTooSmall, err.Error())
 	}
 	return b
 }

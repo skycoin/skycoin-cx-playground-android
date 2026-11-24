@@ -18,16 +18,21 @@ const (
 	OperationHave      programblocks.Operation = 0x10
 	OperationSubscribe programblocks.Operation = 0x11
 	OperationGetPeers  programblocks.Operation = 0x12
+	// OperationGetPeerPart reads a range of one encoded peer entry, so a peer
+	// entry longer than a get peers reply can hold still arrives (#31).
+	OperationGetPeerPart programblocks.Operation = 0x13
 )
 
 // The packet lengths, header included.
 const (
-	haveRequestLength      = programblocks.PacketHeaderLength + 32 + 4 + 8
-	haveReplyLength        = programblocks.PacketHeaderLength + 32
-	subscribeRequestLength = programblocks.PacketHeaderLength + 4
-	subscribeReplyLength   = programblocks.PacketHeaderLength + 4
-	getPeersRequestLength  = programblocks.PacketHeaderLength + 2
-	getPeersReplyFixed     = programblocks.PacketHeaderLength + 2 + 2 + 1
+	haveRequestLength        = programblocks.PacketHeaderLength + 32 + 4 + 8
+	haveReplyLength          = programblocks.PacketHeaderLength + 32
+	subscribeRequestLength   = programblocks.PacketHeaderLength + 4
+	subscribeReplyLength     = programblocks.PacketHeaderLength + 4
+	getPeersRequestLength    = programblocks.PacketHeaderLength + 2
+	getPeersReplyFixed       = programblocks.PacketHeaderLength + 2 + 2 + 1
+	getPeerPartRequestLength = programblocks.PacketHeaderLength + 2 + 1
+	getPeerPartReplyFixed    = programblocks.PacketHeaderLength + 2 + 2 + 1 + 1
 )
 
 // The limits of a peer entry in a get peers reply.
@@ -163,16 +168,14 @@ func EncodeGetPeersReply(id uint32, total, first uint16, entries []PeerEntry, pa
 	b = append(b, 0)
 	n := 0
 	for _, e := range entries {
-		if len(e.Address) == 0 || len(e.Address) > MaxAddressLength || len(e.Group) > MaxGroupNameLength {
-			return nil, 0, fmt.Errorf("peer entry %q in group %q is too long", e.Address, e.Group)
+		eb, err := EncodePeerEntry(e)
+		if err != nil {
+			return nil, 0, err
 		}
-		if len(b)+peerEntryFixed+len(e.Address)+len(e.Group) > packetSize || n == 255 {
+		if len(b)+len(eb) > packetSize || n == 255 {
 			break
 		}
-		b = append(b, byte(e.Scope), byte(len(e.Address)))
-		b = append(b, e.Address...)
-		b = append(b, byte(len(e.Group)))
-		b = append(b, e.Group...)
+		b = append(b, eb...)
 		n++
 	}
 	b[getPeersReplyFixed-1] = byte(n)
@@ -211,4 +214,83 @@ func DecodeGetPeersReply(b []byte) (GetPeersReply, error) {
 		return r, bad
 	}
 	return r, nil
+}
+
+// EncodePeerEntry returns the bytes of one peer entry as a get peers reply
+// carries it.
+func EncodePeerEntry(e PeerEntry) ([]byte, error) {
+	if len(e.Address) == 0 || len(e.Address) > MaxAddressLength || len(e.Group) > MaxGroupNameLength {
+		return nil, fmt.Errorf("peer entry %q in group %q is too long", e.Address, e.Group)
+	}
+	b := append(make([]byte, 0, peerEntryFixed+len(e.Address)+len(e.Group)), byte(e.Scope), byte(len(e.Address)))
+	b = append(b, e.Address...)
+	b = append(b, byte(len(e.Group)))
+	return append(b, e.Group...), nil
+}
+
+// DecodePeerEntry parses the bytes of exactly one peer entry.
+func DecodePeerEntry(b []byte) (PeerEntry, error) {
+	bad := fmt.Errorf("%w: peer entry of %d bytes", programblocks.ErrPacket, len(b))
+	if len(b) < peerEntryFixed {
+		return PeerEntry{}, bad
+	}
+	n := int(b[1])
+	if len(b) < 2+n+1 || len(b) != 2+n+1+int(b[2+n]) {
+		return PeerEntry{}, bad
+	}
+	return PeerEntry{Scope: AddressScope(b[0]), Address: string(b[2 : 2+n]), Group: string(b[3+n:])}, nil
+}
+
+// PeerPart is a get peer part reply: Data is the range from Offset of the
+// encoded entry at Index, which is EntryLength bytes long. EntryLength 0
+// means Index is past the Total peers shared with the asker.
+type PeerPart struct {
+	Total       uint16
+	Index       uint16
+	EntryLength int
+	Offset      int
+	Data        []byte
+}
+
+// EncodeGetPeerPart asks for the encoded peer entry at index from offset on.
+func EncodeGetPeerPart(id uint32, index uint16, offset int) []byte {
+	b := binary.BigEndian.AppendUint16(header(OperationGetPeerPart, id, getPeerPartRequestLength), index)
+	return append(b, byte(offset))
+}
+
+// DecodeGetPeerPart parses a get peer part request.
+func DecodeGetPeerPart(b []byte) (uint16, int, error) {
+	if len(b) != getPeerPartRequestLength {
+		return 0, 0, malformed(OperationGetPeerPart, len(b))
+	}
+	return binary.BigEndian.Uint16(b[6:]), int(b[8]), nil
+}
+
+// EncodeGetPeerPartReply returns as much of entry from offset as fits in
+// packetSize. A nil entry answers an index past total.
+func EncodeGetPeerPartReply(id uint32, total, index uint16, entry []byte, offset, packetSize int) ([]byte, error) {
+	if offset > len(entry) || (len(entry) > 0 && offset == len(entry)) {
+		return nil, fmt.Errorf("offset %d past a peer entry of %d bytes", offset, len(entry))
+	}
+	room := packetSize - getPeerPartReplyFixed
+	if room < 1 {
+		return nil, fmt.Errorf("%w: a get peer part reply needs %d bytes", programblocks.ErrPacketTooSmall, getPeerPartReplyFixed+1)
+	}
+	b := header(OperationGetPeerPart|programblocks.ReplyFlag, id, packetSize)
+	b = binary.BigEndian.AppendUint16(b, total)
+	b = binary.BigEndian.AppendUint16(b, index)
+	b = append(b, byte(len(entry)), byte(offset))
+	return append(b, entry[offset:offset+min(room, len(entry)-offset)]...), nil
+}
+
+// DecodeGetPeerPartReply parses a get peer part reply.
+func DecodeGetPeerPartReply(b []byte) (PeerPart, error) {
+	if len(b) < getPeerPartReplyFixed {
+		return PeerPart{}, malformed(OperationGetPeerPart|programblocks.ReplyFlag, len(b))
+	}
+	p := PeerPart{Total: binary.BigEndian.Uint16(b[6:]), Index: binary.BigEndian.Uint16(b[8:]), EntryLength: int(b[10]), Offset: int(b[11]), Data: b[getPeerPartReplyFixed:]}
+	if p.Offset+len(p.Data) > p.EntryLength || (p.EntryLength > 0 && len(p.Data) == 0) {
+		return p, malformed(OperationGetPeerPart|programblocks.ReplyFlag, len(b))
+	}
+	return p, nil
 }

@@ -77,11 +77,7 @@ func (s *Store) Sync(c *programblocks.Client) ([]Row, error) {
 		return nil, fmt.Errorf("no trusted signer in %s", s.TrustedPath())
 	}
 	c.TrustedSigners = trusted
-	listAddr, _, err := c.ListManifests()
-	if err != nil {
-		return nil, err
-	}
-	list, encoded, err := c.FetchManifest(listAddr)
+	list, encoded, listAddr, err := c.FetchManifestList()
 	if err != nil {
 		return nil, fmt.Errorf("manifest list: %w", err)
 	}

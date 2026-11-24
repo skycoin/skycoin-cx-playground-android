@@ -80,7 +80,7 @@ func node(args []string) error {
 	addr := fl.String("addr", ":7010", "UDP address to listen on")
 	storeDir := fl.String("store", "programnetwork-store", "store directory of the programs this node holds")
 	peersFile := fl.String("peers", "", "peer list file that get peers answers from")
-	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 or 1024")
+	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
 	signers := fl.String("signer", "", "comma separated public keys, hex, whose programs the node downloads")
 	subscribe := fl.String("subscribe", "", "comma separated nodes to subscribe to")
 	publish := fl.String("publish", "", "directory of program directories to publish")

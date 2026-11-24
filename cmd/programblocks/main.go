@@ -85,7 +85,7 @@ func signer(args []string) error {
 func serve(args []string) error {
 	fl := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fl.String("addr", ":7002", "UDP address to listen on")
-	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 or 1024")
+	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
 	secret := secretFlags(fl)
 	fl.Parse(args)
 	if fl.NArg() != 1 {
@@ -112,7 +112,7 @@ func serve(args []string) error {
 func fetch(cmd string, args []string) error {
 	fl := flag.NewFlagSet(cmd, flag.ExitOnError)
 	addr := fl.String("addr", "127.0.0.1:7002", "server UDP address")
-	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 or 1024")
+	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
 	signerHex := fl.String("signer", "", "public key of the trusted signer, hex")
 	out := fl.String("out", "", "directory to write the program's files to")
 	text := fl.Bool("text", false, "print the program manifest in text form")
@@ -133,11 +133,7 @@ func fetch(cmd string, args []string) error {
 	c.PacketSize = *packet
 	start := time.Now()
 	if cmd == "list" {
-		listAddr, _, err := c.ListManifests()
-		if err != nil {
-			return err
-		}
-		list, _, err := c.FetchManifest(listAddr)
+		list, _, _, err := c.FetchManifestList()
 		if err != nil {
 			return err
 		}

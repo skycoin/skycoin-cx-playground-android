@@ -11,6 +11,7 @@ type Assembly struct {
 	pack     []byte
 	received []bool // per block, in block ID order
 	missing  int
+	parts    map[int][]bool // bytes held of blocks fetched in parts
 	// BlockStored, when set, is called with each new block after its hash
 	// matched, before it counts as received, so a store can write it out.
 	BlockStored func(packOffset uint64, block []byte) error
@@ -102,4 +103,87 @@ func (a *Assembly) Files() (map[string][]byte, error) {
 		files[f.Path] = b
 	}
 	return files, nil
+}
+
+// BlockPart is a range inside one block: Index is the block's position in
+// the manifest (block ID minus 1) and Offset counts from the block start.
+type BlockPart struct {
+	Index  int
+	Offset uint64
+	Length uint64
+}
+
+// MissingParts returns the parts of the missing blocks still to fetch, each
+// at most partLength bytes, skipping the bytes AcceptPart already holds.
+func (a *Assembly) MissingParts(partLength int) []BlockPart {
+	var out []BlockPart
+	for i, p := range a.manifest.Packing {
+		if a.received[i] {
+			continue
+		}
+		filled := a.parts[i]
+		for off := uint64(0); off < uint64(p.BlockLength); off += uint64(partLength) {
+			n := min(uint64(partLength), uint64(p.BlockLength)-off)
+			if filled != nil && allTrue(filled[off:off+n]) {
+				continue
+			}
+			out = append(out, BlockPart{Index: i, Offset: off, Length: n})
+		}
+	}
+	return out
+}
+
+// AcceptPart stores data at offset off inside the block at index i. When
+// the block is whole it checks the block's hash and stores the block as
+// Accept does, and reports true. A block that fails its hash is dropped,
+// so its parts are fetched again, and ErrBlockHash is returned.
+func (a *Assembly) AcceptPart(i int, off uint64, data []byte) (bool, error) {
+	m := a.manifest
+	if i < 0 || i >= len(m.Packing) {
+		return false, fmt.Errorf("block index %d outside the manifest", i)
+	}
+	p := m.Packing[i]
+	if off+uint64(len(data)) > uint64(p.BlockLength) {
+		return false, fmt.Errorf("part %d+%d outside block %d of %d bytes", off, len(data), p.BlockID, p.BlockLength)
+	}
+	if a.received[i] {
+		return false, nil
+	}
+	if a.parts == nil {
+		a.parts = map[int][]bool{}
+	}
+	filled := a.parts[i]
+	if filled == nil {
+		filled = make([]bool, p.BlockLength)
+		a.parts[i] = filled
+	}
+	copy(a.pack[p.PackOffset+off:], data)
+	for k := range data {
+		filled[off+uint64(k)] = true
+	}
+	if !allTrue(filled) {
+		return false, nil
+	}
+	delete(a.parts, i)
+	block := a.pack[p.PackOffset : p.PackOffset+uint64(p.BlockLength)]
+	if Sum(block) != m.Blocks[i].BlockHash {
+		return false, fmt.Errorf("%w: block %d at offset %d", ErrBlockHash, p.BlockID, p.PackOffset)
+	}
+	if a.BlockStored != nil {
+		if err := a.BlockStored(p.PackOffset, block); err != nil {
+			return false, err
+		}
+	}
+	a.received[i] = true
+	a.missing--
+	return true, nil
+}
+
+// largestBlock returns the length of the longest block.
+func (a *Assembly) largestBlock() int {
+	n := 0
+	for _, p := range a.manifest.Packing {
+		n = max(n, int(p.BlockLength))
+	}
+	return n
 }

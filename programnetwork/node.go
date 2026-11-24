@@ -31,6 +31,9 @@ var ErrClosed = errors.New("node closed")
 type Node struct {
 	// PacketSize bounds every packet the node sends, 1200 by default.
 	PacketSize int
+	// Forms selects the request forms of the node's downloads and get
+	// peers, as in programblocks.Client.
+	Forms programblocks.Forms
 	// Lease is the longest subscription the node grants.
 	Lease time.Duration
 	// Logf, when set, receives one line per event.
@@ -235,18 +238,32 @@ func (n *Node) handle(b []byte, from net.Addr) {
 			fail(err)
 			return
 		}
-		var shared []PeerEntry
-		n.mu.Lock()
-		peers := n.peers
-		n.mu.Unlock()
-		if peers != nil {
-			shared = peers.SharedWith(from.String())
-		}
+		shared := n.sharedWith(from)
 		var page []PeerEntry
 		if int(first) < len(shared) {
 			page = shared[first:]
 		}
 		r, _, err := EncodeGetPeersReply(id, uint16(len(shared)), first, page, n.PacketSize)
+		if err != nil {
+			fail(err)
+			return
+		}
+		n.send(r, from)
+	case op == OperationGetPeerPart:
+		index, offset, err := DecodeGetPeerPart(b)
+		if err != nil {
+			fail(err)
+			return
+		}
+		shared := n.sharedWith(from)
+		var entry []byte
+		if int(index) < len(shared) {
+			if entry, err = EncodePeerEntry(shared[index]); err != nil {
+				fail(err)
+				return
+			}
+		}
+		r, err := EncodeGetPeerPartReply(id, uint16(len(shared)), index, entry, offset, n.PacketSize)
 		if err != nil {
 			fail(err)
 			return
@@ -398,24 +415,82 @@ func (n *Node) GetPeers(address string) ([]PeerEntry, error) {
 		return nil, err
 	}
 	var all []PeerEntry
-	for {
-		id := n.newRequestID()
-		b, err := n.request(to, id, EncodeGetPeers(id, uint16(len(all))))
+	total := -1
+	for total < 0 || len(all) < total {
+		if n.Forms != programblocks.FormsShort {
+			id := n.newRequestID()
+			b, err := n.request(to, id, EncodeGetPeers(id, uint16(len(all))))
+			if err != nil {
+				return nil, err
+			}
+			r, err := DecodeGetPeersReply(b)
+			if err != nil {
+				return nil, err
+			}
+			if int(r.First) != len(all) {
+				return nil, fmt.Errorf("%w: get peers page at %d, asked %d", programblocks.ErrPacket, r.First, len(all))
+			}
+			total = int(r.Total)
+			all = append(all, r.Entries...)
+			if len(r.Entries) > 0 || len(all) >= total {
+				continue
+			}
+			if n.Forms == programblocks.FormsFull {
+				return all, fmt.Errorf("%w: peer %d does not fit a get peers reply", programblocks.ErrPacketTooSmall, len(all))
+			}
+		}
+		e, t, err := n.getPeerByParts(to, uint16(len(all)))
 		if err != nil {
-			return nil, err
+			return all, err
 		}
-		r, err := DecodeGetPeersReply(b)
-		if err != nil {
-			return nil, err
-		}
-		if int(r.First) != len(all) {
-			return nil, fmt.Errorf("%w: get peers page at %d, asked %d", programblocks.ErrPacket, r.First, len(all))
-		}
-		all = append(all, r.Entries...)
-		if len(all) >= int(r.Total) || len(r.Entries) == 0 {
-			return all, nil
+		if total = t; e != nil {
+			all = append(all, *e)
 		}
 	}
+	return all, nil
+}
+
+// getPeerByParts reads the peer entry at index with get peer part, a range
+// at a time. It returns nil and the total when index is past the total.
+func (n *Node) getPeerByParts(to net.Addr, index uint16) (*PeerEntry, int, error) {
+	var entry []byte
+	for offset := 0; entry == nil || offset < len(entry); {
+		id := n.newRequestID()
+		b, err := n.request(to, id, EncodeGetPeerPart(id, index, offset))
+		if err != nil {
+			return nil, 0, err
+		}
+		p, err := DecodeGetPeerPartReply(b)
+		if err != nil {
+			return nil, 0, err
+		}
+		if p.Index != index || p.Offset != offset || (entry != nil && p.EntryLength != len(entry)) {
+			return nil, 0, fmt.Errorf("%w: get peer part of entry %d at %d, asked %d at %d", programblocks.ErrPacket, p.Index, p.Offset, index, offset)
+		}
+		if p.EntryLength == 0 {
+			return nil, int(p.Total), nil
+		}
+		if entry == nil {
+			entry = make([]byte, p.EntryLength)
+		}
+		offset += copy(entry[offset:], p.Data)
+		if offset == len(entry) {
+			e, err := DecodePeerEntry(entry)
+			return &e, int(p.Total), err
+		}
+	}
+	return nil, 0, nil
+}
+
+// sharedWith returns the peers this node shares with the asker at from.
+func (n *Node) sharedWith(from net.Addr) []PeerEntry {
+	n.mu.Lock()
+	peers := n.peers
+	n.mu.Unlock()
+	if peers == nil {
+		return nil
+	}
+	return peers.SharedWith(from.String())
 }
 
 // sendHave announces h to one subscriber and waits for the acknowledgement.
@@ -515,6 +590,7 @@ func (n *Node) fetchFrom(h Have, from net.Addr) error {
 	defer conn.Close()
 	c := programblocks.NewClient(conn, n.trusted...)
 	c.PacketSize, c.FirstTimeout, c.MaxTimeout, c.MaxTries = n.PacketSize, n.FirstTimeout, n.MaxTimeout, n.MaxTries
+	c.Forms = n.Forms
 	m, encoded, err := c.FetchManifest(h.Address)
 	if err != nil {
 		return err
