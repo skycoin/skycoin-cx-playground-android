@@ -1,0 +1,10 @@
+package main
+
+import "sys/tcp"
+
+func main() {
+	var err str
+	err = tcp.Dial("tcp", "127.0.0.1:47115")
+	printf("%s\n", err)
+	tcp.Close()
+}

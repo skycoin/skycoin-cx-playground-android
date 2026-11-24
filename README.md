@@ -108,6 +108,28 @@ programblocks list -addr HOST:7002 -signer PUBKEY
 programblocks fetch -addr HOST:7002 -signer PUBKEY -out OUT -text PROGRAM
 ```
 
+### Checking a program before it runs
+
+`programcheck` reads a CX program without running it, compiled from source
+or loaded from its serialized form. It lists the system library calls
+(file, net, process), the `app.NetDial` networks (udp, tcp, or unknown when
+the name is not a constant), the imports, the opcode sets (core, app from
+opcode 4096, library) and IR problems such as a call of a missing function.
+A policy says what is allowed. `PolicyFetched`, for programs from the
+network, blocks the `os` and `tcp` imports and every system library, and
+`PolicyBundled` allows everything. The report is one monospaced line per
+check:
+
+```
+file system no
+networking yes, udp yes, tcp no
+process no
+imports app string time
+blocked imports none
+sandbox violations none
+verdict run
+```
+
 ## The `app` package for CX
 
 Programs draw a display list that the host renders with Gio's GPU renderer
@@ -250,6 +272,11 @@ suite at once with that many runs.
 | `net-udp-delay-loss` | the same program with 200 ms delay and 30% loss each way, reports both, and the capture holds its datagrams |
 | `cx-forms-same-output` (go) | the bundled apps of each form print the expected files on the host |
 | `net-echo-on-host` (go) | the network programs against `netecho` on the host |
+| `program-validation-library-calls` (go) | one program per system library is reported with its call, allowed when bundled and refused when fetched |
+| `program-validation-network-udp` (go) | the UDP echo app reports udp, the TCP echo app tcp, a network from the arguments unknown |
+| `program-validation-blocked-import` (go) | a fetched program importing `os` is refused |
+| `program-validation-opcode-sets` (go) | an app opcode in a core-only program fails, and the serialized form checks the same as the source |
+| `program-validation-report-text` (go) | the report text of two programs matches the expected lines |
 
 ## Benchmark suite
 

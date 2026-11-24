@@ -1,0 +1,14 @@
+form source, 1 functions, 2 operations
+file system yes
+networking no
+process no
+library calls file os.ReadAllText
+imports os
+blocked imports os
+opcode sets core 1, library 1
+ir checks ok
+sandbox violations 3
+  import os is blocked
+  opcode set library is not allowed (1 operations)
+  library file is not allowed
+verdict refused

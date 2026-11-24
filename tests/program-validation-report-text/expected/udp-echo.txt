@@ -1,0 +1,11 @@
+form source, 1 functions, 55 operations
+file system no
+networking yes, udp yes, tcp no
+process no
+library calls none
+imports app string time
+blocked imports none
+opcode sets core 51, app 4
+ir checks ok
+sandbox violations none
+verdict run

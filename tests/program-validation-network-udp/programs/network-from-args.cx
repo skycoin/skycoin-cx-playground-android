@@ -1,0 +1,9 @@
+package main
+
+import "sys/os"
+import "sys/app"
+
+func main() { global os.Args
+	conn, err := app.NetDial(os.Args[1], "10.0.2.2:7001")
+	printf("%d %s\n", conn, err)
+}

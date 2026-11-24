@@ -1,0 +1,8 @@
+package main
+
+import "sys/os"
+
+func main() {
+	text, found := os.ReadAllText("notes.txt")
+	printf("%s %v\n", text, found)
+}

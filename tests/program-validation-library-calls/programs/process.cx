@@ -1,0 +1,8 @@
+package main
+
+import "sys/os"
+
+func main() {
+	runError, exitCode, output := os.Run("ls", 0, 1000, ".")
+	printf("%d %d %s\n", runError, exitCode, output)
+}

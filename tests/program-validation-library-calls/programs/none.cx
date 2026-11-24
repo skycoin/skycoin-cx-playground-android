@@ -1,0 +1,5 @@
+package main
+
+func main() {
+	printf("%d\n", 6 * 7)
+}

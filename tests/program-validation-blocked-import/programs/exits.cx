@@ -1,0 +1,8 @@
+package main
+
+import "sys/os"
+
+func main() {
+	printf("leaving\n")
+	os.Exit(1)
+}
