@@ -268,6 +268,13 @@ func (u *ui) start(a *store.App) {
 			}
 			return checkedProgram(m, files, out)
 		}
+		if a.Manifest.Kind == thinKind {
+			m, files, err := thinProgram(a.Manifest, out)
+			if err != nil {
+				return nil, fmt.Errorf("thin fetch failed: %v", err)
+			}
+			return checkedProgram(m, files, out)
+		}
 		return &preparedProgram{app: a.Manifest, files: files, libraries: cxrun.LibrariesAll()}, nil
 	})
 }

@@ -171,13 +171,13 @@ func TestParseSettings(t *testing.T) {
 		t.Fatalf("%+v", tf)
 	}
 	flood := testFolder{dir: "tests/x"}
-	if err := flood.parseSettings(strings.NewReader("flood-nodes 7010 3 publish a test seed\n")); err != nil {
+	if err := flood.parseSettings(strings.NewReader("flood-nodes 7010 3 publish a test seed\nflood-type medium\n")); err != nil {
 		t.Fatal(err)
 	}
-	if n := flood.net; n.floodPort != 7010 || n.floodCount != 3 || n.floodDir != "tests/x/publish" || n.floodSeed != "a test seed" || !n.used() {
+	if n := flood.net; n.floodPort != 7010 || n.floodCount != 3 || n.floodDir != "tests/x/publish" || n.floodSeed != "a test seed" || n.floodType != "medium" || !n.used() {
 		t.Fatalf("flood-nodes: %+v", n)
 	}
-	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app", "input fast", "flood-nodes 7010 3 dir", "flood-nodes 7010 0 dir seed"} {
+	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app", "input fast", "flood-nodes 7010 3 dir", "flood-nodes 7010 0 dir seed", "flood-type huge"} {
 		if err := new(testFolder).parseSettings(strings.NewReader(bad)); err == nil {
 			t.Errorf("%q parsed", bad)
 		}

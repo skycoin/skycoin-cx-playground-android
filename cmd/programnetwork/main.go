@@ -5,7 +5,14 @@
 //	programnetwork node [-addr :7010] [-store DIR] [-peers FILE] [-packet 1200]
 //	                    [-signer PUBKEY,...] [-subscribe HOST:PORT,...]
 //	                    [-publish DIR (-seed TEXT | -secret HEX)]
+//	                    [-config FILE] [-type thin|medium|super] [-budget BYTES]
+//	                    [-pins FILE] [-fetch HASH,...]
 //	programnetwork getpeers HOST:PORT
+//	programnetwork pins [-file pins.txt] list
+//	programnetwork pins [-file pins.txt] add HASH-OR-PREFIX...
+//	programnetwork pins [-file pins.txt] remove HASH-OR-PREFIX...
+//	programnetwork store [-store DIR] list
+//	programnetwork store [-store DIR] remove HASH-PREFIX
 //	programnetwork peers [-file peers.txt] list
 //	programnetwork peers [-file peers.txt] add ADDRESS GROUP CLASS [COMMENT...]
 //	programnetwork peers [-file peers.txt] remove ADDRESS
@@ -20,6 +27,15 @@
 // a program and flooded to the subscribers. Classes are private,
 // own-infrastructure, lan-group, user-shareable and public; scopes are
 // lan, internal and global.
+//
+// The node type, "Node types (#34)" in docs/ProgramDistribution.md, is
+// super by default. A thin node keeps nothing for others and fetches the
+// -fetch programs on demand. A medium node keeps the programs its -pins
+// file names and others within -budget. A super node keeps everything up
+// to -budget, 0 for no limit, and never evicts: `store remove` deletes a
+// program, and a running node keeps serving it until it restarts. -config
+// names a file of "type medium", "budget 1000000" and "pins pins.txt"
+// lines, which the flags override.
 package main
 
 import (
@@ -51,6 +67,10 @@ func main() {
 		err = getPeers(os.Args[2:])
 	case "peers":
 		err = peers(os.Args[2:])
+	case "pins":
+		err = pins(os.Args[2:])
+	case "store":
+		err = storeCommand(os.Args[2:])
 	default:
 		usage()
 	}
@@ -61,7 +81,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: programnetwork node|getpeers|peers, see go doc ./cmd/programnetwork")
+	fmt.Fprintln(os.Stderr, "usage: programnetwork node|getpeers|peers|pins|store, see go doc ./cmd/programnetwork")
 	os.Exit(2)
 }
 
@@ -86,7 +106,16 @@ func node(args []string) error {
 	publish := fl.String("publish", "", "directory of program directories to publish")
 	seed := fl.String("seed", "", "derive the publishing key from this seed (tests only when public)")
 	secretHex := fl.String("secret", "", "publishing secret key in hex")
+	configFile := fl.String("config", "", "file of type, budget and pins lines, overridden by the flags")
+	typeName := fl.String("type", string(programnetwork.TypeSuper), "node type: thin, medium or super")
+	budget := fl.Int64("budget", 0, "bytes a medium node keeps besides its pins, or a super node's capacity, 0 for none")
+	pinsFile := fl.String("pins", "", "a medium node's pin list file, one hash or prefix per line")
+	fetch := fl.String("fetch", "", "comma separated manifest addresses to fetch on demand, from the -subscribe nodes")
 	fl.Parse(args)
+	settings, err := nodeSettings(fl, *configFile, *typeName, *budget, *pinsFile)
+	if err != nil {
+		return err
+	}
 	var trusted []cipher.PubKey
 	for _, s := range splitList(*signers) {
 		k, err := cipher.PubKeyFromHex(s)
@@ -96,7 +125,6 @@ func node(args []string) error {
 		trusted = append(trusted, k)
 	}
 	var secret cipher.SecKey
-	var err error
 	switch {
 	case *secretHex != "":
 		secret, err = cipher.SecKeyFromHex(*secretHex)
@@ -126,7 +154,7 @@ func node(args []string) error {
 	if err != nil {
 		return err
 	}
-	n, err := programnetwork.NewNode(conn, st, trusted)
+	n, err := programnetwork.NewTypedNode(conn, st, trusted, settings)
 	if err != nil {
 		return err
 	}
@@ -141,13 +169,28 @@ func node(args []string) error {
 		}
 		n.SetPeers(l)
 	}
-	fmt.Printf("node listening on %s, packet %d bytes, %d trusted signers\n", conn.LocalAddr(), *packet, len(trusted))
+	fmt.Printf("node listening on %s, packet %d bytes, %d trusted signers, type %s, budget %d bytes, pins %q, %d bytes held\n",
+		conn.LocalAddr(), *packet, len(trusted), settings.Type, settings.Budget, settings.PinsFile, n.Stats().StoredBytes)
 	done := make(chan error, 1)
 	go func() { done <- n.Run() }()
 	for _, s := range splitList(*subscribe) {
 		if err := n.Subscribe(s); err != nil {
 			return fmt.Errorf("subscribe to %s: %v", s, err)
 		}
+	}
+	for _, f := range splitList(*fetch) {
+		addr, err := programblocks.HashFromHex(f)
+		if err != nil {
+			return fmt.Errorf("-fetch %s: %v", f, err)
+		}
+		p, err := n.Fetch(addr, splitList(*subscribe)...)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("fetched %s %s, %d files, %d bytes\n", p.Name, p.Address, len(p.Files), p.Manifest.PackLength)
+	}
+	if *fetch != "" && settings.Type == programnetwork.TypeThin {
+		return n.Close()
 	}
 	if *publish != "" {
 		entries, err := os.ReadDir(*publish)
@@ -187,7 +230,7 @@ func getPeers(args []string) error {
 	if err != nil {
 		return err
 	}
-	n, err := programnetwork.NewNode(conn, st, nil)
+	n, err := programnetwork.NewTypedNode(conn, st, nil, programnetwork.Settings{Type: programnetwork.TypeThin})
 	if err != nil {
 		return err
 	}

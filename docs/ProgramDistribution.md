@@ -1044,6 +1044,129 @@ once, verifies every block and runs it. In the first run the program was
 held 27 ms after the app subscribed, with 2 haves received, 1 duplicate and
 1 download, and the whole test took 7.1 s including install and start.
 
+### Node types (#34)
+
+A node has one of three types, which decide what it downloads, keeps,
+announces and serves. Only a node that holds a program announces it and
+serves it, so a have always names a node that can answer the download.
+
+| | Thin | Medium | Super |
+|---|---|---|---|
+| on a have | records it, downloads nothing | downloads when pinned or within the budget | downloads when it fits the capacity |
+| keeps for others | nothing | pinned programs and others within the budget | everything until full |
+| announces and serves | nothing | what it keeps | what it keeps |
+| subscribers | grants no lease | yes | yes |
+| survives a restart | nothing | programs, subscriptions, subscribers | programs, subscriptions, subscribers |
+
+A thin node subscribes like any node, so it hears every have and knows
+which programs exist and which nodes hold them (D39). `Node.Known` lists
+them, and `Node.Fetch` downloads one on demand from the nodes that
+announced it or from nodes given by address. The thin node keeps what it
+fetched in its own store, for itself: it never adds the program to what it
+serves, never announces it, and answers a get manifest for it with error
+1. A second fetch of a cached program reads the store.
+
+A medium node keeps every program its pin list names, and other programs
+while the bytes it holds stay within its budget (D38). The bytes are the
+manifest and the linear packing of each program held, which is what the
+store holds on disk. A download reserves its bytes when it starts, so haves
+that arrive together cannot overcommit the budget. Pinned programs count
+against the budget and are kept past it. With no budget a medium node keeps
+only pinned programs. The pin list is a text file, one manifest address or
+address prefix of 8 to 64 hex digits per line, `#` starting a comment line.
+The node reads it again whenever it changes, so a pin added while the node
+runs applies to the next have.
+
+```
+# pins.txt: one address or address prefix per line
+4bf42c1844ab4576
+```
+
+A super node keeps every program it hears of while it fits the capacity,
+the `-budget` of a super node, and with no capacity until a write fails
+because the disk is full. There is no eviction. A program that does not
+fit is refused with a "storage full" log line and counted in
+`Stats.HavesRefusedFull`, and the node keeps serving what it holds (D40).
+A smaller program that still fits is taken. A write that fails with no
+space left drops the partial program from the store. Removing a program is
+manual, with `programnetwork store remove`; a running node keeps serving
+it from memory until it restarts.
+
+A medium or super node keeps two files next to its store's `index.txt`:
+
+```
+# subscriptions.txt: the nodes this node subscribes to, one per line
+10.1.0.1:7010
+# subscribers.txt: this node's subscribers and their lease ends, RFC 3339
+192.168.1.5:7010 2026-11-24T03:29:46Z
+```
+
+On start the node holds every cached program of its store, takes back the
+subscribers whose lease has not ended, so a program held after a restart
+reaches them before they renew, and subscribes again to every node of
+`subscriptions.txt`. Such a resumed subscription first ends the earlier one
+with a lease of 0, so the other node, which still counts this node as a
+subscriber, sends the catch-up haves of D34 for what was published while
+it was down. A thin node writes neither file.
+
+`programnetwork node -type thin|medium|super -budget BYTES -pins FILE`
+sets the type, super by default as before #34 (D41). `-config FILE` reads
+the same three settings from `type`, `budget` and `pins` lines, and a flag
+given on the command line overrides its line. `-fetch HASH,...` fetches
+programs on demand from the `-subscribe` nodes; a thin node exits after
+them. The pin list and the store have their own commands:
+
+```
+programnetwork pins -file pins.txt add 4bf42c1844ab4576
+programnetwork pins -file pins.txt remove 4bf42c1844ab4576
+programnetwork pins -file pins.txt list
+programnetwork store -store DIR list
+programnetwork store -store DIR remove 4bf42c18
+```
+
+`store remove` takes an address prefix of at least 8 hex digits, refuses
+one that matches two programs, and deletes the manifest, the packing and
+the index row.
+
+Tests, each over UDP on the host:
+
+- `tests/program-network-node-types-mixed`: a publisher, a super node, a
+  medium node with one pin, a medium node with a budget, a thin node, and a
+  super node subscribed only to the pinned medium node. After three
+  programs of 11071, 1225 and 2293 bytes, the super node holds all three,
+  the pinned medium node only its pin, the budget medium node one program
+  within its 2293 bytes, the node behind the pinned medium node only the
+  pinned program, and the thin node none while it knows all three. The
+  thin node then fetches one from the super node in about 30 ms, still
+  holds nothing, and serves nothing.
+- `tests/program-network-super-full-no-eviction`: a super node with a
+  capacity of two programs keeps both, refuses the third, still serves the
+  first, and after a manual remove and a restart takes the removed one
+  again from the catch-up haves and still refuses the third.
+- `tests/program-network-node-restart-persistence`: a super node and a
+  medium node restart on their ports. Both hold what they held, the super
+  node knows its subscriber before the medium node is back, neither calls
+  Subscribe, and a program published after the restart, pinned while the
+  medium node ran, reaches both.
+- `tests/program-network-node-budget-accounting`: six programs published
+  at once to a medium node with a budget and one pin larger than the
+  budget. The unpinned programs held stay within the budget, the pin is
+  held past it, the bytes counted equal the bytes on disk, and a restart
+  counts the same.
+
+On the phone, an app of kind `thin` runs a thin node with an empty store
+in the app's files dir. Its args are those of a `flood` app. It subscribes
+to the nodes, fetches each program it hears of on demand until one has the
+wanted name, and checks and runs it like a `fetch` app. The emulator
+driver's `flood-type` setting gives the rig's flood nodes their `-type`.
+`tests/program-network-thin-fetch-in-emulator` runs one super node on port
+7020 in the rig container that publishes `fib-and-primes`. The app
+subscribes to it at 10.0.2.2, hears one have and ignores it, fetches the
+program on demand with one download, holds nothing for others, has no
+subscriber, verifies every block and runs it. In the first run the program
+was fetched 89 ms after the app subscribed, and the whole test took 5.4 s
+including install and start.
+
 ## Test programs (#19 and skycoin-cx-forth #11)
 
 This section describes the hash, memory, storage and serial test programs
@@ -1363,6 +1486,70 @@ D37 ProgramShortFormSelectionDecision
   `Client.Forms` and `Node.Forms` force either form. Built: `FormsAuto` in
   `programblocks/client.go`.
 
+D38 MediumNodePinBudgetDecision
+- What exists now: #34 says a medium node stores up to a configured amount
+  and/or pins certain hashes, and does not say how the two combine.
+- Question: do pinned programs count against a medium node's budget, and
+  is a pinned program kept when it does not fit?
+- Option a: pinned programs are always kept and count against the budget;
+  an unpinned program is kept only while all bytes held stay within the
+  budget. With no budget the node keeps only pinned programs.
+- Option b: the budget covers unpinned programs only, and pinned programs
+  come on top of it.
+- Option c: the budget is a hard cap for everything, so a pin that does not
+  fit is refused.
+- Recommendation: option a, because the budget then bounds the disk the
+  node gives to programs it was not asked for, a pin is the operator's
+  explicit wish and is never refused, and one number in `Stats.StoredBytes`
+  answers both. Built: `Node.onHave` in `programnetwork/node.go`, tested by
+  `tests/program-network-node-budget-accounting`.
+
+D39 ThinNodeSubscribeAndCacheDecision
+- What exists now: #34 says a thin node gets data only and fetches what it
+  needs.
+- Question: does a thin node subscribe, and does it keep what it fetched?
+- Option a: it subscribes, so it hears every have and knows what exists and
+  where, downloads nothing on a have, and keeps what it fetches in its own
+  store for itself without serving or announcing it.
+- Option b: it never subscribes and fetches only from nodes given by
+  address, keeping nothing.
+- Option c: it subscribes, and keeps nothing after a run.
+- Recommendation: option a, because a have is 50 bytes per program and is
+  the only way a thin node learns what exists without a new list operation,
+  and a phone that runs a program twice should not download it twice.
+  Built: `Node.Known` and `Node.Fetch` in `programnetwork/node.go`, the
+  `thin` app kind on the phone.
+
+D40 SuperNodeFullStorageDecision
+- What exists now: #34 says a super node keeps everything until its storage
+  is full, with no eviction.
+- Question: what is full, and what does a full node take?
+- Option a: full is the configured capacity (`-budget`) or, with none, a
+  write that fails with no space left; a program that does not fit is
+  refused and logged, a smaller one that still fits is taken, and the
+  partial program of a failed write is dropped.
+- Option b: the first refusal sets the node full, and it takes nothing more
+  until a program is removed by hand.
+- Option c: no capacity setting, only a full disk.
+- Recommendation: option a, because a capacity keeps a super node from
+  filling a disk it shares with other work, and taking a program that fits
+  is not eviction and wastes no space. Built: `Node.onHave` and
+  `Node.dropFull` in `programnetwork/node.go`, tested by
+  `tests/program-network-super-full-no-eviction`.
+
+D41 NodeTypeDefaultDecision
+- What exists now: before #34 every node kept and forwarded every program,
+  which is what a super node with no capacity does.
+- Question: which type does `programnetwork node` run without `-type`?
+- Option a: super, so every existing command, test and the flood app keep
+  their behaviour; the phone's new thin app runs a thin node.
+- Option b: medium with no budget and no pins, which keeps nothing until
+  pins are given.
+- Option c: thin, so a node keeps nothing unless told to.
+- Recommendation: option a, because nothing changes for existing setups
+  and a node that keeps nothing by default would end every flood at its
+  first hop. Built: `NewNode` and the `-type` default.
+
 ## Task breakdown
 
 This section breaks #14 to #19 and skycoin-cx-forth #11 down into leaf tasks
@@ -1449,6 +1636,15 @@ dependencies and its test.
       on GroupsScopes. Test: round trip of the list file.
     - ProgramNetworkEmulatorFlood: the phone receives a program by flood.
       Depends on FloodReplication. Test: emulator test.
+    - ProgramNetworkNodeTypes (#34): thin, medium and super nodes, the pin
+      list, the budget, persistence and `store remove`. Depends on
+      FloodReplication. Test: program-network-node-types-mixed,
+      program-network-super-full-no-eviction,
+      program-network-node-restart-persistence and
+      program-network-node-budget-accounting.
+    - ProgramNetworkEmulatorThin (#34): the phone as a thin node fetches
+      from a super node. Depends on NodeTypes. Test:
+      program-network-thin-fetch-in-emulator.
   - ProgramTestSuite (#19, skycoin-cx-forth #11)
     - ProgramTestSuiteReportFormat: the result line. Test: parse round trip.
     - ProgramTestSuiteHashKnown: HashSha256Known and HashMerkleKnown in CX.

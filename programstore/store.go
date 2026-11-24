@@ -11,6 +11,9 @@
 //	index.txt           one line per program: number, address, state,
 //	                    length and name, which the lister reads alone
 //	trusted.txt         the trusted signer keys, one per line (D27)
+//
+// A medium or super programnetwork node also keeps subscriptions.txt and
+// subscribers.txt there (#34).
 package programstore
 
 import (

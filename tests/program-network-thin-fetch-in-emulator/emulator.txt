@@ -1,0 +1,8 @@
+# One super programnetwork node runs in the rig container, which the
+# emulator reaches as 10.0.2.2. Node 7020 publishes fib-and-primes. The app
+# runs a thin node, subscribes to 7020, hears its have, fetches the program
+# on demand, holds nothing for others, verifies it and runs it.
+ready start app="Programs: fetch as a thin node"
+flood-nodes 7020 1 publish cx playground test signer
+flood-type super
+timeout 60

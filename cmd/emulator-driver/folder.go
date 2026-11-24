@@ -23,7 +23,7 @@ import (
 //	                           clear it after the test
 //	before <shell command>     run on the device before the start
 //	after <shell command>      run on the device after the test
-//	echo-server, program-server, program-packet, flood-nodes, netem, capture see net.go
+//	echo-server, program-server, program-packet, flood-nodes, flood-type, netem, capture see net.go
 //	input untimed              send input.txt events without timing them, for
 //	                           a screen of the app that is not a program canvas
 //	timeout <seconds>          for wait-for steps and the expected output,
@@ -156,6 +156,11 @@ func (t *testFolder) parseSettings(r io.Reader) error {
 			}
 			t.net.floodPort, t.net.floodCount, t.net.floodDir = port, count, filepath.Join(t.dir, f[2])
 			t.net.floodSeed = strings.Join(f[3:], " ")
+		case "flood-type":
+			if rest != "thin" && rest != "medium" && rest != "super" {
+				return fmt.Errorf("line %d: flood-type takes thin, medium or super", n)
+			}
+			t.net.floodType = rest
 		case "input":
 			if rest != "untimed" {
 				return fmt.Errorf("line %d: input takes untimed", n)

@@ -31,6 +31,8 @@ import (
 //	                     under <dir> signed with the key from <seed>, each
 //	                     other subscribes to the one before, and the test
 //	                     starts once every node holds every program
+//	flood-type <type>    the flood nodes' -type, thin, medium or super, super by
+//	                     default (#34)
 //	netem <args>         tc netem on the port's packets, e.g. delay 200ms loss 30%
 //	capture <file>       tcpdump of the port's packets, pulled as <file>
 type netSettings struct {
@@ -43,6 +45,7 @@ type netSettings struct {
 	floodCount    int
 	floodDir      string
 	floodSeed     string
+	floodType     string
 	netem         string
 	capture       string
 }
@@ -271,6 +274,9 @@ func (s *session) startFloodNodes(ctx context.Context, n netSettings, undo *[]fu
 		port := n.floodPort + i
 		node := fmt.Sprintf("%s/node%d", base, port)
 		args := fmt.Sprintf("-addr 0.0.0.0:%d -store %s -seed %s", port, node, shellQuote(n.floodSeed))
+		if n.floodType != "" {
+			args += " -type " + n.floodType
+		}
 		if i == 0 {
 			args += " -publish " + base + "/publish"
 		} else {
