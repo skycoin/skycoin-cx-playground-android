@@ -64,148 +64,286 @@ Nothing is signed today, and nothing fetches a program over the network.
 
 ## Manifest format (#14)
 
-This section defines the bytes of a manifest, how it is signed and how it
-is verified. The format is binary, and the reasons are in decision D24.
+This part defines the bytes of a manifest in seven sections: the encoding
+conventions, the header, the arrays, the linear packing, the chunking of the
+manifest, the Merkle tree and the text form. The UDP packets follow in their
+own part. The binary form is the canonical form, which means the address and
+the signature are computed over its bytes. Decision D30 asks whether the text
+form should be canonical instead.
 
-### Layout
+A manifest is laid out in this order:
 
-A manifest is a header followed by K arrays. Each array has an entry in the
-header's array directory, which gives its kind, its entry count, where it
-starts, its length and its SHA-256 hash. A client can therefore read and
-verify the file list without reading the block arrays. All integers are
-unsigned and big-endian.
+1. the header, which ends with the signer public key and the signature;
+2. the file list array;
+3. the block list array;
+4. the block packing map array.
 
-The header:
+The header holds an array directory with one entry per array, so a client
+can read and verify the file list without reading the block arrays.
 
-| Offset | Size | Field |
-|---|---|---|
-| 0 | 4 | magic `CXPM` |
-| 4 | 2 | format version, 1 |
-| 6 | 2 | array count K |
-| 8 | 8 | date, Unix seconds when the manifest was signed |
-| 16 | 8 | manifest length, the byte length of the whole manifest |
-| 24 | 8 | linear packing length, the sum of all file lengths |
-| 32 | 32 | Merkle hash over every block hash, in block ID order |
-| 64 | 48 × K | array directory |
-| 64 + 48K | 33 | signer public key, compressed secp256k1 |
-| 97 + 48K | 65 | signature |
+### Binary encoding conventions
+
+This section fixes how every field is written, so the other sections only
+name fields and types.
+
+- Every integer is unsigned and big-endian (network byte order). The types
+  are `u16` (2 bytes), `u32` (4 bytes) and `u64` (8 bytes).
+- A `hash` is a SHA-256 digest of 32 raw bytes (decision D23).
+- A `pubkey` is a compressed secp256k1 public key of 33 bytes, and a `sig`
+  is a compact secp256k1 signature of 65 bytes with its recovery byte
+  (decision D22). These are the formats of the Skycoin `cipher` package.
+- A `path` is a `u16` byte length followed by that many bytes of UTF-8. A
+  path is slash separated, relative, at most 255 bytes, and has no `.` or
+  `..` element.
+- An array is a sequence of entries with no separator. Its entry count,
+  byte offset, byte length and hash are in the array directory of the
+  header, not in front of the array, so the count of every array is known
+  from the first packet.
+- There is no padding and no alignment anywhere.
+
+### Manifest header
+
+This section defines the header, which identifies the manifest, commits to
+every array and carries the signature.
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 0 | 4 | bytes | magic, the ASCII text `CXPM` |
+| 4 | 2 | u16 | format version, 1 |
+| 6 | 2 | u16 | array count K, 3 in version 1 |
+| 8 | 8 | u64 | date, Unix seconds when the manifest was built |
+| 16 | 8 | u64 | manifest length, the byte length of the whole manifest |
+| 24 | 8 | u64 | linear packing length, the sum of all file lengths |
+| 32 | 32 | hash | Merkle hash over every block hash, in block ID order |
+| 64 | 48 × K | entries | array directory, one entry per array, in array order |
+| 64 + 48K | 33 | pubkey | signer public key |
+| 97 + 48K | 65 | sig | signature |
 
 Each array directory entry:
 
-| Size | Field |
-|---|---|
-| 2 | array kind |
-| 2 | reserved, 0 |
-| 4 | entry count |
-| 4 | offset of the array from the start of the manifest |
-| 4 | byte length of the array |
-| 32 | SHA-256 of the array bytes |
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 0 | 2 | u16 | array kind: 1 file list, 2 block list, 3 block packing map |
+| 2 | 2 | u16 | reserved, 0 |
+| 4 | 4 | u32 | entry count |
+| 8 | 4 | u32 | offset of the array from the start of the manifest |
+| 12 | 4 | u32 | byte length of the array |
+| 16 | 32 | hash | SHA-256 of the array bytes |
 
-With the three array kinds below, the header is 306 bytes, which fits in the
-first reply packet.
+With K = 3, the header is 306 bytes. The arrays follow without gaps, so the
+first array starts at the end of the header, each next array starts where the
+previous one ends, and the last one ends at the manifest length.
 
-The arrays follow the header in directory order. Version 1 defines three
-kinds, and a reader skips a kind it does not know (its hash still counts,
-because the hash is signed).
+What is signed:
 
-1. *File list* (kind 1). One entry per file, in path order:
+- The *signed part* is the header from offset 0 up to the end of the signer
+  public key, which is every header byte except the signature.
+- The *manifest address* is the SHA-256 of the signed part.
+- The signature is `cipher.SignHash(address, secret key)`, and a reader
+  checks it with `cipher.VerifyPubKeySignedHash(public key, signature,
+  address)`.
+- Because the signed part holds the hash of every array, the address and the
+  signature cover every byte of the manifest except the signature itself.
+- The address cannot be stored inside the manifest, because a hash cannot
+  hold itself. The header holds the manifest length, the date and the Merkle
+  hash, and the address names the manifest from outside.
 
-   | Size | Field |
-   |---|---|
-   | 32 | SHA-256 of the whole file |
-   | 8 | file length |
-   | 8 | offset of the file in the linear packing |
-   | 4 | block size of this file, 512 by default |
-   | 4 | first block ID of the file |
-   | 4 | block count of the file |
-   | 32 | Merkle hash over the file's block hashes |
-   | 2 | path length |
-   | n | path, UTF-8, slash separated, no `..` |
+### Manifest arrays
 
-   The file's range in the linear packing is its offset and its file length.
-   Its blocks are the block IDs from the first block ID for block count IDs.
-   This is how a file entry carries its block hash list and block size: the
-   hashes themselves sit in the block list, at the end of the manifest, as
-   #14 asks.
+This section defines the three arrays of version 1 and their order. A reader
+skips an array kind it does not know, and its hash still counts, because the
+hash is in the signed part.
 
-2. *Block list* (kind 2). One entry of 48 bytes per block, in ID order:
+The file list (kind 1) has one entry per file, sorted by path:
 
-   | Size | Field |
-   |---|---|
-   | 4 | block ID |
-   | 32 | SHA-256 of the block |
-   | 4 | block length |
-   | 8 | offset of the block within its file |
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 0 | 32 | hash | SHA-256 of the whole file |
+| 32 | 8 | u64 | file length |
+| 40 | 8 | u64 | offset of the file in the linear packing |
+| 48 | 4 | u32 | block size of this file, 512 by default |
+| 52 | 4 | u32 | first block ID of the file |
+| 56 | 4 | u32 | block count of the file |
+| 60 | 32 | hash | Merkle hash over the block hashes of this file |
+| 92 | 2 + n | path | file path |
 
-3. *Block packing map* (kind 3). One entry of 16 bytes per block, in ID
-   order, mapping the block ID to its range in the linear packing:
+A file entry carries its block size and its block hash list. The hash list
+is the range of block IDs from the first block ID for the block count, and
+the hashes themselves are in the block list at the end of the manifest, as
+#14 asks. A file therefore has an offset and length in two places: within
+the file (each block's offset in the block list) and within the linear
+packing (the file's offset here, and each block's offset in the packing
+map).
 
-   | Size | Field |
-   |---|---|
-   | 4 | block ID |
-   | 8 | offset in the linear packing |
-   | 4 | block length |
+The block list (kind 2) has one entry of 48 bytes per block, in block ID
+order:
 
-The block IDs, lengths and offsets are redundant with the file list, and the
-reader checks that they agree. The lead asked for them to be explicit, and
-they let a client that only holds the block arrays serve or fetch a range.
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 0 | 4 | u32 | block ID, counted from 1 |
+| 4 | 32 | hash | SHA-256 of the block bytes |
+| 36 | 4 | u32 | block length |
+| 40 | 8 | u64 | offset of the block within its file |
 
-The manifest length is 306 bytes plus the array lengths. A program of 64 KB
-has 128 blocks, so its block list is 6144 bytes and its packing map 2048
-bytes, about 8.5 KB in all.
+The block packing map (kind 3) has one entry of 16 bytes per block, in block
+ID order, and maps each block ID to its range in the linear packing:
 
-### Merkle hash
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 0 | 4 | u32 | block ID |
+| 4 | 8 | u64 | offset of the block in the linear packing |
+| 12 | 4 | u32 | block length |
 
-The Merkle hash lets a client check a complete set of block hashes against
-one signed value.
+Because the block entries have a fixed size, block ID n is at byte
+`(n - 1) × 48` of the block list and `(n - 1) × 16` of the packing map, so a
+client can read any range of them without reading the rest.
+
+The block IDs, lengths and offsets are redundant with the file list. A
+reader checks that they all agree and rejects the manifest otherwise.
+
+A program of 64 KB has 129 blocks with its `cxapp.json`, which makes a
+manifest of 8769 bytes (measured, see D30).
+
+### Linear packing
+
+This section defines the linear packing, which is the one byte sequence a
+client fetches blocks from.
+
+- All blocks of all files are laid out one after another in block ID order,
+  with no padding. Since block IDs follow the file list, which is sorted by
+  path, this is also every file in path order.
+- A file with offset `o` and length `l` is the range `o` to `o + l` of the
+  linear packing. The next file starts at `o + l`.
+- Block `i` of a file (counted from 0) starts at `i × block size` within the
+  file, and so at `o + i × block size` in the linear packing. Its length is
+  the block size, except for the last block of the file, which holds the
+  rest. An empty file has no blocks.
+- Because a short last block is not padded, a block of the next file does
+  not start at a multiple of 512 in the linear packing. The packing map
+  gives every block's offset, so no client computes it.
+- Any range of the linear packing can be asked for by offset and length. A
+  client asks for whole blocks, so it can check each reply on arrival.
+
+### Manifest chunking and fetching
+
+This section says how the manifest itself is split and fetched, since it can
+be larger than one packet.
+
+- The manifest is fetched by offset and length with the get manifest
+  operation, in pieces of at most one reply packet, 1154 bytes at the
+  1200-byte packet size.
+- The first piece holds the whole header. The client checks the magic, the
+  version and the lengths, computes the address and compares it with the
+  address it asked for, verifies the signature, and checks that the signer
+  is trusted (decision D27). A manifest that fails any of these is dropped
+  after one packet.
+- The client then asks for the remaining pieces, several at a time. Each
+  array is checked against the hash in the directory as soon as all its
+  bytes are in. The file list is usually complete in the first piece.
+- When the block list is complete, the client recomputes the Merkle hash of
+  every file and of the whole manifest and compares them with the signed
+  values.
+- The get block list operation reads entries of the block list by block ID,
+  so a device with little memory can read the hashes of one file at a time
+  instead of holding the whole list.
+
+### Merkle tree
+
+This section defines the Merkle hash, which lets a client check a complete
+set of block hashes against one signed value.
 
 - A leaf is a block hash, the plain SHA-256 of the block bytes.
-- An inner node is SHA-256 of the byte 0x01, the left child and the right
-  child.
-- When a level has an odd number of nodes, the last node moves up unchanged.
-  It is not paired with itself, which avoids the duplicate-leaf ambiguity of
-  the Bitcoin tree (CVE-2012-2459).
-- The root of an empty list is the SHA-256 of nothing.
+- An inner node is the SHA-256 of 65 bytes: the byte 0x01, the left child
+  and the right child.
+- The leaves are paired from the left. When a level has an odd number of
+  nodes, the last node moves up to the next level unchanged. It is not paired
+  with itself, which avoids the duplicate-leaf ambiguity of the Bitcoin tree
+  (CVE-2012-2459).
+- A tree with one leaf has that leaf as its root, and the root of an empty
+  list is the SHA-256 of zero bytes.
+- The header holds the root over all blocks of the manifest, and every file
+  entry holds the root over its own blocks, so one file can be checked
+  without the others.
 
-The header holds the root over all blocks of the manifest, and every file
-entry holds the root over its own blocks, so one file can be checked
-without the others.
+### Text form
 
-### Address and signature
+This section defines a text form of the manifest, which people can read and
+tools can write, and which converts to the binary form byte for byte.
 
-The signature lets a client reject a manifest from an unknown signer after
-the first packet.
+- The text form has one section per part, each opened by a `[name]` line,
+  in the order `[header]`, `[arrays]`, `[files]`, `[hashes]`, `[linear]`.
+- `[header]` has one `key = value` line per header field, plus `address`.
+- Each other section has one entry per line. The fields are separated by
+  commas and padded with spaces into aligned columns. The column order is
+  fixed, and the first line of the section is a comment that names the
+  columns.
+- A line that starts with `;` is a comment. Numbers are decimal, and hashes,
+  keys and signatures are lower case hex.
+- Only a path is ever quoted, and only when it holds a comma, a space or a
+  double quote, with `""` for a quote inside it.
+- The address, the manifest length and the whole `[arrays]` section are
+  derived from the other fields. A reader recomputes them from the binary
+  form it rebuilds and rejects the text when they differ.
+- The address and the signature are always computed over the binary form. A
+  text form and its binary form therefore have the same address, and the
+  text form is verified by converting it.
 
-- The *signed part* is the header from offset 0 through the signer public
-  key, that is every header byte except the signature.
-- The manifest address is the SHA-256 of the signed part.
-- The signature is the Skycoin `cipher.SignHash` of the address with the
-  signer's secret key: 65 bytes, a compact secp256k1 signature with a
-  recovery byte.
-- Because the header holds the hash of every array, the address covers every
-  byte of the manifest except the signature.
+The columns:
 
-The address cannot be stored inside the manifest, because a hash cannot hold
-itself. The header holds the manifest length, the date and the Merkle hash,
-and the address is what names the manifest from outside.
+- `[arrays]`: kind, count, offset, length, hash.
+- `[files]`: path, file hash, size, offset in the linear packing, block
+  size, first block ID, block count, Merkle hash.
+- `[hashes]`: block hash, block ID, size, offset within the file.
+- `[linear]`: block ID, offset in the linear packing, length.
 
-### How the manifest itself is chunked
+This is the complete example from `tests/program-manifest-round-trip`,
+whose test rebuilds it from `program/` and checks that it prints back the
+same bytes. Its signer key is derived from the public seed `cx playground
+example signer`, so it is for tests only. The program has two files, and
+`main.cx` is 673 bytes, so it has two blocks, and its second block starts at
+offset 637 of the linear packing, not at a multiple of 512.
 
-A manifest is read like a file, by offset and length, in pieces of at most
-one reply packet. The pieces are checked in this order:
+```ini
+; CX program manifest, text form. The address and signature are over the binary form.
+[header]
+magic           = CXPM
+version         = 1
+date            = 1795478400
+manifest_length = 703
+pack_length     = 798
+merkle_hash     = ec58e0a6486748dd3e27041d757216637ea7dbefd55e07aa90dd54e62a0642a8
+signer          = 039a645f9f2e3e101defd413e99b31a44c2e8f43620f3029bdd5454c652d6f0399
+signature       = 76073fb71696b820525e17084b6b3ce45066bf15417597687bcf557979dd75e946e01dbddb37eae4bd97fad3dc9314b6fe99ea6d4e8cec2172e4e95ae347c4d901
+address         = 33b4c5b0eecd6b75fe88fac07b24e7a31c024c027a74e0ea566390b8a908dd41
 
-1. The first piece holds the header. The client checks the magic, version
-   and lengths, computes the address and compares it with the address it
-   asked for, and verifies the signature against the signer key. When the
-   signer is not trusted, the client stops here.
-2. Each array is checked against its directory hash as soon as all its bytes
-   are in. The file list usually arrives in the first or second piece.
-3. When the block list is complete, the client recomputes the Merkle hash
-   and every file's Merkle hash and compares them with the signed values.
+[arrays]
+; kind, count, offset, length, hash
+  1,    2,     306,    205,    6e402d956969a8a2318aff1356087f87c6d240c8077ea3130456c84e1a0558ba
+  2,    3,     511,    144,    7df19b9d10ec8c9155008be599d248dfd8ffd3b878dcf9972266f2fc30aa6e35
+  3,    3,     655,    48,     4e596b093b847948772757a8997d7038bc3ea14be0bbe75fc603fa889aeefc87
+
+[files]
+; path,       file_hash,                                                        size, offset, block_size, first_block, block_count, merkle_hash
+  cxapp.json, 4755ead67638c13fd43f56cca93b8946074e3f86e0be0a1fe9da862722d2ef3f, 125,  0,      512,        1,           1,           4755ead67638c13fd43f56cca93b8946074e3f86e0be0a1fe9da862722d2ef3f
+  main.cx,    aa24c98456232ee3a7d1f898e3eb1146caa23779dbd6cb2f2c55c1d61beda91f, 673,  125,    512,        2,           2,           adaea5e4a6e79ec088ec23db8c02c40594b78975ec68a5b0f5b636fbb142d48b
+
+[hashes]
+; block_hash,                                                       block_id, size, offset
+  4755ead67638c13fd43f56cca93b8946074e3f86e0be0a1fe9da862722d2ef3f, 1,        125,  0
+  d431f9aa898ad795ac4d3fdda0c34a8db75f9ec07d47b7e90158222c02db5a93, 2,        512,  0
+  44f5c83df84986299209e4083f376d8c5694df314fd8ece10c48da6d2bd9f017, 3,        161,  512
+
+[linear]
+; block_id, offset, length
+  1,        0,      125
+  2,        125,    512
+  3,        637,    161
+```
 
 ### Verification of the files
 
-A client checks every block as it arrives and every file once it is whole.
+This section lists the checks a client makes on the blocks and files, after
+the manifest is verified.
 
 - A block is accepted only when its SHA-256 matches its block list entry and
   its length matches.
@@ -215,69 +353,122 @@ A client checks every block as it arrives and every file once it is whole.
 
 ### Relation to the JSON manifest
 
-The JSON manifest stays for the apps embedded in the APK, and the binary
-format is used for programs fetched over the network. The loader of #17
-moves the embedded bundle to the binary format in a later pull request.
-Decision D25 asks whether to replace the JSON manifest at once instead.
+This section says how the new format sits next to the existing one.
 
-The program metadata (name, kind, form, entry, arguments) stays in
-`cxapp.json`, which is an ordinary file of the binary manifest. A client
-rebuilds a `manifest.Manifest` from the downloaded files with
-`manifest.Build`, and runs it with `apprun.Run` as today.
+- The JSON manifest stays for the apps embedded in the APK, and the binary
+  format is used for programs fetched over the network. The loader of #17
+  moves the embedded bundle to the binary format later. Decision D25 asks
+  whether to replace the JSON manifest at once instead.
+- The program metadata (name, kind, form, entry, arguments) stays in
+  `cxapp.json`, which is an ordinary file of the binary manifest. A client
+  rebuilds a `manifest.Manifest` from the downloaded files with
+  `programblocks.AppManifest`, and runs it with `apprun.Run` as today.
 
 ## UDP operations (#15)
 
-This section defines the packets that fetch a manifest list, a manifest and
-its blocks, and how a client recovers from loss. Every packet is at most
-1200 bytes, and a 1024-byte variant is supported by configuration
-(decision D26).
+This part defines the packets that fetch a manifest list, a manifest and its
+blocks, and how a client recovers from loss. Every packet is at most 1200
+bytes, and a 1024-byte packet size is supported by a setting (decision
+D26). The packets use the binary encoding conventions above.
 
-### Common header
+### Packet header
 
-Every packet starts with six bytes:
+This section defines the six bytes every packet starts with.
 
-| Size | Field |
-|---|---|
-| 1 | protocol version, 1 |
-| 1 | operation code, with the high bit set in a reply |
-| 4 | request ID, chosen by the client and echoed in the reply |
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 0 | 1 | u8 | protocol version, 1 |
+| 1 | 1 | u8 | operation code; a reply adds 0x80; an error reply is 0xFF |
+| 2 | 4 | u32 | request ID, chosen by the client and echoed in the reply |
 
-A reply carries the request's operation code with 0x80 added, or 0xFF for
-an error.
+### Operation packets
 
-### Operations
+This section gives the layout of each request and reply after the six-byte
+header. The largest counts are for a 1200-byte packet, with the 1024-byte
+values in brackets.
 
-The sizes below are for a 1200-byte packet, with the 1024-byte values in
-brackets.
+List manifests (0x01) asks for the server's manifest list. The request has
+no body. The reply body:
 
-1. *List manifests* (0x01). The request is the header only. The reply holds
-   the 32-byte address and the 4-byte length of the server's manifest list.
-   The client then fetches the list like any manifest. Each file of the list
-   is a program manifest, and its path is the program name.
-2. *Get manifest* (0x02). The request holds the address, a 4-byte offset and
-   a 2-byte length. The reply holds the address, the offset, the 4-byte total
-   manifest length and the bytes, at most 1154 (978) of them.
-3. *Get block list* (0x03). The request holds the address, a 4-byte first
-   block ID and a 2-byte count. The reply holds the address, the first ID,
-   the count and the 48-byte block list entries (hash, length and offset), at
-   most 24 (20) of them. This is the "get hash list with length and offset"
-   operation.
-4. *Get blocks* (0x04). The request holds the address, an 8-byte offset and
-   a 2-byte length in the linear packing. The reply holds the address, the
-   offset, the length and the bytes, at most 1152 (976) of them. Any range
-   can be asked for. A client asks for whole blocks, two 512-byte blocks per
-   packet (one at 1024), so each reply can be verified on arrival.
-5. *Error* (0xFF, reply only). It holds a 1-byte code, a 1-byte text length
-   and a short text. The codes are 1 unknown manifest, 2 range outside the
-   manifest, 3 malformed request and 4 unsupported version.
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | address of the manifest list |
+| 38 | 4 | u32 | manifest length of the manifest list |
+
+The manifest list is a manifest whose files are program manifests. Each
+file's path is the program name, and its content is the program's binary
+manifest. The client fetches the list like any program.
+
+Get manifest (0x02) reads a range of a manifest. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 4 | u32 | offset in the manifest |
+| 42 | 2 | u16 | length wanted |
+
+Reply body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 4 | u32 | offset |
+| 42 | 4 | u32 | manifest length |
+| 46 | n | bytes | manifest bytes, at most 1154 (978) |
+
+Get block list (0x03) reads block list entries by block ID. This is the "get
+hash list with length and offset" operation. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 4 | u32 | first block ID |
+| 42 | 2 | u16 | entry count wanted |
+
+Reply body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 4 | u32 | first block ID |
+| 42 | 2 | u16 | entry count |
+| 44 | 48 × n | entries | block list entries, at most 24 (20) |
+
+Get blocks (0x04) reads a range of the linear packing. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 8 | u64 | offset in the linear packing |
+| 46 | 2 | u16 | length wanted |
+
+Reply body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 32 | hash | manifest address |
+| 38 | 8 | u64 | offset |
+| 46 | 2 | u16 | length |
+| 48 | n | bytes | linear packing bytes, at most 1152 (976) |
+
+A client asks for whole blocks, two 512-byte blocks per packet at 1200 bytes
+and one at 1024.
+
+Error (0xFF) is a reply only. Body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 | u8 | code: 1 unknown manifest, 2 range outside the manifest, 3 malformed request, 4 unsupported version |
+| 7 | 1 | u8 | text length, at most 100 |
+| 8 | n | bytes | text |
 
 A server never sends more than the packet size. It shortens a reply that
 would not fit, and the client asks again for what is missing.
 
 ### Loss, retries and order
 
-UDP packets can be lost, repeated or reordered, so the client handles all
-three.
+This section says how the client handles lost, repeated and reordered
+packets.
 
 - The client keeps up to 16 requests in flight and matches each reply by
   its request ID. A reply to an unknown or finished request is dropped.
@@ -285,12 +476,13 @@ three.
   each time up to 2 s, and the fetch fails after 8 tries of one request.
 - Every request is idempotent, so a repeated reply does no harm.
 - A block that fails its hash check is asked for again, and the fetch fails
-  when the same block fails three times, because then the server holds bad
+  when the same range fails three times, because then the server holds bad
   data.
 
 ### Incremental verification
 
-A client verifies as it goes, so it never holds unverified data for long.
+This section lists the order in which a client fetches and verifies a
+program, so it never holds unverified data for long.
 
 1. List manifests, then get manifest offset 0 of the list: check the address
    and the signature from the first packet.
@@ -497,12 +689,12 @@ D24 ProgramManifestEncodingDecision
   `json.MarshalIndent`.
 - Question: is the new manifest binary or JSON?
 - Option a: binary, with the header, array directory and arrays of this
-  document. It has fixed offsets, can be read by array without a parser, and
-  is about a third of the JSON size with raw hashes.
+  document. It has fixed offsets and can be read by array without a parser.
 - Option b: JSON with hex hashes. It is readable by eye, but a reader must
   parse all of it, hashes double in size, and the ESP32 needs a JSON parser.
 - Recommendation: option a, because the manifest is read a packet at a time
-  and on the ESP32, and `cmd/programblocks show` prints it as text.
+  and on the ESP32. The text form of this document gives the readable view
+  that JSON would, and D30 asks which of the two is canonical.
 
 D25 ProgramManifestReplacesJsonManifestDecision
 - What exists now: `cxmanifest bundle` writes JSON manifests into
@@ -564,6 +756,42 @@ D29 StorageDirectBlockMethodOnPhoneDecision
   system's metadata path against plain block writes, and it is the same test
   code on both targets.
 
+D30 ProgramManifestCanonicalFormDecision
+- What exists now: the manifest has a binary form (`Manifest.Encode`,
+  `programblocks.Decode`) and a text form (`Manifest.EncodeText`,
+  `programblocks.DecodeText`) that convert to each other byte for byte. The
+  address and signature are computed over the binary form.
+- Question: are the address and signature computed over the binary form or
+  over the exact bytes of the canonical text form?
+- Option a: over the binary form, as built. Devices and packets use the
+  binary form, and the text form is a view that tools convert.
+- Option b: over the canonical text form. The text form is stored and sent,
+  a tool or a small device writes it directly, and the binary form is dropped
+  or kept only as a cache.
+- Evidence, measured by `tests/program-manifest-form-sizes` on the host (an
+  Intel i7-3770S), with gzip at its best level and lz4 block mode:
+
+  | Manifest | Blocks | Binary | gzip | lz4 | Text | gzip | lz4 |
+  |---|---|---|---|---|---|---|---|
+  | apps/benchmarks | 21 | 2472 | 1780 | 1947 | 5157 | 2265 | 3817 |
+  | 64 KB program | 129 | 8769 | 6087 | 6854 | 16313 | 7171 | 12787 |
+
+  Decoding the 64 KB program's manifest takes 0.72 ms and 123 allocations
+  (35 KB) in binary, and 1.03 ms and 1396 allocations (149 KB) from text.
+  About 0.5 ms of both is the signature check. Decoding was not measured on
+  an ESP32. The text form is about twice the binary size raw and 1.2 times
+  compressed, because hex hashes compress back toward their raw size.
+- Further facts: the binary form gives every block entry a fixed offset, so
+  a device reads entry n at `(n - 1) × 48` without parsing the entries before
+  it, and the header with the signature arrives in the first packet. A text
+  form must be parsed line by line, its signed bytes depend on exact spaces
+  and column widths, and a device needs decimal and hex parsing.
+- Recommendation: option a, because the binary form is half the size raw,
+  the ESP32 (about 300 KB of free RAM) reads it in place without the extra
+  allocations, and its signed bytes cannot change with whitespace. Tools
+  keep the text form for reading, writing and tests, and convert it with
+  `DecodeText`.
+
 ## Task breakdown
 
 This section breaks #14 to #19 and skycoin-cx-forth #11 down into leaf tasks
@@ -581,6 +809,9 @@ dependencies and its test.
     - ProgramManifestBinaryEncode: header, directory and three arrays,
       encode and decode with all cross checks. Depends on BlockSplit and
       MerkleRoot. Test: truncated manifest rejected.
+    - ProgramManifestTextForm: the text form with a printer and a parser
+      that convert to the binary form byte for byte. Depends on
+      BinaryEncode. Test: program-manifest-round-trip with manifest.ini.
     - ProgramManifestSignature: address, sign and verify with the Skycoin
       cipher. Depends on BinaryEncode. Test: wrong signature detected.
     - ProgramManifestAssemble: accept blocks in any order, verify each block
