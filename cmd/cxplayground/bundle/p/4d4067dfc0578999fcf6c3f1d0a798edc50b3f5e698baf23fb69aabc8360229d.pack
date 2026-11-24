@@ -1,0 +1,42 @@
+{"name":"Soft keyboard","description":"Test demo: a tap opens the soft keyboard and the next tap closes it","kind":"gfx"}package main
+
+import "sys/app"
+
+func main() {
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var open bool = false
+	var w i32
+	var h i32
+
+	for bool.not(app.ShouldClose()) {
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			if kind == app.TOUCH_UP {
+				if open {
+					app.HideKeyboard()
+					open = false
+					printf("hide keyboard\n")
+				} else {
+					app.ShowKeyboard()
+					open = true
+					printf("show keyboard\n")
+				}
+			}
+			if kind == app.RESIZE {
+				printf("resize %d x %d\n", f32.i32(ex), f32.i32(ey))
+			}
+			if kind == app.KEY {
+				printf("key code=%d\n", code)
+			}
+			kind, ex, ey, code = app.PollEvent()
+		}
+		w, h = app.ScreenSize()
+		app.Clear(0.1, 0.1, 0.12)
+		app.Text(sprintf("keyboard open: %v", open), 32.0, 40.0, 0.0, 1.0, 1.0, 1.0, 1.0)
+		app.Text(sprintf("canvas %d x %d", w, h), 32.0, 120.0, 0.0, 0.8, 0.8, 0.9, 1.0)
+		app.Frame()
+	}
+}

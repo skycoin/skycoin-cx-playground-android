@@ -1,0 +1,28 @@
+{"name":"Benchmark: recursive fib","description":"Recursive Fibonacci, timed per n","kind":"console"}package main
+
+import "sys/time"
+
+func fib(n i32) (r i32) {
+	if n < 2 {
+		r = n
+	} else {
+		r = fib(n-1) + fib(n-2)
+	}
+}
+
+func main() {
+	var n i32
+	var t0 i64
+	var t1 i64
+	var r i32
+	var total i64 = 0L
+	printf("recursive fib, CX interpreter\n")
+	for n = 10; n <= 22; n = n + 4 {
+		t0 = time.UnixNano()
+		r = fib(n)
+		t1 = time.UnixNano()
+		total = total + (t1 - t0)
+		printf("fib(%d) = %d   %d us\n", n, r, i64.i32((t1-t0)/1000L))
+	}
+	printf("total %d ms\n", i64.i32(total/1000000L))
+}

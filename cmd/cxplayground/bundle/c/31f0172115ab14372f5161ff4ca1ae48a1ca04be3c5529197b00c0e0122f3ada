@@ -1,7 +1,0 @@
-package main
-
-// formatDate is strftime "%Y-%m-%d" in UTC.
-func formatDate(epoch i64) (formatted str) {
-	year, month, day := civilDate(epoch / 86400L)
-	formatted = joinStrings([]str{i64.str(year), "-", padTwo(month), "-", padTwo(day)})
-}

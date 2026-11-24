@@ -1,9 +1,0 @@
-package main
-
-// Port of llm_tool_call_t of llm/llm_proxy.h. inputJson is "" when the
-// reply had no input, where the C code holds NULL.
-type ToolCall struct {
-	id str
-	name str
-	inputJson str
-}

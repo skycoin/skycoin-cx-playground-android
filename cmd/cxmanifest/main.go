@@ -7,6 +7,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -37,7 +38,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: cxmanifest build|hash [-chunk N] DIR | bundle -o OUT DIR... | verify BUNDLE")
+	fmt.Fprintln(os.Stderr, "usage: cxmanifest build|hash [-chunk N] DIR | bundle -o OUT [-signatures OLD] DIR... | verify BUNDLE")
 	os.Exit(2)
 }
 
@@ -69,28 +70,39 @@ func build(cmd string, args []string) error {
 func bundle(args []string) error {
 	fl := flag.NewFlagSet("bundle", flag.ExitOnError)
 	out := fl.String("o", "", "output directory, replaced")
-	chunk := fl.Int("chunk", manifest.DefaultChunkSize, "chunk size in bytes")
+	signatures := fl.String("signatures", "", "earlier bundle whose signatures to keep for unchanged manifests, default the output directory")
 	fl.Parse(args)
 	if *out == "" || fl.NArg() == 0 {
 		usage()
 	}
-	var apps []store.Built
+	if *signatures == "" {
+		*signatures = *out
+	}
+	apps := map[string]map[string][]byte{}
 	for _, dir := range fl.Args() {
-		m, chunks, err := buildApp(dir, *chunk)
+		files, err := appFiles(dir)
 		if err != nil {
+			return err
+		}
+		var meta manifest.Meta
+		if err := json.Unmarshal(files[manifest.MetaFile].Data, &meta); err != nil {
 			return fmt.Errorf("%s: %w", dir, err)
 		}
-		apps = append(apps, store.Built{Manifest: m, Chunks: chunks})
+		if _, ok := apps[meta.Name]; ok {
+			return fmt.Errorf("%s: two apps are named %q", dir, meta.Name)
+		}
+		app := map[string][]byte{}
+		for name, f := range files {
+			app[name] = f.Data
+		}
+		apps[meta.Name] = app
 	}
-	if err := os.RemoveAll(*out); err != nil {
-		return err
-	}
-	hashes, err := store.WriteBundle(*out, apps)
+	rows, err := store.WriteBundle(*out, apps, os.DirFS(*signatures))
 	if err != nil {
 		return err
 	}
-	for i, h := range hashes {
-		fmt.Printf("%s  %s\n", h, apps[i].Manifest.Name)
+	for _, r := range rows {
+		fmt.Printf("%s  %s\n", r.Address, r.Name)
 	}
 	return nil
 }

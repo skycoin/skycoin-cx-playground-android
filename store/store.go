@@ -1,184 +1,249 @@
-// Package store fetches apps by manifest hash from a Source and verifies
-// every byte against the manifest. The APK assets are one Source. A network
-// Source (dmsg, skywire routes) only has to implement the same three
-// lookups by hash.
+// Package store reads the app bundle built into the APK. The bundle has the
+// layout of programstore, the store of programs fetched over the network:
+// a signed manifest list, one signed binary manifest and one linear packing
+// per app, and index.txt. Every block and file is verified against its
+// manifest as it is read. See docs/ProgramDistribution.md, decision D25.
 package store
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/skycoin/skycoin/src/cipher"
 
 	"github.com/skycoin/skycoin-cx-playground-android/manifest"
+	"github.com/skycoin/skycoin-cx-playground-android/programblocks"
+	"github.com/skycoin/skycoin-cx-playground-android/programstore"
 )
 
-// Bundle layout, relative to the bundle root.
+// Bundle layout, relative to the bundle root, the same as programstore.
 const (
+	ListFile    = "list.bin"
 	IndexFile   = "index.txt"
 	ManifestDir = "m"
-	ChunkDir    = "c"
+	PackingDir  = "p"
 )
 
-// Size limits for anything read from a Source.
-const (
-	MaxManifest = 1 << 20
-	MaxChunk    = 4 << 20
-)
+// BundleSeed derives the key that signs the bundle. It is public, so the
+// signature only says the bundle came from cxmanifest; the APK signature
+// covers the bundle's origin. The key is trusted for the bundle alone, never
+// for a program from the network.
+const BundleSeed = "cx playground bundle"
 
-// Source returns raw bytes by hash. It does not need to verify them.
-type Source interface {
-	// Index lists the app hashes the source offers.
-	Index() ([]manifest.Hash, error)
-	// Manifest returns the encoded manifest whose hash is h.
-	Manifest(h manifest.Hash) ([]byte, error)
-	// Chunk returns the chunk whose hash is h.
-	Chunk(h manifest.Hash) ([]byte, error)
+// BundleDate is the date in every bundle manifest, so a bundle of the same
+// apps has the same bytes.
+var BundleDate = time.Unix(1795392000, 0).UTC()
+
+// BundleSigner returns the public key and secret key of BundleSeed.
+func BundleSigner() (cipher.PubKey, cipher.SecKey) {
+	return cipher.MustGenerateDeterministicKeyPair([]byte(BundleSeed))
 }
 
-// App is a listed app with its verified manifest.
+// Source reads the files of a bundle by their path in the layout. It does
+// not need to verify them.
+type Source interface {
+	ReadFile(name string) ([]byte, error)
+}
+
+// FSSource is a Source over a file system, such as the embedded bundle.
+type FSSource struct{ FS fs.FS }
+
+// ReadFile reads name from the file system.
+func (s FSSource) ReadFile(name string) ([]byte, error) { return fs.ReadFile(s.FS, name) }
+
+// App is a listed app: the address of its binary manifest, in hex, and the
+// app manifest built from its cxapp.json.
 type App struct {
 	Hash     manifest.Hash
 	Manifest *manifest.Manifest
 }
 
-// List fetches and verifies the manifest of every app in src. Apps that
-// fail verification are returned in errs and left out of the list.
+// List verifies the bundle's manifest list and every app in it, and returns
+// the apps by name. An app that fails verification is left out and its
+// error returned in errs. err is set when the list itself cannot be read.
 func List(src Source) (apps []App, errs []error, err error) {
-	hashes, err := src.Index()
+	signer, _ := BundleSigner()
+	listBytes, err := src.ReadFile(ListFile)
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, h := range hashes {
-		m, err := Get(src, h)
+	list, listAddr, err := decodeSigned(listBytes, programblocks.Hash{}, signer)
+	if err != nil {
+		return nil, nil, fmt.Errorf("manifest list: %w", err)
+	}
+	programs, err := packedFiles(src, listAddr, list)
+	if err != nil {
+		return nil, nil, fmt.Errorf("manifest list: %w", err)
+	}
+	for _, name := range programblocks.ProgramNames(list) {
+		_, addr, err := decodeSigned(programs[name], programblocks.Hash{}, signer)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("app %s: %w", h, err))
+			errs = append(errs, fmt.Errorf("app %s: %w", name, err))
 			continue
 		}
-		apps = append(apps, App{Hash: h, Manifest: m})
+		app := App{Hash: manifest.Hash(addr.String())}
+		files, err := Load(src, app)
+		if err == nil {
+			app.Manifest, err = programblocks.AppManifest(files)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("app %s: %w", name, err))
+			continue
+		}
+		apps = append(apps, app)
 	}
+	sort.SliceStable(apps, func(i, j int) bool { return apps[i].Manifest.Name < apps[j].Manifest.Name })
 	return apps, errs, nil
 }
 
-// Get fetches and verifies one manifest.
-func Get(src Source, h manifest.Hash) (*manifest.Manifest, error) {
-	if !h.Valid() {
-		return nil, fmt.Errorf("bad app hash %q", h)
-	}
-	b, err := src.Manifest(h)
+// Load returns the files of app after checking its manifest, every block
+// and every file.
+func Load(src Source, app App) (map[string][]byte, error) {
+	signer, _ := BundleSigner()
+	addr, err := programblocks.HashFromHex(string(app.Hash))
 	if err != nil {
 		return nil, err
 	}
-	return manifest.Decode(b, h)
+	b, err := src.ReadFile(path.Join(ManifestDir, addr.String()+".bin"))
+	if err != nil {
+		return nil, err
+	}
+	m, _, err := decodeSigned(b, addr, signer)
+	if err != nil {
+		return nil, err
+	}
+	return packedFiles(src, addr, m)
 }
 
-// Load fetches every file of app, verified chunk by chunk.
-func Load(src Source, app App) (map[string][]byte, error) {
-	files := map[string][]byte{}
-	for _, f := range app.Manifest.Files {
-		b, err := app.Manifest.Assemble(f, src.Chunk)
-		if err != nil {
+func decodeSigned(b []byte, want programblocks.Hash, signer cipher.PubKey) (*programblocks.Manifest, programblocks.Hash, error) {
+	m, addr, err := programblocks.Decode(b, want)
+	if err != nil {
+		return nil, addr, err
+	}
+	if m.SignerPublicKey != signer {
+		return nil, addr, fmt.Errorf("%w: %s", programblocks.ErrUntrusted, m.SignerPublicKey.Hex())
+	}
+	return m, addr, nil
+}
+
+// packedFiles reads the linear packing of m, the manifest at addr, and
+// returns its files once every block and file is verified.
+func packedFiles(src Source, addr programblocks.Hash, m *programblocks.Manifest) (map[string][]byte, error) {
+	pack, err := src.ReadFile(path.Join(PackingDir, addr.String()+".pack"))
+	if err != nil {
+		return nil, err
+	}
+	if uint64(len(pack)) != m.PackLength {
+		return nil, fmt.Errorf("packing of %s has %d bytes, the manifest %d", addr, len(pack), m.PackLength)
+	}
+	a := programblocks.NewAssembly(m)
+	if _, err := a.Accept(0, pack); err != nil {
+		return nil, err
+	}
+	return a.Files()
+}
+
+// WriteBundle writes apps, each a map of file path to bytes with its
+// cxapp.json, keyed by app name, as a bundle in dir, which it replaces. A
+// signature is not repeatable, so a manifest whose address is the same as
+// in previous, an earlier bundle or nil, keeps the signature it has there,
+// and the bundle of the same apps has the same bytes. It returns the rows of
+// index.txt.
+func WriteBundle(dir string, apps map[string]map[string][]byte, previous fs.FS) ([]programstore.Row, error) {
+	signer, secret := BundleSigner()
+	sign := func(m *programblocks.Manifest) error {
+		// The address covers the signer key but not the signature.
+		m.SignerPublicKey, m.Signature = signer, cipher.Sig{}
+		if previous == nil {
+			return m.Sign(secret)
+		}
+		for _, name := range []string{path.Join(ManifestDir, m.Address().String()+".bin"), ListFile} {
+			b, err := fs.ReadFile(previous, name)
+			if err != nil {
+				continue
+			}
+			if old, _, err := programblocks.Decode(b, m.Address()); err == nil && old.SignerPublicKey == signer {
+				m.SignerPublicKey, m.Signature = old.SignerPublicKey, old.Signature
+				return nil
+			}
+		}
+		return m.Sign(secret)
+	}
+	type built struct {
+		manifest *programblocks.Manifest
+		encoded  []byte
+		pack     []byte
+	}
+	var programs []built
+	write := func(m *programblocks.Manifest, pack []byte) ([]byte, error) {
+		if err := sign(m); err != nil {
 			return nil, err
 		}
-		files[f.Path] = b
+		b := m.Encode()
+		programs = append(programs, built{m, b, pack})
+		return b, nil
 	}
-	return files, nil
-}
-
-// ParseIndex parses an index file: one app hash per line, # comments.
-func ParseIndex(b []byte) ([]manifest.Hash, error) {
-	var out []manifest.Hash
-	sc := bufio.NewScanner(bytes.NewReader(b))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		h := manifest.Hash(line)
-		if !h.Valid() {
-			return nil, fmt.Errorf("bad hash %q in index", line)
-		}
-		out = append(out, h)
+	encoded := map[string][]byte{}
+	names := make([]string, 0, len(apps))
+	for name := range apps {
+		names = append(names, name)
 	}
-	return out, sc.Err()
-}
-
-// FSSource reads a bundle from a file system.
-type FSSource struct{ FS fs.FS }
-
-func (s FSSource) read(name string, limit int64) ([]byte, error) {
-	f, err := s.FS.Open(name)
+	sort.Strings(names)
+	var rows []programstore.Row
+	for i, name := range names {
+		m, pack, err := programblocks.Build(apps[name], programblocks.DefaultBlockSize, BundleDate)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		if encoded[name], err = write(m, pack); err != nil {
+			return nil, err
+		}
+		rows = append(rows, programstore.Row{Number: i + 1, Address: m.Address().String(), State: programstore.StateCached, Length: int64(m.PackLength), Name: name})
+	}
+	list, listPack, err := programblocks.BuildManifestList(encoded, BundleDate)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	return manifest.ReadAllLimited(f, limit)
-}
-
-// Index implements Source.
-func (s FSSource) Index() ([]manifest.Hash, error) {
-	b, err := s.read(IndexFile, MaxManifest)
+	listEncoded, err := write(list, listPack)
 	if err != nil {
 		return nil, err
 	}
-	return ParseIndex(b)
-}
 
-// Manifest implements Source.
-func (s FSSource) Manifest(h manifest.Hash) ([]byte, error) {
-	return s.read(ManifestDir+"/"+string(h)+".json", MaxManifest)
-}
-
-// Chunk implements Source.
-func (s FSSource) Chunk(h manifest.Hash) ([]byte, error) {
-	return s.read(ChunkDir+"/"+string(h), MaxChunk)
-}
-
-// Built is one app ready to be written to a bundle.
-type Built struct {
-	Manifest *manifest.Manifest
-	Chunks   map[manifest.Hash][]byte
-}
-
-// WriteBundle writes apps into dir in the bundle layout and returns their
-// hashes in index order. Apps are ordered by name.
-func WriteBundle(dir string, apps []Built) ([]manifest.Hash, error) {
-	sort.SliceStable(apps, func(i, j int) bool { return apps[i].Manifest.Name < apps[j].Manifest.Name })
-	for _, d := range []string{ManifestDir, ChunkDir} {
+	if err := os.RemoveAll(dir); err != nil {
+		return nil, err
+	}
+	for _, d := range []string{ManifestDir, PackingDir} {
 		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
 			return nil, err
 		}
 	}
-	var hashes []manifest.Hash
-	var index bytes.Buffer
-	index.WriteString("# CX app hashes, one per line. Generated by cxmanifest bundle.\n")
-	for _, a := range apps {
-		b, err := a.Manifest.Encode()
-		if err != nil {
+	for _, p := range programs {
+		addr := p.manifest.Address().String()
+		if err := os.WriteFile(filepath.Join(dir, ManifestDir, addr+".bin"), p.encoded, 0o644); err != nil {
 			return nil, err
 		}
-		h := manifest.Sum(b)
-		if err := os.WriteFile(filepath.Join(dir, ManifestDir, string(h)+".json"), b, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, PackingDir, addr+".pack"), p.pack, 0o644); err != nil {
 			return nil, err
 		}
-		for ch, c := range a.Chunks {
-			if err := os.WriteFile(filepath.Join(dir, ChunkDir, string(ch)), c, 0o644); err != nil {
-				return nil, err
-			}
-		}
-		hashes = append(hashes, h)
-		fmt.Fprintln(&index, h)
 	}
-	return hashes, os.WriteFile(filepath.Join(dir, IndexFile), index.Bytes(), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, ListFile), listEncoded, 0o644); err != nil {
+		return nil, err
+	}
+	var index strings.Builder
+	for _, r := range rows {
+		index.WriteString(r.Line() + "\n")
+	}
+	return rows, os.WriteFile(filepath.Join(dir, IndexFile), []byte(index.String()), 0o644)
 }
 
 // WriteDataFiles writes the files of an app that are not CX sources under
-// dir, the sandbox root a program reads them from, and returns whether there
-// were any.
+// dir, the sandbox root of its program, and reports whether it wrote any.
 func WriteDataFiles(dir string, files map[string][]byte) (bool, error) {
 	wrote := false
 	for name, b := range files {

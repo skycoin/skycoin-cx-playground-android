@@ -1,4 +1,0 @@
-This app holds no program. It fetches the program its args name from the
-server its args give, over UDP, checks the manifest signature against the
-signer key of its args and every block hash, then runs the program.
-See docs/ProgramDistribution.md.

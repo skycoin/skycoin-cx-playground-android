@@ -1,7 +1,0 @@
-package main
-
-func main() {
-	wrapperInit()
-	agentLoopRun()
-	wrapperFinish()
-}

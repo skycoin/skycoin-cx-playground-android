@@ -1,8 +1,0 @@
-package main
-
-import "sys/string"
-
-// Port of validate_path of tools/tool_files.c.
-func toolValidatePath(path str) (valid bool) {
-	valid = string.ByteIndexOfFirstSubstring(path, "/spiffs/") == 0 && string.ByteIndexOfFirstSubstring(path, "..") < 0
-}

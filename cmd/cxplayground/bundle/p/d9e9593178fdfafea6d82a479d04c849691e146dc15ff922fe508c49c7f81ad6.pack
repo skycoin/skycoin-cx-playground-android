@@ -1,0 +1,58 @@
+{"name":"Spinning triangles","description":"Animated triangles drawn every frame on the GPU, with FPS and screen size","kind":"gfx"}package main
+
+import "sys/app"
+import "sys/time"
+
+func tri(cx f32, cy f32, r f32, a f32, red f32, green f32, blue f32) {
+	var k f32 = 2.0944
+	app.Tri(cx+r*f32.cos(a), cy+r*f32.sin(a), cx+r*f32.cos(a+k), cy+r*f32.sin(a+k), cx+r*f32.cos(a+k+k), cy+r*f32.sin(a+k+k), red, green, blue, 1.0)
+}
+
+func main() {
+	var w i32
+	var h i32
+	var kind i32
+	var ex f32
+	var ey f32
+	var code i32
+	var frames i32 = 0
+	var fps i32 = 0
+	var last i64 = time.UnixMilli()
+	var start i64 = last
+	var now i64
+	var t f32
+	var cx f32
+	var cy f32
+	var r f32
+
+	for bool.not(app.ShouldClose()) {
+		w, h = app.ScreenSize()
+		kind, ex, ey, code = app.PollEvent()
+		for kind != app.NONE {
+			kind, ex, ey, code = app.PollEvent()
+		}
+
+		now = time.UnixMilli()
+		t = i64.f32(now-start) / 1000.0
+		cx = i32.f32(w) / 2.0
+		cy = i32.f32(h) / 2.0
+		r = cx * 0.8
+
+		app.Clear(0.05, 0.06, 0.1)
+		tri(cx, cy, r, t, 0.9, 0.2, 0.3)
+		tri(cx, cy, r*0.66, 0.0-t*1.5, 0.2, 0.8, 0.4)
+		tri(cx, cy, r*0.36, t*2.5, 0.25, 0.45, 1.0)
+		app.Circle(cx, cy, r*0.08, 1.0, 1.0, 1.0, 0.9)
+		app.Rect(0.0, i32.f32(h)-12.0, i32.f32(w)*(f32.sin(t)*0.5+0.5), 12.0, 0.9, 0.7, 0.1, 1.0)
+
+		frames = frames + 1
+		if now-last >= 1000L {
+			fps = frames
+			frames = 0
+			last = now
+		}
+		app.Text(sprintf("%d fps", fps), 24.0, 40.0, 48.0, 1.0, 1.0, 1.0, 1.0)
+		app.Text(sprintf("screen %dx%d px", w, h), 24.0, 100.0, 36.0, 0.7, 0.8, 1.0, 1.0)
+		app.Frame()
+	}
+}

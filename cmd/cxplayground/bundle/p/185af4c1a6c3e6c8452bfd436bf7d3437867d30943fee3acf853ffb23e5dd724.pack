@@ -1,0 +1,4 @@
+{"name":"Programs: fetch over UDP with loss","description":"Test demo: the fetch with 40% of the packets dropped and 50 ms delay","kind":"fetch","entry":"fetch.txt","args":["10.0.2.2:7003","03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d","fib-and-primes"]}This app holds no program. It fetches the program its args name from the
+server its args give, over UDP, checks the manifest signature against the
+signer key of its args and every block hash, then runs the program.
+See docs/ProgramDistribution.md.

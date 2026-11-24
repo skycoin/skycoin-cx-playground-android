@@ -355,10 +355,10 @@ the manifest is verified.
 
 This section says how the new format sits next to the existing one.
 
-- The JSON manifest stays for the apps embedded in the APK, and the binary
-  format is used for programs fetched over the network. The loader of #17
-  moves the embedded bundle to the binary format later. Decision D25 asks
-  whether to replace the JSON manifest at once instead.
+- The embedded bundle uses the binary format too, in the layout of the
+  program store, as D25 option a planned once the store existed. The JSON
+  form stays only as the output of `cxmanifest build` and `hash` and as the
+  app manifest the app shows and runs.
 - The program metadata (name, kind, form, entry, arguments) stays in
   `cxapp.json`, which is an ordinary file of the binary manifest. A client
   rebuilds a `manifest.Manifest` from the downloaded files with
@@ -781,7 +781,8 @@ D25 ProgramManifestReplacesJsonManifestDecision
 - Option b: replace the JSON manifest everywhere in this batch, including
   the bundle, `store` and `cxmanifest`.
 - Recommendation: option a, because it keeps each pull request small and the
-  bundle tests unchanged while the network format settles.
+  bundle tests unchanged while the network format settles. Done: the
+  bundle moved to the binary manifest after the store of #17.
 
 D26 ProgramPacketSizeDecision
 - What exists now: there is no program packet.

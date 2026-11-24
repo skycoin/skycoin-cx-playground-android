@@ -29,15 +29,18 @@ into a manifest:
 }
 ```
 
-Each file is split into `chunk_size` pieces, the last one shorter, and
-`chunks` lists the SHA-256 of each piece in order. The app hash is the
-SHA-256 of the manifest bytes exactly as encoded. The home screen lists one
-line per app, and an opened app shows its hash and manifest details.
-
-A bundle is content addressed: `index.txt` lists app hashes, `m/<hash>.json`
-holds manifests and `c/<hash>` holds chunks. The app embeds the bundle built
-from `apps/` and checks every manifest against its hash and every chunk,
-file size and file hash before it runs anything.
+`cxmanifest build` and `hash` still print this JSON form of one app, and the
+app shows its fields. The bundle the APK embeds uses the binary manifest of
+docs/ProgramDistribution.md instead, in the layout of the program store:
+`list.bin` is the signed manifest list, `m/<address>.bin` one signed binary
+manifest per app, `p/<address>.pack` its linear packing and `index.txt` one
+line per app. The app checks the list, every manifest and its signer, every
+512-byte block and every file before it runs anything, and an app's hash is
+its manifest address. The bundle key comes from a seed in `store`, so it only
+marks the bundle as made by `cxmanifest`, and it is trusted for the bundle
+alone. Signatures are not repeatable, so `cxmanifest bundle` keeps the
+signature of each manifest whose address has not changed, and a rebuild of
+the same apps gives the same bytes.
 
 ```
 cxmanifest hash apps/keyboard
@@ -88,9 +91,8 @@ console app prints to the console and has no grid and no keys.
 | `KEY? ( -- flag )` | whether a key is waiting |
 | `SHOW ( -- )` | draws the grid now, as `KEY` and the end of the program do |
 
-Fetching apps over the network is deferred. `store.Source` is the seam: a
-loader that can return an index, a manifest and a chunk by hash plugs in
-without changes to verification or the UI.
+`store.Source` reads a bundle by path in that layout, and the program
+loader below fetches programs over the network into the same layout.
 
 ### Programs over UDP
 

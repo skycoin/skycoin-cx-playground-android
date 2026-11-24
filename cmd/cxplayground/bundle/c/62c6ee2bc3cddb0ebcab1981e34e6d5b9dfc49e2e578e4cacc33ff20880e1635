@@ -1,7 +1,0 @@
-package main
-
-// hexDigit returns the lower case hex digit of value 0 to 15.
-func hexDigit(value i32) (digit str) {
-	var digits []str = []str{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"}
-	digit = digits[value]
-}

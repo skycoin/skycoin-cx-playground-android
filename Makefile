@@ -14,7 +14,7 @@ bundle: ## Rebuild the embedded app bundle from apps/
 	go run ./cmd/cxmanifest bundle -o cmd/cxplayground/bundle apps/* tests/*/app
 
 check-bundle: ## Fail if the committed bundle is stale
-	go run ./cmd/cxmanifest bundle -o build/bundle-check apps/* tests/*/app > /dev/null
+	go run ./cmd/cxmanifest bundle -o build/bundle-check -signatures cmd/cxplayground/bundle apps/* tests/*/app > /dev/null
 	diff -r build/bundle-check cmd/cxplayground/bundle
 
 test: ## Run the tests, including every bundled CX app headless

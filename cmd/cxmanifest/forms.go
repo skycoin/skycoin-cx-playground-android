@@ -22,9 +22,19 @@ const (
 // CX sources become one serialized program, and a forth app with a
 // cxir_example gets that program's Forth translation.
 func buildApp(dir string, chunk int) (*manifest.Manifest, map[manifest.Hash][]byte, error) {
-	files, meta, err := manifest.ReadDir(dir)
+	files, err := appFiles(dir)
 	if err != nil {
 		return nil, nil, err
+	}
+	return manifest.Build(files, chunk)
+}
+
+// appFiles returns the files of the app directory dir with the program
+// forms applied and the final cxapp.json, the files the bundle holds.
+func appFiles(dir string) (fstest.MapFS, error) {
+	files, meta, err := manifest.ReadDir(dir)
+	if err != nil {
+		return nil, err
 	}
 	switch meta.Form {
 	case manifest.FormSource:
@@ -39,9 +49,9 @@ func buildApp(dir string, chunk int) (*manifest.Manifest, map[manifest.Hash][]by
 		err = manifest.SetMeta(files, meta)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s: %w", dir, err)
+		return nil, fmt.Errorf("%s: %w", dir, err)
 	}
-	return manifest.Build(files, chunk)
+	return files, nil
 }
 
 // serializeApp compiles the .cx files with the pinned skycoin-cx and replaces

@@ -1,8 +1,0 @@
-package main
-
-// How every file, network, clock and inbound operation is served, chosen at
-// start by ++mode=live|record|replay.
-
-var WrapperModeLive i32 = 0
-var WrapperModeRecord i32 = 1
-var WrapperModeReplay i32 = 2

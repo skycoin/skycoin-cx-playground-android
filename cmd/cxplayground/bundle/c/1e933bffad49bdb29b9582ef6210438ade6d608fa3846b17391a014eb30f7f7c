@@ -1,4 +1,0 @@
-This app holds no program. It opens the program loader on the server its
-args give, trusting the signer keys of its args: a list of the server's
-programs, each of which can be downloaded into the store, validated and
-run. See "Loader, lister and runner (#17)" in docs/ProgramDistribution.md.
