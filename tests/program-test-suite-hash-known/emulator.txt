@@ -1,0 +1,4 @@
+# Known SHA-256 vectors and a Merkle hash computed in CX, from the hash and memory program.
+app Test program: hash and memory
+ready start app="Test program: hash and memory"
+timeout 60

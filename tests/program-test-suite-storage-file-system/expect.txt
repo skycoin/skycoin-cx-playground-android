@@ -1,0 +1,11 @@
+out test program done
+finished app="Test program: storage and serial" err=<nil>
+result StorageFileSystemRead1024 true
+result StorageFileSystemRead2048 true
+result StorageFileSystemRead4096 true
+result StorageFileSystemRead512 true
+result StorageFileSystemWrite1024 true
+result StorageFileSystemWrite2048 true
+result StorageFileSystemWrite4096 true
+result StorageFileSystemWrite512 true
+results-pass

@@ -1,0 +1,4 @@
+# The phone has no UART or SPI, so the serial tests report skipped.
+app Test program: storage and serial
+ready start app="Test program: storage and serial"
+timeout 120

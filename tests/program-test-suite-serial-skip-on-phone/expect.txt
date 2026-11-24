@@ -1,0 +1,7 @@
+out test program done
+finished app="Test program: storage and serial" err=<nil>
+result SerialSpiRead skipped
+result SerialSpiWrite skipped
+result SerialUartRead skipped
+result SerialUartWrite skipped
+results-pass

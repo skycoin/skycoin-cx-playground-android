@@ -1,0 +1,4 @@
+# Method A: one file per block size written and read back through the file system.
+app Test program: storage and serial
+ready start app="Test program: storage and serial"
+timeout 120

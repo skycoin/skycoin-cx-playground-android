@@ -1,0 +1,515 @@
+{"name":"Test program: hash and memory","description":"Known SHA-256 and Merkle hashes and memory pattern tests, one result line each","kind":"console"}package main
+
+// Test program 1 of skycoin-cx-playground-android #19: known answer hashes
+// and memory pattern tests. Every test prints one result line, see
+// testreport.Result: name, verdict, blocks/s, KB/s and latency in us.
+
+import "sys/time"
+
+var sha256RoundConstants [64]ui32
+var sha256State [8]ui32
+var sha256Schedule [64]ui32
+
+// memoryWords is 128 KiB of ui32, the memory under test.
+var memoryWords [32768]ui32
+
+func sha256Reset() { global sha256State
+	sha256State[0] = 1779033703U
+	sha256State[1] = 3144134277U
+	sha256State[2] = 1013904242U
+	sha256State[3] = 2773480762U
+	sha256State[4] = 1359893119U
+	sha256State[5] = 2600822924U
+	sha256State[6] = 528734635U
+	sha256State[7] = 1541459225U
+}
+
+func sha256RoundConstantsInit() { global sha256RoundConstants
+	sha256RoundConstants[0] = 1116352408U
+	sha256RoundConstants[1] = 1899447441U
+	sha256RoundConstants[2] = 3049323471U
+	sha256RoundConstants[3] = 3921009573U
+	sha256RoundConstants[4] = 961987163U
+	sha256RoundConstants[5] = 1508970993U
+	sha256RoundConstants[6] = 2453635748U
+	sha256RoundConstants[7] = 2870763221U
+	sha256RoundConstants[8] = 3624381080U
+	sha256RoundConstants[9] = 310598401U
+	sha256RoundConstants[10] = 607225278U
+	sha256RoundConstants[11] = 1426881987U
+	sha256RoundConstants[12] = 1925078388U
+	sha256RoundConstants[13] = 2162078206U
+	sha256RoundConstants[14] = 2614888103U
+	sha256RoundConstants[15] = 3248222580U
+	sha256RoundConstants[16] = 3835390401U
+	sha256RoundConstants[17] = 4022224774U
+	sha256RoundConstants[18] = 264347078U
+	sha256RoundConstants[19] = 604807628U
+	sha256RoundConstants[20] = 770255983U
+	sha256RoundConstants[21] = 1249150122U
+	sha256RoundConstants[22] = 1555081692U
+	sha256RoundConstants[23] = 1996064986U
+	sha256RoundConstants[24] = 2554220882U
+	sha256RoundConstants[25] = 2821834349U
+	sha256RoundConstants[26] = 2952996808U
+	sha256RoundConstants[27] = 3210313671U
+	sha256RoundConstants[28] = 3336571891U
+	sha256RoundConstants[29] = 3584528711U
+	sha256RoundConstants[30] = 113926993U
+	sha256RoundConstants[31] = 338241895U
+	sha256RoundConstants[32] = 666307205U
+	sha256RoundConstants[33] = 773529912U
+	sha256RoundConstants[34] = 1294757372U
+	sha256RoundConstants[35] = 1396182291U
+	sha256RoundConstants[36] = 1695183700U
+	sha256RoundConstants[37] = 1986661051U
+	sha256RoundConstants[38] = 2177026350U
+	sha256RoundConstants[39] = 2456956037U
+	sha256RoundConstants[40] = 2730485921U
+	sha256RoundConstants[41] = 2820302411U
+	sha256RoundConstants[42] = 3259730800U
+	sha256RoundConstants[43] = 3345764771U
+	sha256RoundConstants[44] = 3516065817U
+	sha256RoundConstants[45] = 3600352804U
+	sha256RoundConstants[46] = 4094571909U
+	sha256RoundConstants[47] = 275423344U
+	sha256RoundConstants[48] = 430227734U
+	sha256RoundConstants[49] = 506948616U
+	sha256RoundConstants[50] = 659060556U
+	sha256RoundConstants[51] = 883997877U
+	sha256RoundConstants[52] = 958139571U
+	sha256RoundConstants[53] = 1322822218U
+	sha256RoundConstants[54] = 1537002063U
+	sha256RoundConstants[55] = 1747873779U
+	sha256RoundConstants[56] = 1955562222U
+	sha256RoundConstants[57] = 2024104815U
+	sha256RoundConstants[58] = 2227730452U
+	sha256RoundConstants[59] = 2361852424U
+	sha256RoundConstants[60] = 2428436474U
+	sha256RoundConstants[61] = 2756734187U
+	sha256RoundConstants[62] = 3204031479U
+	sha256RoundConstants[63] = 3329325298U
+}
+
+func rotateRight(x ui32, n ui32) (r ui32) {
+	r = (x >> n) | (x << (32U - n))
+}
+
+// sha256Compress folds the 64-byte block of message at offset into
+// sha256State, FIPS 180-4 section 6.2.2.
+func sha256Compress(message []ui8, offset i32) { global sha256RoundConstants, sha256State, sha256Schedule
+	var t i32
+	var j i32
+	for t = 0; t < 16; t++ {
+		j = offset + t*4
+		sha256Schedule[t] = (ui8.ui32(message[j]) << 24U) | (ui8.ui32(message[j+1]) << 16U) | (ui8.ui32(message[j+2]) << 8U) | ui8.ui32(message[j+3])
+	}
+	var x ui32
+	var s0 ui32
+	var s1 ui32
+	for t = 16; t < 64; t++ {
+		x = sha256Schedule[t-15]
+		s0 = rotateRight(x, 7U) ^ rotateRight(x, 18U) ^ (x >> 3U)
+		x = sha256Schedule[t-2]
+		s1 = rotateRight(x, 17U) ^ rotateRight(x, 19U) ^ (x >> 10U)
+		sha256Schedule[t] = sha256Schedule[t-16] + s0 + sha256Schedule[t-7] + s1
+	}
+	var a ui32
+	var b ui32
+	var c ui32
+	var d ui32
+	var e ui32
+	var f ui32
+	var g ui32
+	var h ui32
+	var choose ui32
+	var majority ui32
+	var temp1 ui32
+	var temp2 ui32
+	a = sha256State[0]
+	b = sha256State[1]
+	c = sha256State[2]
+	d = sha256State[3]
+	e = sha256State[4]
+	f = sha256State[5]
+	g = sha256State[6]
+	h = sha256State[7]
+	for t = 0; t < 64; t++ {
+		s1 = rotateRight(e, 6U) ^ rotateRight(e, 11U) ^ rotateRight(e, 25U)
+		choose = (e & f) ^ ((e ^ 4294967295U) & g)
+		temp1 = h + s1 + choose + sha256RoundConstants[t] + sha256Schedule[t]
+		s0 = rotateRight(a, 2U) ^ rotateRight(a, 13U) ^ rotateRight(a, 22U)
+		majority = (a & b) ^ (a & c) ^ (b & c)
+		temp2 = s0 + majority
+		h = g
+		g = f
+		f = e
+		e = d + temp1
+		d = c
+		c = b
+		b = a
+		a = temp1 + temp2
+	}
+	sha256State[0] = sha256State[0] + a
+	sha256State[1] = sha256State[1] + b
+	sha256State[2] = sha256State[2] + c
+	sha256State[3] = sha256State[3] + d
+	sha256State[4] = sha256State[4] + e
+	sha256State[5] = sha256State[5] + f
+	sha256State[6] = sha256State[6] + g
+	sha256State[7] = sha256State[7] + h
+}
+
+// sha256Sum hashes message into sha256State and returns the number of
+// 64-byte blocks it compressed.
+func sha256Sum(message []ui8) (blocks i32) {
+	sha256Reset()
+	var padded []ui8
+	var i i32
+	for i = 0; i < len(message); i++ {
+		padded = append(padded, message[i])
+	}
+	padded = append(padded, 128UB)
+	for len(padded)%64 != 56 {
+		padded = append(padded, 0UB)
+	}
+	var bitLength ui64
+	bitLength = i32.ui64(len(message)) * 8UL
+	var shift ui64
+	for shift = 56UL; shift < 64UL; shift = shift - 8UL {
+		padded = append(padded, ui64.ui8(bitLength >> shift))
+	}
+	blocks = 0
+	for i = 0; i < len(padded); i = i + 64 {
+		sha256Compress(padded, i)
+		blocks++
+	}
+}
+
+func sha256StateEquals(w0 ui32, w1 ui32, w2 ui32, w3 ui32, w4 ui32, w5 ui32, w6 ui32, w7 ui32) (equal bool) { global sha256State
+	equal = sha256State[0] == w0 && sha256State[1] == w1 && sha256State[2] == w2 && sha256State[3] == w3
+	equal = equal && sha256State[4] == w4 && sha256State[5] == w5 && sha256State[6] == w6 && sha256State[7] == w7
+}
+
+// appendSha256State appends the digest in sha256State to bytes, big endian.
+func appendSha256State(bytes []ui8) (out []ui8) { global sha256State
+	out = bytes
+	var i i32
+	for i = 0; i < 8; i++ {
+		out = append(out, ui32.ui8(sha256State[i] >> 24U))
+		out = append(out, ui32.ui8(sha256State[i] >> 16U))
+		out = append(out, ui32.ui8(sha256State[i] >> 8U))
+		out = append(out, ui32.ui8(sha256State[i]))
+	}
+}
+
+// decimalThousandths formats value / 1000 with three decimals.
+func decimalThousandths(value i64) (text str) {
+	var fraction i64
+	fraction = value % 1000L
+	text = sprintf("%d.", value / 1000L)
+	if fraction < 100L {
+		text = sprintf("%s0", text)
+	}
+	if fraction < 10L {
+		text = sprintf("%s0", text)
+	}
+	text = sprintf("%s%d", text, fraction)
+}
+
+// reportResult prints the result line of one test. bytes counts every
+// byte written and read, elapsed covers only the measured work.
+func reportResult(name str, passed bool, blocks i64, bytes i64, elapsed i64, note str) {
+	if elapsed < 1L {
+		elapsed = 1L
+	}
+	if blocks < 1L {
+		blocks = 1L
+	}
+	var verdict str
+	verdict = "false"
+	if passed {
+		verdict = "true"
+	}
+	printf("%s %s %d %d %s %s\n", name, verdict, blocks * 1000000000L / elapsed, bytes * 1000000000L / (elapsed * 1024L), decimalThousandths(elapsed / blocks), note)
+}
+
+func testHashSha256Known() {
+	var passed bool
+	var blocks i32
+	var message []ui8
+	var t0 i64
+	var elapsed i64
+	var i i32
+	var j i32
+
+	t0 = time.UnixNano()
+	blocks = sha256Sum(message)
+	passed = sha256StateEquals(3820012610U, 2566659092U, 2600203464U, 2574235940U, 665731556U, 1687917388U, 2761267483U, 2018687061U)
+
+	message = append(message, 97UB)
+	message = append(message, 98UB)
+	message = append(message, 99UB)
+	blocks = blocks + sha256Sum(message)
+	passed = passed && sha256StateEquals(3128432319U, 2399260650U, 1094795486U, 1571693091U, 2953011619U, 2518121116U, 3021012833U, 4060091821U)
+
+	// abcdbcde...nopq, FIPS 180-4 example two.
+	var long []ui8
+	for i = 0; i < 14; i++ {
+		for j = 0; j < 4; j++ {
+			long = append(long, i32.ui8(97 + i + j))
+		}
+	}
+	blocks = blocks + sha256Sum(long)
+	passed = passed && sha256StateEquals(613247585U, 3523623096U, 3854575251U, 205414457U, 2738676825U, 1694441831U, 4142722516U, 433784513U)
+
+	// 16 KiB of (i*131 + 17) & 255, digest from Go's crypto/sha256.
+	var bulk []ui8
+	for i = 0; i < 16384; i++ {
+		bulk = append(bulk, i32.ui8(i * 131 + 17))
+	}
+	blocks = blocks + sha256Sum(bulk)
+	passed = passed && sha256StateEquals(3832721797U, 984486495U, 947071032U, 505805717U, 2178106223U, 3342609794U, 3148226268U, 995016990U)
+	elapsed = time.UnixNano() - t0
+	reportResult("HashSha256Known", passed, i32.i64(blocks), i32.i64(blocks) * 64L, elapsed, "block=64B vectors=4")
+}
+
+// testHashMerkleKnown builds the Merkle hash of programblocks.MerkleHash
+// over five 512-byte blocks: inner nodes hash 0x01, left and right, and an
+// odd last node moves up unchanged.
+func testHashMerkleKnown() {
+	var t0 i64
+	var blocks i32
+	var leafCount i32
+	var i i32
+	var j i32
+	var level []ui8
+	var next []ui8
+	var block []ui8
+	var node []ui8
+
+	t0 = time.UnixNano()
+	blocks = 0
+	leafCount = 5
+	for j = 0; j < leafCount; j++ {
+		block = []ui8{}
+		for i = 0; i < 512; i++ {
+			block = append(block, i32.ui8(i + j*13))
+		}
+		blocks = blocks + sha256Sum(block)
+		level = appendSha256State(level)
+	}
+	var count i32
+	count = leafCount
+	for count > 1 {
+		next = []ui8{}
+		for j = 0; j < count; j = j + 2 {
+			if j + 1 == count {
+				for i = 0; i < 32; i++ {
+					next = append(next, level[j*32 + i])
+				}
+			} else {
+				node = []ui8{}
+				node = append(node, 1UB)
+				for i = 0; i < 64; i++ {
+					node = append(node, level[j*32 + i])
+				}
+				blocks = blocks + sha256Sum(node)
+				next = appendSha256State(next)
+			}
+		}
+		level = next
+		count = (count + 1) / 2
+	}
+	// The root is the only node left; load it into sha256State to compare.
+	var passed bool
+	passed = true
+	var expected [8]ui32
+	expected[0] = 3144403875U
+	expected[1] = 1852244089U
+	expected[2] = 2768136459U
+	expected[3] = 1497452948U
+	expected[4] = 2161111766U
+	expected[5] = 3353591430U
+	expected[6] = 1448135938U
+	expected[7] = 912989406U
+	var word ui32
+	for i = 0; i < 8; i++ {
+		word = (ui8.ui32(level[i*4]) << 24U) | (ui8.ui32(level[i*4+1]) << 16U) | (ui8.ui32(level[i*4+2]) << 8U) | ui8.ui32(level[i*4+3])
+		passed = passed && word == expected[i]
+	}
+	reportResult("HashMerkleKnown", passed, i32.i64(blocks), i32.i64(blocks) * 64L, time.UnixNano() - t0, "block=64B leaves=5")
+}
+
+// The memory tests follow memtest.cx of skycoin-cx t0-benchmarks/compare:
+// each writes a pattern over memoryWords, reads it back and counts the
+// words that differ. A block is one 4-byte word written or read.
+
+func testMemoryPatternAddress() { global memoryWords
+	var n i32
+	n = len(memoryWords)
+	var i i32
+	var bad i32
+	var t0 i64
+	t0 = time.UnixNano()
+	bad = 0
+	for i = 0; i < n; i++ {
+		memoryWords[i] = i32.ui32(i)
+	}
+	for i = 0; i < n; i++ {
+		if memoryWords[i] != i32.ui32(i) {
+			bad++
+		}
+	}
+	for i = 0; i < n; i++ {
+		memoryWords[i] = i32.ui32(i) ^ 4294967295U
+	}
+	for i = 0; i < n; i++ {
+		if memoryWords[i] != (i32.ui32(i) ^ 4294967295U) {
+			bad++
+		}
+	}
+	reportResult("MemoryPatternAddress", bad == 0, i32.i64(n) * 4L, i32.i64(n) * 16L, time.UnixNano() - t0, sprintf("block=4B words=%d mismatches=%d", n, bad))
+}
+
+// walkingBits writes 1 << bit, or its inverse, for every bit over the first
+// walk words and returns the mismatches.
+func walkingBits(walk i32, inverted bool) (bad i32) { global memoryWords
+	var bit ui32
+	var pattern ui32
+	var i i32
+	bad = 0
+	for bit = 0U; bit < 32U; bit++ {
+		pattern = 1U << bit
+		if inverted {
+			pattern = pattern ^ 4294967295U
+		}
+		for i = 0; i < walk; i++ {
+			memoryWords[i] = pattern
+		}
+		for i = 0; i < walk; i++ {
+			if memoryWords[i] != pattern {
+				bad++
+			}
+		}
+	}
+}
+
+func testMemoryPatternWalking(name str, inverted bool) {
+	var walk i32
+	walk = 2048
+	var t0 i64
+	var bad i32
+	t0 = time.UnixNano()
+	bad = walkingBits(walk, inverted)
+	reportResult(name, bad == 0, i32.i64(walk) * 64L, i32.i64(walk) * 256L, time.UnixNano() - t0, sprintf("block=4B words=%d mismatches=%d", walk, bad))
+}
+
+func testMemoryPatternMovingInversions() { global memoryWords
+	var patterns [4]ui32
+	patterns[0] = 0U
+	patterns[1] = 4294967295U
+	patterns[2] = 1431655765U
+	patterns[3] = 2863311530U
+	var n i32
+	n = len(memoryWords)
+	var i i32
+	var k i32
+	var bad i32
+	var pattern ui32
+	var inverse ui32
+	var t0 i64
+	t0 = time.UnixNano()
+	bad = 0
+	for k = 0; k < 4; k++ {
+		pattern = patterns[k]
+		inverse = pattern ^ 4294967295U
+		for i = 0; i < n; i++ {
+			memoryWords[i] = pattern
+		}
+		for i = 0; i < n; i++ {
+			if memoryWords[i] != pattern {
+				bad++
+			}
+			memoryWords[i] = inverse
+		}
+		for i = n - 1; i >= 0; i-- {
+			if memoryWords[i] != inverse {
+				bad++
+			}
+			memoryWords[i] = pattern
+		}
+		for i = 0; i < n; i++ {
+			if memoryWords[i] != pattern {
+				bad++
+			}
+		}
+	}
+	reportResult("MemoryPatternMovingInversions", bad == 0, i32.i64(n) * 24L, i32.i64(n) * 96L, time.UnixNano() - t0, sprintf("block=4B words=%d patterns=4 mismatches=%d", n, bad))
+}
+
+func xorshift32(x ui32) (r ui32) {
+	r = x ^ (x << 13U)
+	r = r ^ (r >> 17U)
+	r = r ^ (r << 5U)
+}
+
+func testMemoryPatternRandomSeeded() { global memoryWords
+	var n i32
+	n = len(memoryWords)
+	var i i32
+	var bad i32
+	var state ui32
+	var t0 i64
+	t0 = time.UnixNano()
+	bad = 0
+	state = 2463534242U
+	for i = 0; i < n; i++ {
+		state = xorshift32(state)
+		memoryWords[i] = state
+	}
+	state = 2463534242U
+	for i = 0; i < n; i++ {
+		state = xorshift32(state)
+		if memoryWords[i] != state {
+			bad++
+		}
+	}
+	reportResult("MemoryPatternRandomSeeded", bad == 0, i32.i64(n) * 2L, i32.i64(n) * 8L, time.UnixNano() - t0, sprintf("block=4B words=%d seed=2463534242 mismatches=%d", n, bad))
+}
+
+// testMemoryCorruptionDetectedBitFlip flips one bit after the write and
+// passes when the read back finds exactly that one word.
+func testMemoryCorruptionDetectedBitFlip() { global memoryWords
+	var n i32
+	n = len(memoryWords)
+	var i i32
+	var bad i32
+	var t0 i64
+	t0 = time.UnixNano()
+	bad = 0
+	for i = 0; i < n; i++ {
+		memoryWords[i] = 1431655765U
+	}
+	memoryWords[12345] = memoryWords[12345] ^ 128U
+	for i = 0; i < n; i++ {
+		if memoryWords[i] != 1431655765U {
+			bad++
+		}
+	}
+	reportResult("MemoryCorruptionDetectedBitFlip", bad == 1, i32.i64(n) * 2L, i32.i64(n) * 8L, time.UnixNano() - t0, sprintf("block=4B words=%d injected=1 mismatches=%d", n, bad))
+}
+
+func main() {
+	sha256RoundConstantsInit()
+	printf("test program hash and memory\n")
+	testHashMerkleKnown()
+	testHashSha256Known()
+	testMemoryCorruptionDetectedBitFlip()
+	testMemoryPatternAddress()
+	testMemoryPatternMovingInversions()
+	testMemoryPatternRandomSeeded()
+	testMemoryPatternWalking("MemoryPatternWalkingOnes", false)
+	testMemoryPatternWalking("MemoryPatternWalkingZeros", true)
+	printf("test program done\n")
+}

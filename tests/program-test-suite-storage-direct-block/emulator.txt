@@ -1,0 +1,5 @@
+# Method B (D29): fixed offsets of one preallocated file, a sync after
+# every write, and a flipped byte it must find.
+app Test program: storage and serial
+ready start app="Test program: storage and serial"
+timeout 120

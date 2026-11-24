@@ -1,0 +1,12 @@
+out test program done
+finished app="Test program: storage and serial" err=<nil>
+result StorageCorruptionDetectedByteFlip true
+result StorageDirectBlockRead1024 true
+result StorageDirectBlockRead2048 true
+result StorageDirectBlockRead4096 true
+result StorageDirectBlockRead512 true
+result StorageDirectBlockWrite1024 true
+result StorageDirectBlockWrite2048 true
+result StorageDirectBlockWrite4096 true
+result StorageDirectBlockWrite512 true
+results-pass

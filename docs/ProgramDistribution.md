@@ -818,19 +818,29 @@ what a node shares with the caller.
 ## Test programs (#19 and skycoin-cx-forth #11)
 
 This section describes the hash, memory, storage and serial test programs
-and how their results are reported. They are not part of this batch.
+and how their results are reported. The phone side is built, see "Test
+programs" in the README. The ESP32 side is skycoin-cx-forth #11.
 
 ### Report
 
-Every test prints one line with its name, `pass true` or `pass false`,
-blocks per second, KB/s, latency in microseconds, and, for serial tests, the
-read and write speeds. Test names are lexicographic and hierarchical:
+Every test prints one line, read and written by package `testreport`:
+
+```
+name verdict blocks_per_s kb_per_s latency_us [serial_read_kb_s serial_write_kb_s] [note]
+```
+
+The verdict is `true`, `false` or `skipped`, a measurement is a number or
+`-`, and the serial speeds are present exactly for the `Serial` tests. Test
+names are lexicographic and hierarchical, and a storage name carries its
+method and block size:
 
 - `HashSha256Known`, `HashMerkleKnown`;
-- `MemoryPatternWalkingOnes`, `MemoryPatternWalkingZeros`,
-  `MemoryPatternAddress`, `MemoryPatternRandomSeeded`;
-- `StorageBlockRead512`, `StorageBlockWrite512`, `StorageBlockRead4096`,
-  `StorageBlockWrite4096`, `StorageFileSystemRead`, `StorageFileSystemWrite`;
+- `MemoryPatternAddress`, `MemoryPatternMovingInversions`,
+  `MemoryPatternRandomSeeded`, `MemoryPatternWalkingOnes`,
+  `MemoryPatternWalkingZeros`, `MemoryCorruptionDetectedBitFlip`;
+- `StorageFileSystemRead512` to `StorageFileSystemWrite4096` (method A),
+  `StorageDirectBlockRead512` to `StorageDirectBlockWrite4096` (method B),
+  `StorageCorruptionDetectedByteFlip`;
 - `SerialUartRead`, `SerialUartWrite`, `SerialSpiRead`, `SerialSpiWrite`.
 
 ### Phone

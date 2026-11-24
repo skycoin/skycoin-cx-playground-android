@@ -181,6 +181,7 @@ package with `import "sys/app"`.
 | `app.NetSend(conn i32, data str) (err str)` | writes data, one datagram for UDP |
 | `app.NetRecv(conn i32, timeoutMs i32) (data str, err str)` | what arrived, one datagram for UDP, `err` is `timeout` when nothing did |
 | `app.NetClose(conn i32)` | closes it, as the end of the program does |
+| `app.FileSync(file i32) (ok bool)` | flushes a file from `os.Open` or `os.Create` to storage, as the `os` package of skycoin-cx has no sync |
 
 Console output from `printf` and `string.PrintLine` is shown on screen, and so
 are compile and runtime errors.
@@ -232,7 +233,7 @@ overlays, which relaunches every app.
 | `screen-matches <name> [x y w h]` | the screenshot, or the region, matches `expected/<name>.png` within `-tolerance` per channel and `-max-diff` of the pixels |
 | `file-equals <pulled> <path>` | a pulled file equals a file of the repository, path relative to the test folder |
 | `file-contains <pulled> <text>` | a pulled file contains the text |
-| `result <name> <verdict>` | the test program printed the result line `name` with that verdict, see package `testreport` |
+| `result <name> <verdict>` | the test program printed the result line `name` with that verdict, see "Test programs" and package `testreport` |
 | `results-pass` | every result line the program printed is `true` or `skipped`, and there is one |
 
 Regions keep the status bar clock and the top bar with the app hash out of
@@ -314,7 +315,46 @@ suite at once with that many runs.
 | `program-loader-store-resume` (go) | a download stopped part way resumes from the kept blocks, asking only for the missing ones; an untrusted list is refused |
 | `program-loader-lister` (go) | `index.txt` of 10 and 1000 programs reads back row for row with the same number of allocations |
 | `program-loader-memory` (go) | load, unload and reload from RAM give the same files, a limit of one keeps the last program |
-| `program-test-suite-report-format` (go) | result lines read back unchanged, and malformed ones are refused |
+| `program-test-suite-report-format` (go) | result lines read back unchanged, malformed ones are refused, and both test programs run from the bundle print only passing lines |
+| `program-test-suite-hash-known` | the SHA-256 and Merkle known answer tests of the hash and memory program |
+| `program-test-suite-memory-patterns` | the memory patterns and the flipped bit of the hash and memory program |
+| `program-test-suite-storage-file-system` | method A of the storage program at 512 to 4096 bytes |
+| `program-test-suite-storage-direct-block` | method B (D29) of the storage program at 512 to 4096 bytes, and the flipped byte |
+| `program-test-suite-serial-skip-on-phone` | the four serial tests report `skipped` |
+
+## Test programs
+
+Two bundled CX apps test the device and report one result line per test
+(#19). "Test program: hash and memory" (`apps/test-hash-memory`) checks known
+hashes and memory patterns. "Test program: storage and serial"
+(`apps/test-storage-serial`) writes, reads and verifies storage blocks and
+reports the serial tests. The line, read and written by package
+`testreport`, is
+
+```
+name verdict blocks_per_s kb_per_s latency_us [serial_read_kb_s serial_write_kb_s] [note]
+```
+
+The verdict is `true`, `false` or `skipped`. A measurement is a decimal
+number, or `-` when the test did not measure it. The two serial speeds are
+present exactly when the name starts with `Serial`, and the note runs to the
+end of the line. Only the measured work counts in the time: the pattern
+generation and the comparison of a storage test are left out.
+
+| Test | Does |
+| --- | --- |
+| `HashSha256Known` | SHA-256 written in CX, as skycoin-cx has none, over the FIPS 180-4 vectors "", "abc" and the 448-bit message and 16 KiB of a pattern, a block is 64 bytes |
+| `HashMerkleKnown` | the Merkle hash of `programblocks.MerkleHash` over five 512-byte blocks |
+| `MemoryPatternAddress`, `MemoryPatternWalkingOnes`, `MemoryPatternWalkingZeros`, `MemoryPatternMovingInversions` | the patterns of skycoin-cx `t0-benchmarks/compare/cx/memtest.cx` over 128 KiB, a block is a 4-byte word |
+| `MemoryPatternRandomSeeded` | a seeded xorshift32 sequence written and generated again to compare |
+| `MemoryCorruptionDetectedBitFlip` | flips one bit after the write and passes when the read back finds exactly one word |
+| `StorageFileSystemWrite<size>`, `StorageFileSystemRead<size>` | method A: 64 blocks written one after another to one file per block size, then read back and verified |
+| `StorageDirectBlockWrite<size>`, `StorageDirectBlockRead<size>` | method B, decision D29: 64 blocks at fixed offsets of one preallocated file, with `app.FileSync` after every write, then read back and verified |
+| `StorageCorruptionDetectedByteFlip` | flips one byte of a written block on storage and passes when the read back finds exactly one |
+| `SerialUartRead`, `SerialUartWrite`, `SerialSpiRead`, `SerialSpiWrite` | `skipped`, the phone has no UART or SPI |
+
+The sizes are 512, 1024, 2048 and 4096 bytes. The files live in the app's
+sandbox directory, which the app clears before every run.
 
 ## Benchmark suite
 

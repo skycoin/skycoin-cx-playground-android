@@ -1,0 +1,9 @@
+out test program done
+finished app="Test program: hash and memory" err=<nil>
+result MemoryCorruptionDetectedBitFlip true
+result MemoryPatternAddress true
+result MemoryPatternMovingInversions true
+result MemoryPatternRandomSeeded true
+result MemoryPatternWalkingOnes true
+result MemoryPatternWalkingZeros true
+results-pass

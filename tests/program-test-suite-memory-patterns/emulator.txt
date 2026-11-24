@@ -1,0 +1,4 @@
+# The memory patterns of the hash and memory program, and a flipped bit it must find.
+app Test program: hash and memory
+ready start app="Test program: hash and memory"
+timeout 60

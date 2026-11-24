@@ -83,7 +83,9 @@ func TestApps(t *testing.T) {
 					{Kind: EvKey, Code: KeyBackspace},
 				}}
 				var out bytes.Buffer
-				err := Run(readApp(t, d), "main.cx", h, &out)
+				// As the app runs a bundled app: every library, a sandbox root.
+				opts := Options{Dir: t.TempDir(), Libraries: LibrariesAll()}
+				err := RunWith(readApp(t, d), "main.cx", opts, h, &out)
 				t.Logf("frames=%d cmds=%d kb=%v\n%s", h.frames, h.cmds, h.kb, out.String())
 				if err != nil {
 					t.Fatal(err)
