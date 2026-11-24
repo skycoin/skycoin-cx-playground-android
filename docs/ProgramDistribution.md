@@ -3,11 +3,11 @@
 This document describes how a CX program travels from the machine that
 publishes it to a phone (and later an ESP32) that runs it. It covers the
 signed manifest format (#14), the UDP operations that fetch a manifest and
-its blocks (#15), the checks made before a program runs (#16), the loader,
-lister and runner (#17), the DHT prototype (#18) and the hash, memory,
-storage and serial test programs (#19 and skycoin-cx-forth #11). It ends
-with the open decisions and a task breakdown down to tasks of about one pull
-request each.
+its blocks (#15) and their forms for small packets (#31), the checks made
+before a program runs (#16), the loader, lister and runner (#17), the DHT
+prototype (#18) and the hash, memory, storage and serial test programs (#19
+and skycoin-cx-forth #11). It ends with the open decisions and a task
+breakdown down to tasks of about one pull request each.
 
 The terms of the project lead are used here. Where a standard term exists,
 it is named next to the lead's term, and the two do not correspond exactly.
@@ -232,11 +232,13 @@ be larger than one packet.
 - The manifest is fetched by offset and length with the get manifest
   operation, in pieces of at most one reply packet, 1154 bytes at the
   1200-byte packet size.
-- The first piece holds the whole header. The client checks the magic, the
-  version and the lengths, computes the address and compares it with the
-  address it asked for, verifies the signature, and checks that the signer
-  is trusted (decision D27). A manifest that fails any of these is dropped
-  after one packet.
+- At a packet size of 352 bytes and up the first piece holds the whole
+  header, and below that the header spans the first few pieces. Once the
+  header is in, the client checks the magic, the version and the lengths,
+  computes the address and compares it with the address it asked for,
+  verifies the signature, and checks that the signer is trusted (decision
+  D27). A manifest that fails any of these is dropped before the rest is
+  fetched.
 - The client then asks for the remaining pieces, several at a time. Each
   array is checked against the hash in the directory as soon as all its
   bytes are in. The file list is usually complete in the first piece.
@@ -367,9 +369,12 @@ This section says how the new format sits next to the existing one.
 ## UDP operations (#15)
 
 This part defines the packets that fetch a manifest list, a manifest and its
-blocks, and how a client recovers from loss. Every packet is at most 1200
-bytes, and a 1024-byte packet size is supported by a setting (decision
-D26). The packets use the binary encoding conventions above.
+blocks, and how a client recovers from loss. Every packet is at most the
+packet size, 1200 bytes by default and a setting from 16 to 65507 bytes
+(decision D26). The full forms (0x01 to 0x04) name a manifest by its whole
+32-byte address. The short forms (0x05 to 0x08, #31) name a manifest or a
+block by a hash prefix and read a part of one unit, so a reply fits a small
+packet. The packets use the binary encoding conventions above.
 
 ### Packet header
 
@@ -458,12 +463,185 @@ Error (0xFF) is a reply only. Body:
 
 | Offset | Size | Type | Meaning |
 |---|---|---|---|
-| 6 | 1 | u8 | code: 1 unknown manifest, 2 range outside the manifest, 3 malformed request, 4 unsupported version |
+| 6 | 1 | u8 | code: 1 unknown manifest or block, 2 range outside the unit, 3 malformed request, 4 unsupported version, 5 ambiguous prefix, 6 packet too small |
 | 7 | 1 | u8 | text length, at most 100 |
 | 8 | n | bytes | text |
 
 A server never sends more than the packet size. It shortens a reply that
-would not fit, and the client asks again for what is missing.
+would not fit, and the client asks again for what is missing. When not even
+the fixed part of a reply and one byte (or one block entry) fit, the server
+answers with error 6, and it cuts the error text to fit.
+
+### Short forms (#31)
+
+This section defines the four requests that work below the floors of the
+full forms. Each names a manifest or a block by a prefix of its hash, and
+each reads an offset and length range inside one unit (the manifest, the
+block list or one block), so the reply always fits.
+
+A *prefix* is a u8 length L followed by the first L bytes of a manifest
+address or a block hash. L is 4 to 32 bytes. A client sends 8 bytes by
+default (D36) and fewer only when 8 do not fit the packet, never fewer than
+4. Get block part also takes L = 0 for the manifest, which means any
+manifest the server holds.
+
+- A server refuses a prefix that matches two manifests, or two blocks whose
+  full hashes differ, with error 5. Blocks with the same full hash hold the
+  same bytes, so a prefix that matches several of them is not ambiguous.
+- A client always checks the full value. It checks the address it computes
+  from the header against the address it knows, or against the prefix when
+  it knows only the prefix (the manifest list), and it checks every block
+  against its full hash in the manifest. The signature and the trusted
+  signer decide trust, as in the full forms, so a short prefix only names a
+  unit and never makes a forged one acceptable.
+- A client that gets error 5 can ask again with a longer prefix. With 8
+  bytes, a server needs about 2^32 different blocks before two share a
+  prefix by chance.
+
+List manifests prefix (0x05) asks for the server's manifest list by prefix.
+Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 | u8 | prefix length L wanted, 4 to 32 |
+
+Reply body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 + L | prefix | prefix of the address of the manifest list |
+| 7 + L | 4 | u32 | manifest length of the manifest list |
+
+Get manifest by prefix (0x06) reads a range of a manifest. Get block list
+bytes (0x07) has the same layout and reads a range of the block list array
+of the manifest, so a device reads block entry n at `(n - 1) × 48` without
+knowing where the array starts. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 + L | prefix | manifest address prefix |
+| 7 + L | 4 | u32 | offset in the manifest or the block list |
+| 11 + L | 2 | u16 | length wanted |
+
+Reply body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 + L | prefix | the request's prefix |
+| 7 + L | 4 | u32 | offset |
+| 11 + L | 4 | u32 | length of the manifest or of the block list |
+| 15 + L | n | bytes | the bytes, at most packet size − 15 − L |
+
+Get block part (0x08) reads a range of one block, named by its hash prefix
+alone or with the manifest's prefix. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 + M | prefix | manifest address prefix, M = 0 for any manifest |
+| 7 + M | 1 + L | prefix | block hash prefix |
+| 8 + M + L | 2 | u16 | offset in the block |
+| 10 + M + L | 2 | u16 | length wanted |
+
+Reply body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 1 + L | prefix | the request's block hash prefix |
+| 7 + L | 2 | u16 | offset |
+| 9 + L | 2 | u16 | block length |
+| 11 + L | n | bytes | block bytes, at most packet size − 11 − L |
+
+With 8-byte prefixes a get block part request is 28 bytes and its reply
+carries 109 block bytes at 128 bytes, 45 at 64 and 13 at 32. A block longer
+than 65535 bytes cannot be named this way, and the server answers error 3.
+
+Which forms a client uses. `programblocks.Client.Forms` is `FormsAuto` by
+default: the full forms at 560 bytes and up, where a get blocks reply holds
+a whole 512-byte block, and the short forms below (D37). So at 1200 and
+1024 the packets are the same as before #31, and old requests keep working
+against a new server. The short forms need a server of #31; an older server
+answers them with error 3.
+
+Below 560 bytes in the full forms, and in the short forms, the client
+fetches each block in parts and checks the block's hash when all its parts
+are in. A client whose server has a smaller packet size gets replies shorter
+than it asked for. It keeps the whole blocks a reply holds, asks for the
+rest, and when a reply holds less than one block it fetches the remaining
+blocks in parts of the reply's size. So a client and a server of different
+packet sizes still work together
+(`tests/program-transport-short-forms`, server 1200, 128 and 64 with
+clients 1400 to 32).
+
+### Packet size sweep (#31)
+
+This section answers D26 with measurements.
+`tests/program-packet-size-sweep` runs every operation over UDP on the host
+at each packet size, with the server and the client at the same size, and
+writes this table to `sweep-table.md` in its folder. It also checks every
+operation's floor, the smallest size its packet layout allows, against the
+runs: every size at or above the floor works and every size below it fails
+with "packet size too small".
+
+The reference program is `apps/benchmarks`: 8 files, a manifest of 2472
+bytes, 21 blocks and 8599 bytes of linear packing. A cell is the packets
+(requests and replies) and bytes (headers included) for one fetch: the
+manifest list address for list manifests, the program manifest for get
+manifest, all 21 block entries for get block list, the whole linear packing
+for get blocks, and the whole program from list to verified files for fetch
+program. The DHT rows are one flood of the program from a node to its
+subscriber (subscribe, have, and the subscriber's download), and one get
+peers of five public peers, the last of them a 99-byte entry with a 64-byte
+address and a 32-byte group. Retransmissions are not counted, and there
+were none.
+
+| Operation | 1400 | 1200 | 1024 | 512 | 256 | 128 | 64 | 32 | 16 | Floor | Below the floor |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| list manifests 0x01 | 2/48 | 2/48 | 2/48 | 2/48 | 2/48 | 2/48 | 2/48 | fails | fails | 42 | reply: header 6, 32-byte address, length 4 |
+| list manifests prefix 0x05 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/26 | 2/23 | 15 | reply: header 6, prefix 1+4, length 4 |
+| get manifest 0x02 | 4/2652 | 6/2742 | 6/2742 | 12/3012 | 24/3552 | 62/5262 | 276/14892 | fails | fails | 47 | request 44 with the 32-byte address, reply 46 before the first byte |
+| get manifest by prefix 0x06 | 4/2560 | 6/2604 | 6/2604 | 12/2736 | 22/2956 | 48/3528 | 122/5156 | 550/14572 | fails | 20 | reply: header 6, prefix 1+4, offset 4, length 4, one byte |
+| get block list 0x03 | 2/1096 | 2/1096 | 4/1184 | 6/1272 | 12/1536 | 42/2856 | fails | fails | fails | 92 | reply 44 with the 32-byte address, plus one 48-byte block entry |
+| get block list bytes 0x07 | 2/1052 | 2/1052 | 4/1096 | 6/1140 | 10/1228 | 20/1448 | 50/2108 | 224/5936 | fails | 20 | as get manifest by prefix |
+| get blocks 0x04 | 16/9367 | 18/9463 | 28/9943 | 68/11863 | 102/13495 | 238/20023 | 1082/60535 | fails | fails | 49 | request and reply 48 with the 32-byte address, one byte |
+| get block part 0x08 | 42/9586 | 42/9586 | 42/9586 | 68/10197 | 102/10996 | 174/12688 | 408/18187 | 1350/40324 | 17198/275168 | 16 | reply: header 6, block prefix 1+4, offset 2, length 2, one byte |
+| fetch program, forms by size | 26/12995 | 28/13091 | 40/13667 | 92/13936 | 140/15058 | 238/17352 | 562/24933 | 1902/56231 | fails | 20 | get manifest by prefix |
+| subscribe 0x11 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 2/20 | 10 | request and reply: header 6, lease 4 |
+| have 0x10 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | fails | fails | 50 | request: header 6, 32-byte address, lengths 4 and 8 |
+| flood one program, forms by size | 14/11655 | 16/11749 | 21/11989 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
+| get peers 0x12 | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | fails | fails | fails | 110 | reply 11 plus the longest peer entry, 99 |
+| get peer part 0x13 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 12/335 | 26/482 | 108/1343 | 13 | reply: header 6, total 2, index 2, length 1, offset 1, one byte |
+| get peers, forms by size | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | 12/327 | 36/577 | 118/1438 | 13 | get peer part |
+
+Findings:
+
+- No operation fails because of the 65-byte signature or the 33-byte signer
+  key. The client puts the 306-byte header together from as many get
+  manifest replies as it takes (at 352 bytes and up it is one reply) and
+  checks the address, the signature and the signer when its last byte
+  arrives.
+- The 32-byte address in every full-form packet sets their floors: 42 for
+  list manifests, 47 for get manifest, 49 for get blocks and 50 for have.
+  Get block list also needs one 48-byte block entry in a reply, 92 bytes.
+- Get peers needs room for its longest entry, 110 bytes for a 99-byte entry.
+  Get peer part reads an entry by range, and a node falls back to it for an
+  entry that does not fit, so get peers works down to 13 bytes.
+- In the short forms the floor of every fetch operation is set by the
+  6-byte header, the 5-byte shortest prefix and the offset and length
+  fields: 15 for list manifests prefix, 20 for get manifest by prefix and
+  get block list bytes, 16 for get block part. A whole program fetch works
+  down to 20 bytes, where 16 fails at get manifest by prefix.
+- The flood needs the have, so its floor is 50 bytes (D35).
+- Every operation works at 64 bytes and up. That is the practical floor.
+  At 32 bytes a program can still be fetched from a server, in 1902 packets
+  instead of 28 at 1200, but a node cannot flood. At 16 no program can be
+  fetched.
+- Cost: fetching the program takes 28 packets and 13091 bytes at 1200, 238
+  packets and 17352 bytes at 128 (1.3 times the bytes), 562 and 24933 at 64
+  (1.9 times), and 1902 and 56231 at 32 (4.3 times).
+- At 1200 the short forms would send fewer bytes but more packets: get
+  manifest by prefix saves 138 bytes, while get block part takes 42 packets
+  where get blocks takes 18, because a part never spans two blocks. So the
+  full forms stay the default above 560 bytes (D37).
 
 ### Loss, retries and order
 
@@ -474,6 +652,14 @@ packets.
   its request ID. A reply to an unknown or finished request is dropped.
 - A request with no reply after 250 ms is sent again, with the wait doubled
   each time up to 2 s, and the fetch fails after 8 tries of one request.
+  The tries are a setting: a fetch app takes `tries=N` (and the packet
+  size as `packet=BYTES`) after its three args, and
+  `tests/program-transport-fetch-in-emulator-with-loss` makes 20 (#31).
+  Under its 40% loss each way a request and its reply both arrive
+  36% of the time, so 8 tries lost a request once in 36 and the fetch of
+  about 4 requests failed about once in 9 runs. 20 tries lose a request
+  once in 7500, and the loss stays 40%, so the test still shows recovery
+  under heavy loss.
 - Every request is idempotent, so a repeated reply does no harm.
 - A block that fails its hash check is asked for again, and the fetch fails
   when the same range fails three times, because then the server holds bad
@@ -655,8 +841,8 @@ the operations of #15, so any node that sent a have is a server.
 
 ### Packets
 
-The DHT reuses the six-byte packet header of #15 and adds three operations.
-Every packet is at most the packet size, 1200 bytes or 1024 by setting.
+The DHT reuses the six-byte packet header of #15 and adds four operations.
+Every packet is at most the packet size, 1200 bytes by default, a setting.
 
 Have (0x10) announces that the sender holds a program. Request body:
 
@@ -703,6 +889,32 @@ group name length and the group name of at most 32 bytes. An entry is at
 most 99 bytes, so a reply always holds at least 12 entries at 1200 bytes and
 10 at 1024. The reply holds as many entries as fit, and the asker asks again
 from the next index until it has them all.
+
+Get peer part (0x13, #31) reads a range of one encoded peer entry, so an
+entry longer than a get peers reply can hold still arrives. Request body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 2 | u16 | index of the peer |
+| 8 | 1 | u8 | offset in the encoded entry |
+
+Reply (0x93) body:
+
+| Offset | Size | Type | Meaning |
+|---|---|---|---|
+| 6 | 2 | u16 | number of peers shared with the asker |
+| 8 | 2 | u16 | index of the peer |
+| 10 | 1 | u8 | length of the encoded entry, 0 for an index past the number |
+| 11 | 1 | u8 | offset |
+| 12 | n | bytes | entry bytes, at most packet size − 12 |
+
+A node asks with get peers and falls back to get peer part for an entry
+that does not fit a get peers reply, so get peers works down to 13 bytes.
+`programnetwork.Node.Forms` selects the forms as in the client: with
+`FormsFull` an entry that does not fit is an error, and with `FormsShort`
+every entry is read with get peer part. A node's downloads use the forms
+of its packet size, so a flood works at every size the have fits, 50 bytes
+and up.
 
 A malformed request gets the error reply (0xFF) of #15. The download uses
 get manifest and get blocks of #15 against the node that sent the have.
@@ -944,6 +1156,12 @@ D26 ProgramPacketSizeDecision
 - Recommendation: option a as the default, with 1024 as a setting
   (`-packet 1024`), because two blocks per packet halve the round trips and
   1200 bytes still fits every path that carries IPv6.
+- Lead 2026-11-24: test 1400, 1024, 512, 256 and 128, then 64, 32 and 16,
+  add partial-hash and sub-block requests, keep 1200 until the results.
+- Results (#31): "Packet size sweep" above. 1200 stays the default and the
+  size is a setting from 16 to 65507. Every operation works at 64 bytes and
+  up, a program fetch from a server works down to 20, and the flood down to
+  50. D35 to D37 ask the choices this left open.
 
 D27 ProgramTrustedSignerDecision
 - What exists now: nothing is signed, so nothing is trusted.
@@ -1080,6 +1298,71 @@ D34 FloodSubscribeCatchUpDecision
   programs, and it costs one 50-byte packet per program per new subscriber.
   Built: `Node.subscribe` in `programnetwork/node.go`.
 
+D35 ProgramPacketSizeFloorDecision
+- What exists now: after #31 every operation works at 64 bytes and up. In
+  the short forms a program fetch from a server works down to 20 bytes. The
+  have (0x10) is 50 bytes because it carries the 32-byte manifest address,
+  so a flood needs 50 bytes. At 16 bytes no program can be fetched, because
+  the header, the shortest prefix and the offset and length fields of get
+  manifest by prefix are 19 bytes before the first manifest byte.
+- Question: which packet size is the supported floor?
+- Option a: 64 bytes for every operation, the flood included, with the have
+  kept as it is. 32 bytes works for fetching from a server but is not
+  promised for the flood.
+- Option b: 32 bytes for every operation, by adding a short have that names
+  the program by an address prefix. The receiver then fetches the manifest
+  by prefix and learns the full address only from its header, so the seen
+  set and the announcers are keyed by prefix until then.
+- Option c: 128 bytes, the networks with a 128-byte maximum that #31
+  names, with the sizes below 128 left as untested extras.
+- Evidence: the sweep table. The smallest links named so far are 802.15.4
+  (127-byte frames) and LoRa at its slowest data rates (51-byte payloads),
+  and both carry the 50-byte have. A fetch at 32 bytes takes 1902 packets
+  and 4.3 times the bytes of a fetch at 1200.
+- Recommendation: option a, because every link named so far carries 64
+  bytes, the have fits LoRa's 51 bytes, and option b changes how the flood
+  keys its state for links nobody has asked for. Built: the floors in
+  `tests/program-packet-size-sweep`; nothing else needed.
+
+D36 ProgramHashPrefixLengthDecision
+- What exists now: #31 asks for blocks by a partial hash and does not say
+  how long the prefix is.
+- Question: how long is a manifest address or block hash prefix, and what
+  happens when one matches two units?
+- Option a: a u8 length from 4 to 32 bytes on the wire, 8 bytes sent by
+  default and fewer only when 8 do not fit, the server refuses a prefix
+  that matches two different units with error 5, and the client checks
+  every full hash.
+- Option b: a fixed 4-byte prefix, which saves 4 bytes per packet and makes
+  a collision likely past about 65000 blocks on one server.
+- Option c: a fixed 16-byte prefix, which never collides in practice and
+  costs 8 more bytes per packet than option a.
+- Recommendation: option a, because 8 bytes need about 2^32 blocks on one
+  server before two collide by chance, the length byte lets a client go
+  shorter on a tiny packet or longer after error 5, and trust never rests
+  on the prefix since the client checks the full hash and the signature.
+  Built: `MinPrefixLength`, `DefaultPrefixLength` and `Client.PrefixLength`
+  in `programblocks`, tested by `tests/program-transport-short-forms` with
+  two blocks that share 4 bytes.
+
+D37 ProgramShortFormSelectionDecision
+- What exists now: the full forms (0x01 to 0x04) and the short forms (0x05
+  to 0x08) both work at 1200 bytes.
+- Question: when does a client use the short forms?
+- Option a: below 560 bytes, where a get blocks reply no longer holds a
+  whole 512-byte block, and the full forms at 560 and up.
+- Option b: always, so every packet saves the bytes of the full address.
+- Option c: the client tries the short forms and falls back to the full
+  forms when the server answers error 3, for servers older than #31.
+- Evidence: at 1200 the short forms fetch the program manifest in 2604
+  bytes instead of 2742, but the linear packing in 42 packets instead of 18,
+  because a get block part never spans two blocks.
+- Recommendation: option a, because at 560 and up the full forms take fewer
+  packets and keep the packets of every existing client and server
+  unchanged, and below 560 the short forms carry more bytes per packet.
+  `Client.Forms` and `Node.Forms` force either form. Built: `FormsAuto` in
+  `programblocks/client.go`.
+
 ## Task breakdown
 
 This section breaks #14 to #19 and skycoin-cx-forth #11 down into leaf tasks
@@ -1121,6 +1404,11 @@ dependencies and its test.
     - ProgramTransportEmulatorFetch: the app fetches, verifies and runs a
       program from the rig. Depends on Client and Command. Test:
       programs-fetch-over-udp-in-emulator.
+    - ProgramTransportSmallPackets (#31): the short forms, block parts, get
+      peer part and the packet size sweep. Depends on Client, Server and
+      PeerGetPeers. Test: program-packet-size-sweep,
+      program-transport-short-forms and
+      program-transport-fetch-in-emulator-at-128-bytes.
   - ProgramValidation (#16)
     - ProgramValidationLibraryCalls: list library calls from the IR.
       Depends on skycoin-cx #492. Test: one program per library.

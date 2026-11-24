@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/skycoin/skycoin/src/cipher"
@@ -15,13 +17,37 @@ import (
 
 // fetchKind marks an app that fetches its program over UDP instead of
 // holding it. Its args are the server address, the trusted signer public
-// key in hex and the program name, see docs/ProgramDistribution.md.
+// key in hex and the program name, then optional settings packet=BYTES and
+// tries=N, see docs/ProgramDistribution.md.
 const fetchKind = "fetch"
+
+// fetchClient returns a client for conn with the settings of args.
+func fetchClient(conn net.Conn, signer cipher.PubKey, args []string) (*programblocks.Client, error) {
+	c := programblocks.NewClient(conn, signer)
+	for _, a := range args {
+		key, value, _ := strings.Cut(a, "=")
+		n, err := strconv.Atoi(value)
+		switch {
+		case err != nil:
+			return nil, fmt.Errorf("fetch setting %q: want key=number", a)
+		case key == "packet":
+			if err := programblocks.CheckPacketSize(n); err != nil {
+				return nil, err
+			}
+			c.PacketSize = n
+		case key == "tries" && n > 0:
+			c.MaxTries = n
+		default:
+			return nil, fmt.Errorf("unknown fetch setting %q, want packet=BYTES or tries=N", a)
+		}
+	}
+	return c, nil
+}
 
 // fetchProgram fetches and verifies the program a fetch app names and
 // returns its app manifest and files, reporting each step to out.
 func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[string][]byte, error) {
-	if len(m.Args) != 3 {
+	if len(m.Args) < 3 {
 		return nil, nil, fmt.Errorf("a fetch app takes the server, the signer key and the program name as args")
 	}
 	server, signerHex, name := m.Args[0], m.Args[1], m.Args[2]
@@ -35,7 +61,17 @@ func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[
 	}
 	defer conn.Close()
 	start := time.Now()
-	c := programblocks.NewClient(conn, signer)
+	c, err := fetchClient(conn, signer, m.Args[3:])
+	if err != nil {
+		return nil, nil, err
+	}
+	if c.PacketSize != programblocks.DefaultPacketSize {
+		forms := "full"
+		if c.ShortForms() {
+			forms = "short"
+		}
+		fmt.Fprintf(out, "packet size %d bytes, %s forms\n", c.PacketSize, forms)
+	}
 	p, err := c.FetchProgram(name)
 	if err != nil {
 		return nil, nil, err

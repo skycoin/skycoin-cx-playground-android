@@ -23,6 +23,8 @@ import (
 //	                     runs programblocks serve on the UDP port for the program
 //	                     directories under <dir>, relative to the test folder,
 //	                     signed with the key derived from <seed>
+//	program-packet <bytes>
+//	                     the program server's largest packet, 1200 by default
 //	flood-nodes <port> <count> <dir> <seed>
 //	                     runs count programnetwork nodes on UDP ports port, port+1
 //	                     and on: the first publishes the program directories
@@ -32,16 +34,17 @@ import (
 //	netem <args>         tc netem on the port's packets, e.g. delay 200ms loss 30%
 //	capture <file>       tcpdump of the port's packets, pulled as <file>
 type netSettings struct {
-	echoPort    string
-	programPort string
-	programDir  string
-	programSeed string
-	floodPort   int
-	floodCount  int
-	floodDir    string
-	floodSeed   string
-	netem       string
-	capture     string
+	echoPort      string
+	programPort   string
+	programDir    string
+	programSeed   string
+	programPacket string
+	floodPort     int
+	floodCount    int
+	floodDir      string
+	floodSeed     string
+	netem         string
+	capture       string
 }
 
 func (n netSettings) used() bool {
@@ -212,8 +215,12 @@ func (s *session) startProgramServer(ctx context.Context, n netSettings, undo *[
 		}
 	}
 	pid := dir + ".pid"
-	script := fmt.Sprintf("/tmp/programblocks serve -addr 0.0.0.0:%s -seed %s %s > %s.log 2>&1 & echo $! > %s; wait",
-		n.programPort, shellQuote(n.programSeed), dir, dir, pid)
+	packet := n.programPacket
+	if packet == "" {
+		packet = "1200"
+	}
+	script := fmt.Sprintf("/tmp/programblocks serve -addr 0.0.0.0:%s -packet %s -seed %s %s > %s.log 2>&1 & echo $! > %s; wait",
+		n.programPort, packet, shellQuote(n.programSeed), dir, dir, pid)
 	if _, err := s.dockerExec(ctx, true, "sh", "-c", script); err != nil {
 		return err
 	}

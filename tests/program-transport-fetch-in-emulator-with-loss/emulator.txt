@@ -1,5 +1,8 @@
 # The same fetch with tc netem dropping 40% of the packets of port 7003 and
-# delaying each by 50 ms, both ways, and tcpdump capturing them.
+# delaying each by 50 ms, both ways, and tcpdump capturing them. A request
+# and its reply both arrive 36% of the time, so 8 tries lose one request in
+# 36 and a fetch of about 4 requests failed about once in 9 runs. The app
+# makes 20 tries, which loses a request once in 7500 (#31).
 ready start app="Programs: fetch over UDP with loss"
 program-server 7003 served cx playground test signer
 timeout 90

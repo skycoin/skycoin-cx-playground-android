@@ -1,0 +1,1 @@
+{"name": "Programs: fetch over UDP at 128 bytes", "description": "Test demo: the fetch with every packet at most 128 bytes, in the short forms", "kind": "fetch", "entry": "fetch.txt", "args": ["10.0.2.2:7004", "03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d", "fib-and-primes", "packet=128"]}

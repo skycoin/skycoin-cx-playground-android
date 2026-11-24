@@ -23,7 +23,7 @@ import (
 //	                           clear it after the test
 //	before <shell command>     run on the device before the start
 //	after <shell command>      run on the device after the test
-//	echo-server, program-server, flood-nodes, netem, capture see net.go
+//	echo-server, program-server, program-packet, flood-nodes, netem, capture see net.go
 //	input untimed              send input.txt events without timing them, for
 //	                           a screen of the app that is not a program canvas
 //	timeout <seconds>          for wait-for steps and the expected output,
@@ -139,6 +139,11 @@ func (t *testFolder) parseSettings(r io.Reader) error {
 			}
 			t.net.programPort, t.net.programDir = f[0], filepath.Join(t.dir, f[1])
 			t.net.programSeed = strings.Join(f[2:], " ")
+		case "program-packet":
+			if s, err := strconv.Atoi(rest); err != nil || s < 16 || s > 65507 {
+				return fmt.Errorf("line %d: program-packet takes a packet size of 16 to 65507 bytes", n)
+			}
+			t.net.programPacket = rest
 		case "flood-nodes":
 			f := strings.Fields(rest)
 			if len(f) < 4 {
