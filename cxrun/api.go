@@ -3,6 +3,7 @@ package cxrun
 import (
 	"fmt"
 
+	types "github.com/skycoin/skycoin-cx/t0-types"
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
 	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
@@ -51,6 +52,7 @@ func register(p *cxast.CXProgram) {
 	fn("NetSend", opNetSend, in(i32, str), in(str))
 	fn("NetRecv", opNetRecv, in(i32, i32), in(str, str))
 	fn("NetClose", opNetClose, in(i32), nil)
+	fn("ProgramFile", opProgramFile, in(str, cxast.Slice(types.UI8)), in(boolean))
 
 	for i, c := range []struct {
 		name string
@@ -171,4 +173,20 @@ func registerHost(p *cxast.CXProgram, code int, name string, h handler, inputs, 
 		outputs = []*cxast.CXArgument{}
 	}
 	cxast.Natives[code] = opcodes.MakeNativeFunction(p, code, inputs, outputs)
+}
+
+// programFile receives the files app.ProgramFile hands over during a run,
+// Options.ProgramFile.
+var programFile func(path string, data []byte) bool
+
+// opProgramFile is app.ProgramFile(path str, data []ui8) (accepted bool): a
+// loader program hands one verified file of the program the runner runs
+// next. It is refused when the run has no Options.ProgramFile.
+func opProgramFile(p *cxast.CXProgram, in []cxast.CXValue, out []cxast.CXValue) {
+	accepted := false
+	if programFile != nil {
+		data := append([]byte(nil), cxast.GetSliceData(p, in[1].Get_ptr(p), 1)...)
+		accepted = programFile(in[0].Get_str(p), data)
+	}
+	out[0].Set_bool(p, accepted)
 }

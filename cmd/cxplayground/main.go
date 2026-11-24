@@ -35,6 +35,7 @@ import (
 	"github.com/skycoin/skycoin-cx-playground-android/apprun"
 	"github.com/skycoin/skycoin-cx-playground-android/cxrun"
 	"github.com/skycoin/skycoin-cx-playground-android/manifest"
+	"github.com/skycoin/skycoin-cx-playground-android/programloader"
 	"github.com/skycoin/skycoin-cx-playground-android/store"
 )
 
@@ -265,6 +266,13 @@ func (u *ui) start(a *store.App) {
 			m, files, err := subscribeProgram(a.Manifest, out)
 			if err != nil {
 				return nil, fmt.Errorf("announce and request failed: %v", err)
+			}
+			return checkedProgram(m, files, out)
+		}
+		if a.Manifest.Kind == programloader.Kind {
+			m, files, err := loaderProgram(a.Manifest, files, out)
+			if err != nil {
+				return nil, fmt.Errorf("load failed: %v", err)
 			}
 			return checkedProgram(m, files, out)
 		}

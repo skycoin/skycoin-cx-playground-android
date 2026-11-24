@@ -28,16 +28,25 @@ type catalogManifest struct {
 // NewCatalog signs a manifest for every program, keyed by program name with
 // its files keyed by path, and a manifest list of them.
 func NewCatalog(programs map[string]map[string][]byte, secret cipher.SecKey, date time.Time) (*Catalog, error) {
+	return newCatalog(programs, secret, date, false)
+}
+
+// NewCompressedCatalog is NewCatalog with every manifest sent as LZ4, #lz.
+func NewCompressedCatalog(programs map[string]map[string][]byte, secret cipher.SecKey, date time.Time) (*Catalog, error) {
+	return newCatalog(programs, secret, date, true)
+}
+
+func newCatalog(programs map[string]map[string][]byte, secret cipher.SecKey, date time.Time, compressed bool) (*Catalog, error) {
 	c := &Catalog{manifests: map[Hash]catalogManifest{}}
 	encoded := map[string][]byte{}
 	for name, files := range programs {
-		_, b, err := c.add(func() (*Manifest, []byte, error) { return Build(files, DefaultBlockSize, date) }, secret)
+		_, b, err := c.add(func() (*Manifest, []byte, error) { return Build(files, DefaultBlockSize, date) }, secret, compressed)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		encoded[name] = b
 	}
-	addr, _, err := c.add(func() (*Manifest, []byte, error) { return BuildManifestList(encoded, date) }, secret)
+	addr, _, err := c.add(func() (*Manifest, []byte, error) { return BuildManifestList(encoded, date) }, secret, compressed)
 	if err != nil {
 		return nil, fmt.Errorf("manifest list: %w", err)
 	}
@@ -45,11 +54,12 @@ func NewCatalog(programs map[string]map[string][]byte, secret cipher.SecKey, dat
 	return c, nil
 }
 
-func (c *Catalog) add(build func() (*Manifest, []byte, error), secret cipher.SecKey) (Hash, []byte, error) {
+func (c *Catalog) add(build func() (*Manifest, []byte, error), secret cipher.SecKey, compressed bool) (Hash, []byte, error) {
 	m, pack, err := build()
 	if err != nil {
 		return Hash{}, nil, err
 	}
+	m.Compressed = compressed
 	if err := m.Sign(secret); err != nil {
 		return Hash{}, nil, err
 	}

@@ -114,6 +114,15 @@ a stop. Validate shows the `programcheck` report, and run starts only a
 program the report allows, with the system libraries it allows. A `fetch`
 app shows the same report and refuses the same programs.
 
+An app of kind `loader` runs the loader written in CX, `programloader/loader.cx`,
+which the app holds by `[include]` (#39). Its `args` are the server, the
+program name and optional settings `packet=BYTES`, `tries=N`,
+`wait=MILLISECONDS` and `signer=PUBKEY`. The loader lists, downloads and
+verifies the program with `sys/net` and `sys/cipher` only, hands each file
+over with `app.ProgramFile`, and the app checks and runs what it handed over
+like a `fetch` app. Without `signer=` it accepts any signature that matches
+(D27).
+
 ### Programs by announce and request
 
 `programnetwork` is the DHT prototype of #18. Nodes subscribe to each other
@@ -185,6 +194,7 @@ package with `import "sys/app"`.
 | `app.NetSend(conn i32, data str) (err str)` | writes data, one datagram for UDP |
 | `app.NetRecv(conn i32, timeoutMs i32) (data str, err str)` | what arrived, one datagram for UDP, `err` is `timeout` when nothing did |
 | `app.NetClose(conn i32)` | closes it, as the end of the program does |
+| `app.ProgramFile(path str, data []ui8) (accepted bool)` | a loader hands one verified file of the program to run next, refused outside a `loader` app |
 
 The `app.Net*` calls run on the batched runtime of the CX net library,
 skycoin-cx `t1-netbatch` (skycoin-cx#508, #37). Sockets are read in the

@@ -646,6 +646,52 @@ program returns to the list. `[ refresh ]` fetches the server's list again.
 An app of kind `programs` opens the screen. Its args are the server address
 and the signer keys to trust, which are added to `programs/trusted.txt`.
 
+### Loader in CX (#39)
+
+The lead decided D28 as option b: "loader is cx program, pure cx, that uses
+network and lists, downloads, verifies." `programloader/loader.cx` is that
+program. It uses `sys/net` for the UDP packets, `sys/cipher` for the hash
+and the signature, and `sys/string`, and nothing of Go but the one app call
+that hands the result over.
+
+- It opens a UDP socket with `net.UDPDial` and sends the full forms of "UDP
+  operations": list manifests (0x01), get manifest (0x02) and get blocks
+  (0x04). One request is in flight at a time. A request with no reply
+  after `wait` milliseconds, a `net.TimeoutSet` entry, is sent again, up to
+  `tries` times. It reads any range of the packing in pieces of the packet
+  size, so it works at any packet size from 49 bytes, not only the 560 the
+  Go client's full forms need.
+- It verifies an envelope as "Envelope" says: the header line, the hash
+  line against the address it asked for, the length, the hash of the data
+  with `cipher.HashOfBytes`, and the signature with
+  `cipher.SignatureRecoverPubKey` and `cipher.SignatureVerify`. With no
+  `signer=` setting any matching signature is accepted (D27), and with one
+  the recovered key must be that key. A `#lz` envelope is decompressed by an
+  LZ4 block decoder written in CX.
+- It parses the text form and fetches the named program's envelope as a
+  file of the manifest list, so every block of it is checked against the
+  list, then each file of the program, checking every block and every file
+  hash. The hash is one CX function, `contentHash`, for D23.
+- It hands each verified file to the runner with
+  `app.ProgramFile(path, data) (accepted bool)`, prints the address, the
+  signer and the counts, and ends. `programloader.Load` runs it with only
+  `net` and `cipher` enabled and collects the files. An app of kind
+  `loader` holds `loader.cx` by `[include]`, and the playground checks what
+  the loader handed over with `programcheck` and runs it, as a `fetch` app
+  does.
+
+The Go `programblocks` client stays for the host commands, the nodes and
+the tests, and is the reference: `tests/program-loader-cx-matches-go` loads
+both programs of a local server with the CX loader and with the Go client
+and requires the same bytes, also with `#lz` envelopes, at 128-byte
+packets and through a link that drops a fifth of the packets each way. It
+also checks that a pinned signer and an unknown program are refused, and
+that the loaded program runs. `tests/program-loader-in-emulator` runs the
+loader app on the phone against `programblocks serve` in the rig.
+
+The loader does not yet resume into the program store, read block hashes
+with get block list, or keep several requests in flight, see D89.
+
 ### Storage layout
 
 The SD card (or the app's files directory on the phone) holds, as package
@@ -1263,6 +1309,9 @@ D28 ProgramFetchClientPlacementDecision
 - Recommendation: option a, because the same Go code serves the host
   command, the tests, the phone and (with TinyGo) the ESP32, and it does not
   wait for new CX calls.
+- Decided by the lead (#39): option b, the loader is a pure CX program.
+  Built: "Loader in CX (#39)" above, with `sys/net` in place of `app.Net*`
+  and `sys/cipher` of skycoin-cx (#510) for the hash and signature.
 
 D29 StorageDirectBlockMethodOnPhoneDecision
 - Decided 2026-11-24 (#40, msg 505): option b, "android uses file system,
@@ -1499,6 +1548,59 @@ D71 CollectorJsonRunsDecision
   `runs-text` bucket in `benchcollector`. The deployed collector and the
   release APKs need a rebuild from main to take text documents.
 
+D87 ManifestCompressionDefaultDecision
+- What exists now: D24 makes LZ4 optional, marked `#lz`. `Manifest.Encode`
+  writes `#lz` only when `Manifest.Compressed` is set, and
+  `programblocks.NewCompressedCatalog` sets it, but no command, node or
+  bundle does, so everything sent today is plain text.
+- Question: when does a publisher compress the manifest data?
+- Option a: never by default, with compression a setting a publisher turns
+  on.
+- Option b: always.
+- Option c: whenever the LZ4 block is smaller than the text.
+- Evidence: the `#lz` envelope of apps/benchmarks is 2576 bytes against
+  2969, and of the 64 KB program 9252 against 9605, because the hex hashes
+  that make most of the text barely compress with LZ4.
+- Recommendation: option a, because it saves 4 to 13 percent, while plain
+  text stays readable on the wire and in the store and a small device or
+  the CX loader skips the decoder. Built: `Manifest.Compressed` false by
+  default.
+
+D88 GoClientTrustedSignerDecision
+- What exists now: the lead decided D27 as "signature matches, not who
+  signed". The CX loader accepts any matching signature unless its
+  `signer=` setting pins one. The Go client (`Client.TrustedSigners`), the
+  program store (`trusted.txt`) and the bundle store still refuse a
+  manifest whose recovered signer is not one of their keys, and a store
+  with no trusted key refuses to sync.
+- Question: do the Go client and the store keep their trusted keys?
+- Option a: keep them as they are, so the host tools, nodes and the
+  programs screen pin signers while the CX loader does not by default.
+- Option b: make the keys optional, so an empty list accepts any matching
+  signature and a list pins, as the CX loader's `signer=` does.
+- Option c: remove them, and show the recovered key only.
+- Recommendation: option a until the lead asks for more, because a pinned
+  key is all that stops a server from handing out its own program under a
+  name, and removing the check from nodes that relay to phones is easy to
+  do later but not to undo. Built: nothing changed.
+
+D89 CxLoaderScopeDecision
+- What exists now: the CX loader is a one-shot get into RAM: it lists,
+  downloads one program, verifies it and hands it to the runner, with one
+  request in flight and the full forms only. The programs screen, the
+  store, resume, the short forms and announce and request stay in Go.
+- Question: what does the CX loader do next?
+- Option a: stay a one-shot get, as D39 describes a thin node, "connect,
+  download, done".
+- Option b: also keep programs in the store layout with `sys/file`, so a
+  stopped download resumes and the lister reads `index.txt`.
+- Option c: also take over the programs screen and the node, so the Go
+  side only runs what CX hands it.
+- Recommendation: option a, because it is what the issue asks, it needs no
+  file access, and the other parts gain nothing from moving while the Go
+  code is their reference. A window of several requests is a small change
+  inside option a if a slow link needs it.
+
 ## Task breakdown
 
 This section breaks #14 to #19 and skycoin-cx-forth #11 down into leaf tasks
@@ -1570,6 +1672,10 @@ dependencies and its test.
       Store. Test: review.
     - ProgramLoaderSuspendResume: save and load VM state (later). Depends on
       Memory. Test: suspend, resume, same output, timings.
+    - ProgramLoaderInCx (#39): the loader as a CX program over sys/net and
+      sys/cipher, handing the program over with app.ProgramFile. Depends on
+      the envelope (D24, D30) and skycoin-cx #510 and #508. Test:
+      program-loader-cx-matches-go and program-loader-in-emulator.
   - ProgramNetwork (#18)
     - ProgramNetworkPacketHaveSubscribe: have and subscribe packets. Depends
       on PacketCodec. Test: codec sizes.

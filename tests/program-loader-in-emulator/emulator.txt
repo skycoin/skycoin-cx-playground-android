@@ -1,0 +1,6 @@
+# The CX loader lists the programs of programblocks serve in the rig
+# container, which the emulator reaches as 10.0.2.2, downloads and verifies
+# fib-and-primes with the net and cipher libraries, and the app runs it.
+ready start app="Programs: loader in CX"
+program-server 7005 served cx playground test signer
+timeout 60

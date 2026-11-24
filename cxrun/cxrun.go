@@ -148,6 +148,9 @@ type Options struct {
 	// as cx --net-record. NetReplay runs from such a record and opens no
 	// socket, as cx --net-replay. See docs/Networking.md of skycoin-cx.
 	NetRecord, NetReplay string
+	// ProgramFile receives each file a loader program hands over with
+	// app.ProgramFile, see docs/ProgramDistribution.md. Nil refuses them.
+	ProgramFile func(path string, data []byte) bool
 }
 
 // RunWith is Run with options.
@@ -203,8 +206,8 @@ func compileWith(files map[string][]byte, entry string, opts Options, h Host, ou
 	}
 	defer restore()
 
-	host, cmds = h, cmds[:0]
-	defer func() { host = nil; netRunStop() }()
+	host, cmds, programFile = h, cmds[:0], opts.ProgramFile
+	defer func() { host, programFile = nil, nil; netRunStop() }()
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("cx panic: %v", r)

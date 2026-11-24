@@ -1,0 +1,660 @@
+; CX app, text form.
+[app]
+name = Programs: loader in CX
+description = Test demo: the CX loader lists, downloads and verifies a signed program from the host, then it runs
+kind = loader
+entry = loader.cx
+
+[args]
+10.0.2.2:7005
+fib-and-primes
+signer=03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d
+package main
+
+// The program loader of skycoin-cx-playground-android #39, in CX alone. It
+// lists the programs a server offers, downloads the manifest envelope and
+// the blocks of the one named, verifies them with the cipher library and
+// hands the files to the runner with app.ProgramFile. See "Loader in CX" in
+// docs/ProgramDistribution.md.
+//
+// Args: the server as host:port, the program name, then optional settings
+// packet=BYTES, tries=N, wait=MILLISECONDS and signer=PUBLIC KEY IN HEX.
+
+import "sys/app"
+import "sys/os"
+import "sys/net"
+import "sys/cipher"
+import "sys/string"
+
+// The packets of "UDP operations", full forms.
+var request [64]ui8
+var reply [2048]ui8
+
+var socket i32
+var requestNumber i64
+var packetSize i32
+var tries i32
+var waitMilliseconds i32
+var pinnedSigner str
+var requestsSent i32
+var resent i32
+
+// The parsed text form of the manifest last verified.
+var fileHashes []ui8
+var fileSizes []i64
+var fileBlockSizes []i64
+var filePaths []str
+var blockHashes []ui8
+var blockSizes []i64
+var signerHex str
+
+func fail(message str) {
+	printf("loader: %s\n", message)
+	os.Exit(1)
+}
+
+// contentHash is the hash that names blocks, files and manifests, the one
+// function decision D23 changes.
+func contentHash(data []ui8) (digest []ui8) {
+	digest = cipher.HashOfBytes(data)
+}
+
+func hexOf(b []ui8) (s str) {
+	var digits []ui8 = string.BytesOfString("0123456789abcdef")
+	var out []ui8
+	var i i32
+	for i = 0; i < len(b); i++ {
+		out = append(out, digits[ui8.i32(b[i])>>4])
+		out = append(out, digits[ui8.i32(b[i])&15])
+	}
+	s = string.StringOfBytes(out)
+}
+
+func hexDigit(c i32) (v i32) {
+	v = -1
+	if c >= 48 && c <= 57 {
+		v = c - 48
+	}
+	if c >= 97 && c <= 102 {
+		v = c - 87
+	}
+}
+
+// hexAt decodes the n bytes written as 2n lower case hex digits at start
+// of text.
+func hexAt(text []ui8, start i32, n i32) (out []ui8, ok bool) {
+	ok = start+2*n <= len(text)
+	var i i32
+	var high i32
+	var low i32
+	for i = 0; ok && i < n; i++ {
+		high = hexDigit(ui8.i32(text[start+2*i]))
+		low = hexDigit(ui8.i32(text[start+2*i+1]))
+		if high < 0 || low < 0 {
+			ok = false
+		} else {
+			out = append(out, i32.ui8(high*16+low))
+		}
+	}
+}
+
+// decimalAt reads the decimal number of text from start to end.
+func decimalAt(text []ui8, start i32, end i32) (v i64, ok bool) {
+	ok = end > start && end-start <= 18
+	if ok && end-start > 1 && ui8.i32(text[start]) == 48 {
+		ok = false
+	}
+	var i i32
+	var c i32
+	for i = start; ok && i < end; i++ {
+		c = ui8.i32(text[i])
+		if c < 48 || c > 57 {
+			ok = false
+		} else {
+			v = v*10L + i32.i64(c-48)
+		}
+	}
+}
+
+func sameBytes(a []ui8, aStart i32, b []ui8, bStart i32, n i32) (same bool) {
+	same = aStart+n <= len(a) && bStart+n <= len(b)
+	var i i32
+	for i = 0; same && i < n; i++ {
+		if a[aStart+i] != b[bStart+i] {
+			same = false
+		}
+	}
+}
+
+func bytesOf(s str) (b []ui8) {
+	b = string.BytesOfString(s)
+}
+
+// lineEnd returns the index of the next line feed of text from start, or
+// the length of text.
+func lineEnd(text []ui8, start i32) (end i32) {
+	end = start
+	for end < len(text) && ui8.i32(text[end]) != 10 {
+		end++
+	}
+}
+
+// fieldEnd returns the index of the next space before end, or end.
+func fieldEnd(text []ui8, start i32, end i32) (at i32) {
+	at = start
+	for at < end && ui8.i32(text[at]) != 32 {
+		at++
+	}
+}
+
+func putNumber(at i32, v i64, size i32) { global request
+	var i i32
+	for i = 0; i < size; i++ {
+		request[at+size-1-i] = i64.ui8((v >> i32.i64(8*i)) & 255L)
+	}
+}
+
+func replyNumber(at i32, size i32) (v i64) { global reply
+	var i i32
+	for i = 0; i < size; i++ {
+		v = (v << 8L) | ui8.i64(reply[at+i])
+	}
+}
+
+func putAddress(at i32, address []ui8) { global request
+	var i i32
+	for i = 0; i < 32; i++ {
+		request[at+i] = address[i]
+	}
+}
+
+// exchange sends the request of length bytes and returns the length of
+// the reply with its request ID, sending again after each wait with no
+// reply. An error reply ends the loader.
+func exchange(length i32) (replyLength i32) { global request, reply, socket, requestNumber, tries, waitMilliseconds, requestsSent, resent
+	requestNumber++
+	request[0] = i32.ui8(1)
+	putNumber(2, requestNumber, 4)
+	var try i32
+	var count i32
+	var entry i32
+	var handle i32
+	var trigger i32
+	var message i32
+	var detail i32
+	var queued i32
+	var waiting bool
+	var set bool
+	for try = 0; try < tries; try++ {
+		queued = net.Write(socket, request, length)
+		requestsSent++
+		if try > 0 {
+			resent++
+		}
+		set = net.TimeoutSet(socket, waitMilliseconds)
+		waiting = true
+		for waiting {
+			count = net.Update(waitMilliseconds)
+			for entry = 0; waiting && entry < count; entry++ {
+				handle, trigger, message, detail = net.ReadyNext()
+				if handle == socket && trigger == net.TriggerData {
+					replyLength = net.Read(socket, message, reply, 0)
+					if replyLength >= 6 && ui8.i32(reply[0]) == 1 && replyNumber(2, 4) == requestNumber {
+						set = net.TimeoutSet(socket, 0)
+						if ui8.i32(reply[1]) == 255 {
+							fail(sprintf("server error %d: %s", ui8.i32(reply[6]), string.StringOfBytes(replyBytes(8, replyLength))))
+						}
+						return
+					}
+				}
+				if handle == socket && trigger == net.TriggerTimeout {
+					waiting = false
+				}
+				if handle == socket && trigger == net.TriggerError {
+					fail(sprintf("socket error %d", detail))
+				}
+			}
+		}
+	}
+	fail(sprintf("no reply after %d tries", tries))
+}
+
+func replyBytes(start i32, end i32) (out []ui8) { global reply
+	var i i32
+	for i = start; i < end; i++ {
+		out = append(out, reply[i])
+	}
+}
+
+// listManifests returns the address and envelope length of the server's
+// manifest list.
+func listManifests() (address []ui8, total i64) { global request, reply
+	request[1] = i32.ui8(1)
+	var n i32 = exchange(6)
+	if n != 42 || ui8.i32(reply[1]) != 129 {
+		fail("bad list manifests reply")
+	}
+	address = replyBytes(6, 38)
+	total = replyNumber(38, 4)
+}
+
+// fetchEnvelope downloads the envelope of total bytes at address.
+func fetchEnvelope(address []ui8, total i64) (envelope []ui8) { global request, reply, packetSize
+	var offset i64
+	var n i32
+	var piece i64
+	for offset < total {
+		request[1] = i32.ui8(2)
+		putAddress(6, address)
+		putNumber(38, offset, 4)
+		piece = total - offset
+		if piece > i32.i64(packetSize-46) {
+			piece = i32.i64(packetSize - 46)
+		}
+		putNumber(42, piece, 2)
+		n = exchange(44)
+		if ui8.i32(reply[1]) != 130 || n <= 46 || replyNumber(38, 4) != offset || replyNumber(42, 4) != total || i32.i64(n-46) > piece {
+			fail("bad get manifest reply")
+		}
+		envelope = appendReply(envelope, 46, n)
+		offset = offset + i32.i64(n-46)
+	}
+}
+
+func appendReply(out []ui8, start i32, end i32) (result []ui8) { global reply
+	result = out
+	var i i32
+	for i = start; i < end; i++ {
+		result = append(result, reply[i])
+	}
+}
+
+// fetchRange downloads length bytes from offset of the linear packing of
+// the manifest at address.
+func fetchRange(address []ui8, offset i64, length i64) (data []ui8) { global request, reply, packetSize
+	var end i64 = offset + length
+	var n i32
+	var piece i64
+	for offset < end {
+		request[1] = i32.ui8(4)
+		putAddress(6, address)
+		putNumber(38, offset, 8)
+		piece = end - offset
+		if piece > i32.i64(packetSize-48) {
+			piece = i32.i64(packetSize - 48)
+		}
+		putNumber(46, piece, 2)
+		n = exchange(48)
+		if ui8.i32(reply[1]) != 132 || n <= 48 || replyNumber(38, 8) != offset || replyNumber(46, 2) != i32.i64(n-48) || i32.i64(n-48) > piece {
+			fail("bad get blocks reply")
+		}
+		data = appendReply(data, 48, n)
+		offset = offset + i32.i64(n-48)
+	}
+}
+
+// verifyEnvelope checks the envelope against address, the signature
+// against its hash, and the hash and length of its data, and returns the
+// text form, decompressed when the header says #lz.
+func verifyEnvelope(envelope []ui8, address []ui8) (text []ui8) { global signerHex, pinnedSigner
+	var ends [4]i32
+	var start i32
+	var i i32
+	for i = 0; i < 4; i++ {
+		ends[i] = lineEnd(envelope, start)
+		if ends[i] >= len(envelope) {
+			fail("envelope header truncated")
+		}
+		start = ends[i] + 1
+	}
+	var compressed bool
+	var header str = string.StringOfBytes(sliceOf(envelope, 0, ends[0]))
+	if string.EqualityByByteValue(header, "CXPM 2 #lz") {
+		compressed = true
+	} else if !string.EqualityByByteValue(header, "CXPM 2") {
+		fail(sprintf("envelope header %s", header))
+	}
+	var signature []ui8
+	var hash []ui8
+	var ok bool
+	var hashOk bool
+	signature, ok = hexAt(envelope, ends[0]+1, 65)
+	hash, hashOk = hexAt(envelope, ends[1]+1, 32)
+	if !ok || !hashOk || ends[1]-ends[0] != 131 || ends[2]-ends[1] != 65 {
+		fail("envelope signature or hash is not hex")
+	}
+	if !sameBytes(hash, 0, address, 0, 32) {
+		fail(sprintf("envelope hash %s, want %s", hexOf(hash), hexOf(address)))
+	}
+	var length i64
+	length, ok = decimalAt(envelope, ends[2]+1, ends[3])
+	if !ok || i32.i64(len(envelope)-start) != length {
+		fail("envelope length does not match its data")
+	}
+	var data []ui8 = sliceOf(envelope, start, len(envelope))
+	if !sameBytes(contentHash(data), 0, hash, 0, 32) {
+		fail("envelope data does not match its hash")
+	}
+	var signer []ui8
+	signer, ok = cipher.SignatureRecoverPubKey(hash, signature)
+	if !ok || !cipher.SignatureVerify(hash, signature, signer) {
+		fail("envelope signature does not match its hash")
+	}
+	signerHex = hexOf(signer)
+	if string.ByteLength(pinnedSigner) > 0 && !string.EqualityByByteValue(signerHex, pinnedSigner) {
+		fail(sprintf("signed by %s, not by the pinned signer %s", signerHex, pinnedSigner))
+	}
+	text = data
+	if compressed {
+		text = lz4Decompress(data)
+	}
+}
+
+func sliceOf(b []ui8, start i32, end i32) (out []ui8) {
+	var i i32
+	for i = start; i < end; i++ {
+		out = append(out, b[i])
+	}
+}
+
+// lz4Decompress decodes one LZ4 block,
+// https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md.
+func lz4Decompress(src []ui8) (out []ui8) {
+	var i i32
+	var n i32 = len(src)
+	var token i32
+	var literals i32
+	var more i32
+	var k i32
+	var offset i32
+	var match i32
+	var from i32
+	for i < n {
+		token = ui8.i32(src[i])
+		i++
+		literals = token >> 4
+		if literals == 15 {
+			more = 255
+			for more == 255 {
+				if i >= n {
+					fail("lz4 literal length truncated")
+				}
+				more = ui8.i32(src[i])
+				i++
+				literals = literals + more
+			}
+		}
+		if i+literals > n {
+			fail("lz4 literals truncated")
+		}
+		for k = 0; k < literals; k++ {
+			out = append(out, src[i+k])
+		}
+		i = i + literals
+		if i < n {
+			if i+2 > n {
+				fail("lz4 offset truncated")
+			}
+			offset = ui8.i32(src[i]) | (ui8.i32(src[i+1]) << 8)
+			i = i + 2
+			match = token & 15
+			if match == 15 {
+				more = 255
+				for more == 255 {
+					if i >= n {
+						fail("lz4 match length truncated")
+					}
+					more = ui8.i32(src[i])
+					i++
+					match = match + more
+				}
+			}
+			match = match + 4
+			from = len(out) - offset
+			if offset == 0 || from < 0 {
+				fail("lz4 offset outside the output")
+			}
+			for k = 0; k < match; k++ {
+				out = append(out, out[from+k])
+			}
+		}
+	}
+}
+
+// expectLine fails unless the line of text from start is want, and
+// returns the start of the next line.
+func expectLine(text []ui8, start i32, want str) (next i32) {
+	var end i32 = lineEnd(text, start)
+	if !string.EqualityByByteValue(string.StringOfBytes(sliceOf(text, start, end)), want) {
+		fail(sprintf("manifest line %s, want %s", string.StringOfBytes(sliceOf(text, start, end)), want))
+	}
+	next = end + 1
+}
+
+// parseManifest reads the text form into the file and block lists. Lines
+// starting with # are comments.
+func parseManifest(text []ui8) { global fileHashes, fileSizes, fileBlockSizes, filePaths, blockHashes, blockSizes
+	fileHashes = []ui8{}
+	fileSizes = []i64{}
+	fileBlockSizes = []i64{}
+	filePaths = []str{}
+	blockHashes = []ui8{}
+	blockSizes = []i64{}
+	var at i32 = skipComments(text, 0)
+	at = expectLine(text, at, "[manifest] date pack_length merkle_hash")
+	at = lineEnd(text, at) + 1
+	at = expectLine(text, skipComments(text, at), "")
+	at = expectLine(text, skipComments(text, at), "[files] file_hash size block_size merkle_hash path")
+	var end i32
+	var column i32
+	var hash []ui8
+	var ok bool
+	var value i64
+	var sizeOk bool
+	var blockSize i64
+	var blockOk bool
+	var i i32
+	at = skipComments(text, at)
+	for at < len(text) && ui8.i32(text[at]) != 10 {
+		end = lineEnd(text, at)
+		hash, ok = hexAt(text, at, 32)
+		column = fieldEnd(text, at+65, end)
+		value, sizeOk = decimalAt(text, at+65, column)
+		blockSize, blockOk = decimalAt(text, column+1, fieldEnd(text, column+1, end))
+		column = fieldEnd(text, column+1, end)
+		if !ok || !sizeOk || !blockOk || blockSize < 1L || ui8.i32(text[at+64]) != 32 || column+66 >= end {
+			fail("bad [files] entry")
+		}
+		for i = 0; i < 32; i++ {
+			fileHashes = append(fileHashes, hash[i])
+		}
+		fileSizes = append(fileSizes, value)
+		fileBlockSizes = append(fileBlockSizes, blockSize)
+		filePaths = append(filePaths, string.StringOfBytes(sliceOf(text, column+66, end)))
+		at = skipComments(text, end+1)
+	}
+	at = expectLine(text, at, "")
+	at = expectLine(text, skipComments(text, at), "[blocks] block_hash size")
+	at = skipComments(text, at)
+	for at < len(text) {
+		end = lineEnd(text, at)
+		hash, ok = hexAt(text, at, 32)
+		value, sizeOk = decimalAt(text, at+65, end)
+		if !ok || !sizeOk || at+64 >= end || ui8.i32(text[at+64]) != 32 {
+			fail("bad [blocks] entry")
+		}
+		for i = 0; i < 32; i++ {
+			blockHashes = append(blockHashes, hash[i])
+		}
+		blockSizes = append(blockSizes, value)
+		at = skipComments(text, end+1)
+	}
+	var blocks i64
+	for i = 0; i < len(fileSizes); i++ {
+		blocks = blocks + (fileSizes[i]+fileBlockSizes[i]-1L)/fileBlockSizes[i]
+	}
+	if blocks != i32.i64(len(blockSizes)) {
+		fail(sprintf("files cover %d blocks, [blocks] has %d", blocks, len(blockSizes)))
+	}
+}
+
+func skipComments(text []ui8, start i32) (at i32) {
+	at = start
+	for at < len(text) && ui8.i32(text[at]) == 35 {
+		at = lineEnd(text, at) + 1
+	}
+}
+
+// fetchFile downloads file index of the manifest at address and verifies
+// each of its blocks and the whole file.
+func fetchFile(address []ui8, index i32) (data []ui8) { global fileHashes, fileSizes, fileBlockSizes, blockHashes, blockSizes
+	var offset i64
+	var first i32
+	var i i32
+	for i = 0; i < index; i++ {
+		offset = offset + fileSizes[i]
+		first = first + i64.i32((fileSizes[i]+fileBlockSizes[i]-1L)/fileBlockSizes[i])
+	}
+	data = fetchRange(address, offset, fileSizes[index])
+	var size i32 = i64.i32(fileBlockSizes[index])
+	var count i32 = i64.i32((fileSizes[index] + fileBlockSizes[index] - 1L) / fileBlockSizes[index])
+	var end i32
+	for i = 0; i < count; i++ {
+		end = (i + 1) * size
+		if end > len(data) {
+			end = len(data)
+		}
+		if i32.i64(end-i*size) != blockSizes[first+i] || !sameBytes(contentHash(sliceOf(data, i*size, end)), 0, blockHashes, (first+i)*32, 32) {
+			fail(sprintf("block %d does not match its hash", first+i+1))
+		}
+	}
+	if !sameBytes(contentHash(data), 0, fileHashes, index*32, 32) {
+		fail("file does not match its hash")
+	}
+}
+
+func setting(arg str) { global packetSize, tries, waitMilliseconds, pinnedSigner
+	var equals i32 = string.ByteIndexOfFirstSubstring(arg, "=")
+	if equals < 1 {
+		fail(sprintf("setting %s: want key=value", arg))
+	}
+	var key str = string.SubstringByByteRange(arg, 0, equals)
+	var value str = string.SubstringByByteRange(arg, equals+1, string.ByteLength(arg))
+	var b []ui8 = bytesOf(value)
+	var number i64
+	var ok bool
+	number, ok = decimalAt(b, 0, len(b))
+	if string.EqualityByByteValue(key, "signer") {
+		pinnedSigner = value
+	} else if !ok || number < 1L {
+		fail(sprintf("setting %s: want a number", arg))
+	} else if string.EqualityByByteValue(key, "packet") {
+		packetSize = i64.i32(number)
+	} else if string.EqualityByByteValue(key, "tries") {
+		tries = i64.i32(number)
+	} else if string.EqualityByByteValue(key, "wait") {
+		waitMilliseconds = i64.i32(number)
+	} else {
+		fail(sprintf("unknown setting %s, want packet=, tries=, wait= or signer=", arg))
+	}
+	if packetSize < 49 || packetSize > 2048 {
+		fail("packet must be from 49 to 2048 bytes")
+	}
+}
+
+// dial opens the UDP socket to host:port and waits until it is ready.
+func dial(server str) { global socket
+	var colon i32 = string.ByteIndexOfLastSubstring(server, ":")
+	if colon < 1 {
+		fail(sprintf("server %s: want host:port", server))
+	}
+	var portBytes []ui8 = bytesOf(string.SubstringByByteRange(server, colon+1, string.ByteLength(server)))
+	var port i64
+	var ok bool
+	port, ok = decimalAt(portBytes, 0, len(portBytes))
+	if !ok || port < 1L || port > 65535L {
+		fail(sprintf("server %s: bad port", server))
+	}
+	socket = net.UDPDial(string.SubstringByByteRange(server, 0, colon), i64.i32(port))
+	if socket == 0 {
+		fail("no free socket")
+	}
+	var ready bool
+	var count i32
+	var entry i32
+	var handle i32
+	var trigger i32
+	var message i32
+	var detail i32
+	for !ready {
+		count = net.Update(1000)
+		for entry = 0; entry < count; entry++ {
+			handle, trigger, message, detail = net.ReadyNext()
+			if handle == socket && trigger == net.TriggerConnected {
+				ready = true
+			}
+			if handle == socket && trigger == net.TriggerError {
+				fail(sprintf("dial %s: error %d", server, detail))
+			}
+		}
+	}
+}
+
+func main() { global os.Args, packetSize, tries, waitMilliseconds, filePaths, fileSizes, blockSizes, signerHex, requestsSent, resent, socket
+	packetSize = 1200
+	tries = 8
+	waitMilliseconds = 250
+	if len(os.Args) < 2 {
+		fail("args: server host:port, program name, then packet=, tries=, wait= or signer=")
+	}
+	var i i32
+	for i = 2; i < len(os.Args); i++ {
+		setting(os.Args[i])
+	}
+	var name str = os.Args[1]
+	dial(os.Args[0])
+
+	var listAddress []ui8
+	var listTotal i64
+	listAddress, listTotal = listManifests()
+	parseManifest(verifyEnvelope(fetchEnvelope(listAddress, listTotal), listAddress))
+	printf("list %s\n", hexOf(listAddress))
+	var index i32 = -1
+	for i = 0; i < len(filePaths); i++ {
+		if string.EqualityByByteValue(filePaths[i], name) {
+			index = i
+		}
+	}
+	if index < 0 {
+		fail(sprintf("the server has no program %s", name))
+	}
+	var envelope []ui8 = fetchFile(listAddress, index)
+	var address []ui8 = hashLine(envelope)
+	parseManifest(verifyEnvelope(envelope, address))
+	printf("manifest %s\n", hexOf(address))
+	printf("signer %s matches\n", signerHex)
+	var total i64
+	var accepted bool
+	for i = 0; i < len(filePaths); i++ {
+		accepted = app.ProgramFile(filePaths[i], fetchFile(address, i))
+		if !accepted {
+			fail("the runner refused the program")
+		}
+		total = total + fileSizes[i]
+	}
+	printf("loaded %s: %d files, %d blocks, %d bytes, every block verified\n", name, len(filePaths), len(blockSizes), total)
+	var closed bool
+	printf("packets %d requests, %d resent\n", requestsSent, resent)
+	closed = net.Close(socket)
+}
+
+// hashLine returns the hash of an envelope, its third line, which
+// verifyEnvelope checks against the data.
+func hashLine(envelope []ui8) (hash []ui8) {
+	var start i32 = lineEnd(envelope, lineEnd(envelope, 0)+1) + 1
+	var ok bool
+	hash, ok = hexAt(envelope, start, 32)
+	if !ok {
+		fail("envelope hash is not hex")
+	}
+}
