@@ -815,6 +815,23 @@ to, and `-publish DIR` with `-seed` or `-secret` publishes every program
 directory in DIR and floods it. `programnetwork getpeers HOST:PORT` prints
 what a node shares with the caller.
 
+### On the phone
+
+An app of kind `flood` runs a node on the phone with an empty store in the
+app's files dir. Its args are the nodes to subscribe to, the trusted signer
+key and the name in the wanted program's `cxapp.json`. It waits up to 30 s
+for that program to arrive by flood, then checks and runs it like a `fetch`
+app.
+
+`tests/program-network-flood-in-emulator` starts three nodes in the rig
+container with the `flood-nodes` setting of the emulator driver: 7010
+publishes `fib-and-primes`, 7011 subscribes to 7010 and 7012 to 7011, and
+the app starts once 7012 holds the program. The app subscribes to 10.0.2.2
+ports 7012 and 7011, gets a have from each (D34), downloads the program
+once, verifies every block and runs it. In the first run the program was
+held 27 ms after the app subscribed, with 2 haves received, 1 duplicate and
+1 download, and the whole test took 7.1 s including install and start.
+
 ## Test programs (#19 and skycoin-cx-forth #11)
 
 This section describes the hash, memory, storage and serial test programs

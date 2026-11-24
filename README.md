@@ -137,6 +137,11 @@ programnetwork peers -file peers.txt add 192.168.1.5:7010 lan1 lan-group
 programnetwork getpeers HOST:7010
 ```
 
+An app of kind `flood` runs a node on the phone: its `args` are the comma
+separated nodes to subscribe to, the trusted signer key and the name in the
+wanted program's `cxapp.json`. The app waits for the program to arrive by
+flood, verified block by block, then checks and runs it like a `fetch` app.
+
 ### Checking a program before it runs
 
 `programcheck` reads a CX program without running it, compiled from source
@@ -252,6 +257,7 @@ the comparison. `suite -update-references` writes the captured regions to
 | `input untimed` | sends the `input.txt` events without timing them, for a screen of the app that is not a program canvas |
 | `echo-server <port>` | runs `net-echo-server` on that TCP and UDP port in the rig container, which the emulator reaches as 10.0.2.2 |
 | `program-server <port> <dir> <seed>` | runs `programblocks serve` on that UDP port in the rig container for the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>` |
+| `flood-nodes <port> <count> <dir> <seed>` | runs `count` `programnetwork` nodes on UDP ports `port` and up in the rig container: the first publishes the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>`, each other subscribes to the one before, and the app starts once the last node holds every program |
 | `netem <args>` | `tc qdisc ... netem <args>` on the packets of that port in both directions, for example `delay 200ms loss 30%` |
 | `capture <file>` | `tcpdump` of the packets of that port, pulled as `<file>` for the `file-` checks |
 

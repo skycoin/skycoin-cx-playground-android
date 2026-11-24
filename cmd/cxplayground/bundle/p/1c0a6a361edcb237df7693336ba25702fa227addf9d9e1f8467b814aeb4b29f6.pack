@@ -1,0 +1,5 @@
+{"name":"Programs: receive by flood","description":"Test demo: run a flood node, receive a signed program from the host nodes and run it","kind":"flood","entry":"flood.txt","args":["10.0.2.2:7012,10.0.2.2:7011","03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d","Downloaded: fib and primes"]}This app holds no program. It runs a programnetwork node, subscribes to the
+nodes its args give, and waits for a have of the program its args name. It
+downloads the program from the node that announced it, checks the signer
+key of its args and every block hash, then runs the program.
+See "DHT prototype (#18)" in docs/ProgramDistribution.md.
