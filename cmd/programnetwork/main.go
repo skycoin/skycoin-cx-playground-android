@@ -15,19 +15,15 @@
 //	programnetwork store [-store DIR] list
 //	programnetwork store [-store DIR] remove HASH-PREFIX
 //	programnetwork peers [-file peers.txt] list
-//	programnetwork peers [-file peers.txt] add ADDRESS GROUP CLASS [COMMENT...]
+//	programnetwork peers [-file peers.txt] shareable
+//	programnetwork peers [-file peers.txt] add ADDRESS public|private
 //	programnetwork peers [-file peers.txt] remove ADDRESS
-//	programnetwork peers [-file peers.txt] set-class ADDRESS CLASS
-//	programnetwork peers [-file peers.txt] set-group ADDRESS GROUP
-//	programnetwork peers [-file peers.txt] group-add NAME SCOPE OWNER OPERATOR SECURITY-GROUP
-//	programnetwork peers [-file peers.txt] group-remove NAME
-//	programnetwork peers [-file peers.txt] shared-with ADDRESS
 //
 // A node downloads only programs signed by a -signer key or its own
 // publishing key. With -publish, every subdirectory of DIR is published as
-// a program and announced to the subscribers. Classes are private,
-// own-infrastructure, lan-group, user-shareable and public; scopes are
-// lan, internal and global.
+// a program and announced to the subscribers. Peer exchange follows
+// Bitcoin (#41): get peers answers with fresh public peers only, getpeers
+// learns them, and private peers stay in the local peer file.
 //
 // No have starts a download (#42). A node puts every have it receives in
 // its have queue, prints each one as it reads it, and its type's policy
@@ -49,9 +45,9 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -108,9 +104,9 @@ func node(args []string) error {
 	fl := flag.NewFlagSet("node", flag.ExitOnError)
 	addr := fl.String("addr", ":7010", "UDP address to listen on")
 	storeDir := fl.String("store", "programnetwork-store", "store directory of the programs this node holds")
-	peersFile := fl.String("peers", "", "peer list file that get peers answers from")
+	peersFile := fl.String("peers", "", "peer list file that get peers answers from and learned peers are saved to")
 	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
-	formsName := fl.String("forms", "full", "request forms of downloads and get peers, full or short; a reply that cannot fit fails with error 6")
+	formsName := fl.String("forms", "full", "request forms of downloads, full or short; a reply that cannot fit fails with error 6")
 	signers := fl.String("signer", "", "comma separated public keys, hex, whose programs the node downloads")
 	subscribe := fl.String("subscribe", "", "comma separated nodes to subscribe to")
 	publish := fl.String("publish", "", "directory of program directories to publish")
@@ -205,6 +201,20 @@ func node(args []string) error {
 			return fmt.Errorf("subscribe to %s: %v", s, err)
 		}
 	}
+	// As Bitcoin asks getaddr on an outbound connection, ask each node
+	// subscribed to for peers once, and keep what was learned.
+	go func() {
+		for _, s := range splitList(*subscribe) {
+			if _, err := n.GetPeers(s); err != nil {
+				n.Logf("get peers from %s: %v", s, err)
+			}
+		}
+		if *peersFile != "" {
+			if err := programnetwork.WritePeerList(*peersFile, n.Peers()); err != nil {
+				n.Logf("save %s: %v", *peersFile, err)
+			}
+		}
+	}()
 	for _, f := range splitList(*fetch) {
 		addr, err := programblocks.HashFromHex(f)
 		if err != nil {
@@ -265,7 +275,7 @@ func getPeers(args []string) error {
 		return err
 	}
 	for _, e := range entries {
-		fmt.Printf("%s %s %s\n", e.Address, e.Group, e.Scope)
+		fmt.Printf("%s %s %d\n", e.Address, e.LastSeen.Format(time.RFC3339), e.Flags)
 	}
 	return nil
 }
@@ -292,59 +302,40 @@ func peers(args []string) error {
 		want(0, 0)
 		os.Stdout.Write(l.Format())
 		return nil
-	case "shared-with":
-		want(1, 1)
-		for _, e := range l.SharedWith(a[1]) {
-			fmt.Printf("%s %s %s\n", e.Address, e.Group, e.Scope)
+	case "shareable":
+		want(0, 0)
+		for _, e := range l.Shareable(time.Now(), netip.AddrPort{}) {
+			fmt.Printf("%s %s\n", e.Address, e.LastSeen.Format(time.RFC3339))
 		}
 		return nil
 	case "add":
-		want(3, -1)
-		class, err := programnetwork.ParseClass(a[3])
+		want(2, 2)
+		addr, err := programnetwork.ParsePeerAddress(a[1])
 		if err != nil {
 			return err
 		}
-		err = l.SetPeer(programnetwork.Peer{Address: a[1], Group: a[2], Class: class, Comment: strings.Join(a[4:], " ")})
-		if err != nil {
+		e := programnetwork.PeerEntry{Address: addr, LastSeen: time.Now()}
+		switch a[2] {
+		case "public":
+			e.Flags = programnetwork.PeerShareable
+		case "private":
+		default:
+			return fmt.Errorf("peer %s: %q, want public or private", a[1], a[2])
+		}
+		if err := l.SetPeer(e); err != nil {
 			return err
 		}
 	case "remove":
 		want(1, 1)
-		if err := l.RemovePeer(a[1]); err != nil {
-			return err
-		}
-	case "set-class", "set-group":
-		want(2, 2)
-		p, ok := l.Peer(a[1])
-		if !ok {
-			return fmt.Errorf("no peer %s", a[1])
-		}
-		if a[0] == "set-group" {
-			p.Group = a[2]
-		} else if p.Class, err = programnetwork.ParseClass(a[2]); err != nil {
-			return err
-		}
-		if err := l.SetPeer(p); err != nil {
-			return err
-		}
-	case "group-add":
-		want(5, 5)
-		scope, err := programnetwork.ParseScope(a[2])
+		addr, err := programnetwork.ParsePeerAddress(a[1])
 		if err != nil {
 			return err
 		}
-		if err := l.SetGroup(programnetwork.Group{Name: a[1], Scope: scope, Owner: a[3], Operator: a[4], SecurityGroup: a[5]}); err != nil {
-			return err
-		}
-	case "group-remove":
-		want(1, 1)
-		if err := l.RemoveGroup(a[1]); err != nil {
+		if err := l.RemovePeer(addr); err != nil {
 			return err
 		}
 	default:
-		names := []string{"list", "add", "remove", "set-class", "set-group", "group-add", "group-remove", "shared-with"}
-		sort.Strings(names)
-		return fmt.Errorf("unknown peers command %q, want one of %s", a[0], strings.Join(names, ", "))
+		return fmt.Errorf("unknown peers command %q, want list, shareable, add or remove", a[0])
 	}
 	return programnetwork.WritePeerList(*file, l)
 }

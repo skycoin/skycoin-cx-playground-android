@@ -128,16 +128,16 @@ a node puts every have it receives in its have queue, reads every one, and
 requests only what its type keeps (#42). A super node requests everything
 and relays it once, a medium node its pins and what fits its budget, and a
 thin node is a one-shot get with no subscription (#44). Each node keeps a
-peer list of groups and peers with sharing classes, and answers get peers
-with only the peers it may share. `cmd/programnetwork` runs a node, gets a
+peer list: it exchanges public peers as Bitcoin does (#41), and private
+peers stay in its local file. `cmd/programnetwork` runs a node, gets a
 program and edits the peer list file.
 
 ```
 programnetwork node -addr :7010 -store DIR -publish PROGRAMS -seed "a test seed"
 programnetwork node -addr :7011 -store DIR -signer PUBKEY -subscribe HOST:7010
 programnetwork get -signer PUBKEY ADDRESS HOST:7010
-programnetwork peers -file peers.txt group-add lan1 lan moe moe home
-programnetwork peers -file peers.txt add 192.168.1.5:7010 lan1 lan-group
+programnetwork peers -file peers.txt add 192.168.1.5:7010 private
+programnetwork peers -file peers.txt add 203.0.113.5:7010 public
 programnetwork getpeers HOST:7010
 ```
 

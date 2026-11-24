@@ -564,17 +564,16 @@ and the `forms=full|short` setting of a fetch app on the phone. The default
 is full with a 1200-byte packet, the same packets as before #31. The short
 forms need a server of #31; an older server answers them with error 3.
 
-The full forms read whole units: a get blocks reply holds whole blocks and
-a get peers reply whole peer entries. A request whose reply cannot hold one
-whole unit at the configured size fails with error 6 (packet too small),
-and the error names the flag to change, for example "a 512-byte block in a
-get blocks reply at packet 512 in the full forms, raise the packet flag to
-560 or more or set the forms flag to short". The same holds when a server
-with a smaller packet size sends a get blocks reply that holds no whole
-block. The short forms read parts: the client fetches each block in parts
-and checks the block's hash when all its parts are in, so a short-form
-client works with a server of any packet size
-(`tests/program-transport-short-forms`).
+The full forms read whole units: a get blocks reply holds whole blocks. A
+request whose reply cannot hold one whole unit at the configured size fails
+with error 6 (packet too small), and the error names the flag to change,
+for example "a 512-byte block in a get blocks reply at packet 512 in the
+full forms, raise the packet flag to 560 or more or set the forms flag to
+short". The same holds when a server with a smaller packet size sends a
+get blocks reply that holds no whole block. The short forms read parts:
+the client fetches each block in parts and checks the block's hash when
+all its parts are in, so a short-form client works with a server of any
+packet size (`tests/program-transport-short-forms`).
 
 ### Packet size sweep (#31)
 
@@ -594,8 +593,8 @@ manifest, all 21 block entries for get block list, the whole linear packing
 for get blocks, and the whole program from list to verified files for fetch
 program. The DHT rows are one announce and request of the program from
 a node to its subscriber (subscribe, have, and the subscriber's request
-and download), and one get peers of five public peers, the last of them a
-99-byte entry with a 64-byte address and a 32-byte group. Retransmissions
+and download), and one get peers of five public IPv6 peers, 25-byte
+entries, from a list that also holds a private peer. Retransmissions
 are not counted, and there were none.
 
 | Operation | 1400 | 1200 | 1024 | 512 | 256 | 128 | 64 | 32 | 16 | Floor | Below the floor |
@@ -614,8 +613,7 @@ are not counted, and there were none.
 | have 0x10 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | 2/88 | fails | fails | 50 | request: header 6, 32-byte address, lengths 4 and 8 |
 | announce and request one program, forms=full | 14/11655 | 16/11749 | 21/11989 | fails | fails | fails | fails | fails | fails | 560 | get blocks |
 | announce and request one program, forms=short | 27/11624 | 28/11647 | 28/11647 | 44/11963 | 66/12401 | 115/13384 | 269/16458 | fails | fails | 50 | the have |
-| get peers 0x12, forms=full | 2/228 | 2/228 | 2/228 | 2/228 | 2/228 | 4/247 | fails | fails | fails | 110 | reply 11 plus the longest peer entry, 99 |
-| get peer part 0x13, forms=short | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 10/314 | 12/335 | 26/482 | 108/1343 | 13 | reply: header 6, total 2, index 2, length 1, offset 1, one byte |
+| get peers 0x12 | 2/138 | 2/138 | 2/138 | 2/138 | 2/138 | 2/113 | 2/63 | 2/38 | fails | 32 | reply: header 6, count 1, one 25-byte IPv6 entry |
 
 Findings:
 
@@ -630,9 +628,8 @@ Findings:
 - The full forms read whole units (D37). Get blocks needs a whole 512-byte
   block in a reply, 560 bytes, so a program fetch and a request after a
   have in the full forms work at 560 and up and fail with error 6 below.
-- Get peers needs room for its longest entry, 110 bytes for a 99-byte
-  entry. Get peer part reads an entry by range, down to 13 bytes, when the
-  forms flag is short.
+- Get peers needs room for one 25-byte IPv6 entry, 32 bytes. A reply
+  holds as many entries as fit, up to 32, and there is no paging (#41).
 - In the short forms the floor of every fetch operation is set by the
   6-byte header, the 5-byte shortest prefix and the offset and length
   fields: 15 for list manifests prefix, 20 for get manifest by prefix and
@@ -851,7 +848,7 @@ the operations of #15, so any node that sent a have is a server.
 
 ### Packets
 
-The DHT reuses the six-byte packet header of #15 and adds four operations.
+The DHT reuses the six-byte packet header of #15 and adds three operations.
 Every packet is at most the packet size, 1200 bytes by default, a setting.
 
 Have (0x10) announces that the sender holds a program. Request body:
@@ -878,54 +875,35 @@ The reply (0x91) has the same body with the lease granted, at most 600
 seconds by default. The subscriber renews at half the lease. Both packets
 are 10 bytes.
 
-Get peers (0x12) asks for the peers the receiver shares with the sender.
-Request body:
+Get peers (0x12) is Bitcoin's getaddr (#41). It asks for public peers and
+has no body, so the request is the 6-byte header. Reply (0x92) body, the
+addr message in the shape of BIP155 addrv2:
 
 | Offset | Size | Type | Meaning |
 |---|---|---|---|
-| 6 | 2 | u16 | index of the first peer wanted |
+| 6 | 1 | u8 | entry count, at most 32 |
+| 7 | n | entries | peer entries |
 
-Reply (0x92) body:
-
-| Offset | Size | Type | Meaning |
-|---|---|---|---|
-| 6 | 2 | u16 | number of peers shared with the asker |
-| 8 | 2 | u16 | index of the first entry |
-| 10 | 1 | u8 | entry count |
-| 11 | n | entries | peer entries |
-
-A peer entry is a u8 address scope (1 LAN, 2 internal, 3 global), a u8
-address length, the address as `host:port` text of at most 64 bytes, a u8
-group name length and the group name of at most 32 bytes. An entry is at
-most 99 bytes, so a reply always holds at least 12 entries at 1200 bytes and
-10 at 1024. The reply holds as many entries as fit, and the asker asks again
-from the next index until it has them all.
-
-Get peer part (0x13, #31) reads a range of one encoded peer entry, so an
-entry longer than a get peers reply can hold still arrives. Request body:
+A peer entry:
 
 | Offset | Size | Type | Meaning |
 |---|---|---|---|
-| 6 | 2 | u16 | index of the peer |
-| 8 | 1 | u8 | offset in the encoded entry |
+| 0 | 4 | u32 | last seen, Unix seconds |
+| 4 | 1 | u8 | flags, bit 0 shareable, the other bits zero |
+| 5 | 1 | u8 | network id of BIP155, 1 IPv4, 2 IPv6 |
+| 6 | 1 | u8 | address length, 4 or 16 |
+| 7 | 4 or 16 | bytes | address |
+| 11 or 23 | 2 | u16 | port |
 
-Reply (0x93) body:
+The flag byte takes the place of addrv2's services field. An entry is 13
+bytes for IPv4 and 25 for IPv6, so a reply holds all 32 entries at 807
+bytes and up, and one IPv6 entry at 32 bytes. An entry of another network
+id is malformed. Host names are not addresses here, as in Bitcoin.
 
-| Offset | Size | Type | Meaning |
-|---|---|---|---|
-| 6 | 2 | u16 | number of peers shared with the asker |
-| 8 | 2 | u16 | index of the peer |
-| 10 | 1 | u8 | length of the encoded entry, 0 for an index past the number |
-| 11 | 1 | u8 | offset |
-| 12 | n | bytes | entry bytes, at most packet size − 12 |
-
-`programnetwork.Node.Forms` is the node's forms flag, as in the client
-(D37). With `FormsFull` a node reads whole entries with get peers,
-and an entry that does not fit a reply is error 6 naming the flag. With
-`FormsShort` it reads every entry with get peer part, down to 13 bytes. A
-node's downloads use the same flag, so in the short forms announce and
-request works at every size the have fits, 50 bytes and up, and in the
-full forms at 560 and up.
+`programnetwork.Node.Forms` is the forms flag of the node's downloads, as
+in the client (D37), so in the short forms announce and request works at
+every size the have fits, 50 bytes and up, and in the full forms at 560
+and up. Get peers has one form.
 
 A malformed request gets the error reply (0xFF) of #15. The download uses
 get manifest and get blocks of #15 against the node that sent the have.
@@ -988,75 +966,84 @@ each program once.
 
 ### Peer list file
 
-A node's peer list is a text file, `peers.txt` by default. Each line is a
-group, a peer, a comment starting with `#`, or empty:
+A node's peer list is a text file, `peers.txt` by default, in the text
+form: a `[peers]` header line, a comment naming the columns, and one entry
+per line. A line that starts with `;` is a comment. The columns are the
+address and port (IPv4, or IPv6 in brackets), the last-seen time in Unix
+seconds, and the flag byte in decimal.
 
+```ini
+; CX peer list, text form. Flags bit 0 marks a peer shareable; private peers are never sent or learned.
+[peers]
+; address, last_seen, flags
+10.1.0.1:7010, 1795478400, 0
+192.168.1.5:7010, 1795478400, 0
+203.0.113.5:7010, 1795478400, 1
+[2001:db8::5]:7010, 1795478400, 1
 ```
-# group NAME SCOPE OWNER OPERATOR SECURITY-GROUP
-group china-internal internal lab isp-b china
-group china1 internal lab isp-a china
-group global global - - global
-group lan1 lan moe moe home
-# peer ADDRESS GROUP CLASS [COMMENT]
-peer 10.1.0.1:7010 china1 own-infrastructure
-peer 192.168.1.5:7010 lan1 lan-group laptop in the office
-peer 203.0.113.5:7010 global public
-```
 
-A group has a name of at most 32 characters, an address scope (`lan`,
-`internal` or `global`), an owner, an operator and a security group, each a
-single word with `-` for none. A peer has its node's address, its group and
-one of the five sharing classes:
+An entry with flags 1 is a public peer, which the node gives out and may
+have learned. An entry with flags 0 is a private peer, configured locally,
+for example the owner's own nodes or a LAN: it is never sent in a get
+peers reply and never learned from one. A tool writes the entries in
+address order, so the file round trips byte for byte.
 
-1. `private`: never shared;
-2. `own-infrastructure`: shared only with peers that are themselves
-   `own-infrastructure` records, the owner's own nodes;
-3. `lan-group`: shared only with peers of the same group;
-4. `user-shareable`: shared with every peer in the list (D31);
-5. `public`: shared with anyone, also a node not in the list.
+### Peer exchange (#41)
 
-The rest of a peer line is a comment. A tool writes the groups and then the
-peers, each sorted, so the file round trips byte for byte.
+Peer exchange follows Bitcoin's getaddr and addr. Groups, classes, scopes
+and security groups are out of scope, and decisions D31, D32, D33 and D47
+are withdrawn.
 
-### Sharing rules
+- A node answers get peers with its public peers that were seen within the
+  last 30 days, in random order, and never the asker's own address. Private
+  peers are never sent.
+- `Node.GetPeers` asks a node and learns the entries of its reply into the
+  node's peer list, as shareable, with their last-seen times. It skips an
+  entry that is not shareable or older than 30 days, never turns a private
+  peer public, keeps the later time of a peer it has, and counts a time in
+  the future as now. The node that answered, when listed, is marked seen
+  now. So a peer that nobody sees any more stops spreading after 30 days.
+- `programnetwork node` asks each `-subscribe` node for peers once, as
+  Bitcoin asks getaddr on an outbound connection, and saves what it learned
+  to its `-peers` file.
 
-A get peers reply holds a peer only when both its class and its group's
-scope allow the asker. The asker's record is the one whose address is the
-packet's source address, or else the only record on the same host (D32). An
-asker with no record is a stranger in the `global` group.
+The limits are fixed constants:
 
-- A LAN address goes only to an asker of the same group.
-- An internal address goes only to an asker whose group has the same
-  security group, such as `china1` and `china-internal` (D33).
-- A global address goes to anyone.
+| Limit | Value | Constant |
+|---|---|---|
+| entries in one reply | 32, fewer when the packet holds fewer | `MaxPeersPerReply` |
+| answers to one asker | one with entries per 10 minutes; a retransmission gets the same reply, any other ask a reply with no entries | `PeerAnswerInterval` |
+| peer list size | 1024 entries; a full list takes a learned entry only in place of a staler shareable one | `MaxPeerTableSize` |
+| freshness | 30 days since last seen | `PeerFreshAge` |
 
-The asker's own record is never returned to it.
-`tests/program-network-get-peers-share-classes` and
-`tests/program-network-get-peers-groups-scopes` check each class and scope
-over UDP.
+`tests/program-network-peer-exchange` checks over UDP that private peers
+never leave a node and are not learned even from a crafted reply, that
+public peers spread along a chain of five nodes and stop once 30 days old,
+and that every limit holds. `tests/program-network-peer-list-file-round-trip`
+checks the file and the commands.
 
 ### Command
 
 `programnetwork peers` manages the file, one change per run:
 
 ```
-programnetwork peers -file peers.txt group-add lan1 lan moe moe home
-programnetwork peers -file peers.txt add 192.168.1.5:7010 lan1 lan-group laptop
-programnetwork peers -file peers.txt set-class 192.168.1.5:7010 user-shareable
-programnetwork peers -file peers.txt set-group 192.168.1.5:7010 global
+programnetwork peers -file peers.txt add 192.168.1.5:7010 private
+programnetwork peers -file peers.txt add 203.0.113.5:7010 public
 programnetwork peers -file peers.txt remove 192.168.1.5:7010
-programnetwork peers -file peers.txt group-remove lan1
 programnetwork peers -file peers.txt list
-programnetwork peers -file peers.txt shared-with 203.0.113.9:7010
+programnetwork peers -file peers.txt shareable
 ```
+
+`add` sets the last-seen time to now, and `shareable` prints what a get
+peers reply could hold.
 
 `programnetwork node` runs a node: `-store` names its store, `-peers` its
 peer list, `-signer` the trusted keys, `-subscribe` the nodes it subscribes
 to, and `-publish DIR` with `-seed` or `-secret` publishes every program
 directory in DIR, dated `-date` or now, and announces it. The node prints
 every have it reads from its queue. `programnetwork get` is the thin node,
-see "Node types". `programnetwork getpeers HOST:PORT` prints what a node
-shares with the caller.
+see "Node types". `programnetwork getpeers HOST:PORT` prints the peers a
+node gives the caller.
 
 ### On the phone
 
@@ -1403,52 +1390,12 @@ D30 ProgramManifestCanonicalFormDecision
   keep the text form for reading, writing and tests, and convert it with
   `DecodeText`.
 
-D31 PeerUserShareableClassDecision
-- What exists now: the issue lists five sharing classes. Private, own
-  infrastructure, LAN group and public have a clear audience. User-selected
-  shareable does not say who it is shared with.
-- Question: who receives a `user-shareable` peer in a get peers reply?
-- Option a: every asker that has a record in the peer list, whatever its
-  class or group. A stranger does not get it, which is what sets it apart
-  from `public`.
-- Option b: only askers the user names for that peer, a share list kept on
-  the peer line.
-- Option c: anyone, the same as `public`, with the class kept only as a
-  label of who chose to share it.
-- Recommendation: option a, because it needs no extra field, it differs
-  from `public` in a way a node can check, and it matches "the user chose to
-  share this with the peers the user knows". Built: `classAllows` in
-  `programnetwork/peers.go`.
-
-D32 PeerAskerGroupSourceDecision
-- What exists now: the sharing rules need the asker's group, and a get peers
-  packet carries no identity.
-- Question: how does a node learn the group of the node asking it?
-- Option a: from its own peer list, by the packet's source address, or the
-  only record on the same host. An asker with no record is a stranger in
-  `global`.
-- Option b: the asker names its group in the request, and the node believes
-  it.
-- Option c: the asker signs the request with its node key, and the node
-  looks the key up in its peer list, which then holds keys.
-- Recommendation: option a for the prototype, because a claimed group lets
-  anyone read a LAN group's peers, and the source address is what a UDP
-  node already has. Option c is the step after, when peer records gain
-  keys. Built: `PeerList.Asker` in `programnetwork/peers.go`.
-
-D33 PeerInternalScopeReachDecision
-- What exists now: the issue names LAN, internal and other scopes, and
-  groups such as `china1` and `china-internal` with a security group.
-- Question: which askers may receive an address of internal scope?
-- Option a: askers whose group has the same security group, so `china1`
-  and `china-internal` share addresses when both have security group
-  `china`.
-- Option b: askers of the same group only, the same as a LAN address.
-- Option c: any asker that is not a stranger.
-- Recommendation: option a, because it gives the security group a job and
-  lets one private network hold several groups with different operators.
-  LAN addresses stay within their group. Built: `scopeAllows` in
-  `programnetwork/peers.go`.
+D31 PeerUserShareableClassDecision, D32 PeerAskerGroupSourceDecision,
+D33 PeerInternalScopeReachDecision and D47 PeerListProjectionLayoutDecision
+- Withdrawn 2026-11-24 (#41, msg 524): out of scope. Peer exchange follows
+  Bitcoin: public peers only, private lists configured locally, one
+  shareable flag byte. See "Peer exchange (#41)". The classes, groups,
+  scopes, security groups and asker lookup are removed.
 
 D34 FloodSubscribeCatchUpDecision
 - What exists now: a have is sent when a node starts to hold a program, so
@@ -1689,14 +1636,11 @@ dependencies and its test.
       requests by the node's policy, relay once (D55). Depends on
       HaveSubscribe and Client. Test:
       program-network-announce-request-in-process.
-    - ProgramNetworkPeerGetPeers: the get-peers packet. Depends on PacketCodec.
-      Test: reply fits one packet.
-    - ProgramNetworkPeerListClasses: the five sharing classes. Depends on
-      GetPeers. Test: a private peer is never shared.
-    - ProgramNetworkPeerGroupsScopes: groups and address scopes. Depends on
-      ListClasses. Test: a LAN address is not given to a global peer.
+    - ProgramNetworkPeerExchange (#41): get peers as Bitcoin's getaddr and
+      addr, public peers only, learned peers relayed while fresh, the fixed
+      limits. Depends on PacketCodec. Test: program-network-peer-exchange.
     - ProgramNetworkPeerCommand: command-line peer list management. Depends
-      on GroupsScopes. Test: round trip of the list file.
+      on PeerExchange. Test: program-network-peer-list-file-round-trip.
     - ProgramNetworkEmulatorAnnounceRequest: the phone reads the haves and
       requests a program. Depends on AnnounceRequest. Test:
       program-network-announce-request-in-emulator.

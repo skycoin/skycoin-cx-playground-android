@@ -137,14 +137,10 @@ func newFixture(t *testing.T) *fixture {
 	if f.manifest, _, err = programblocks.Decode(f.encoded, f.address); err != nil {
 		t.Fatal(err)
 	}
-	// Five public peers, the last with the longest address and group, a
-	// 99-byte entry.
-	longGroup := strings.Repeat("g", programnetwork.MaxGroupNameLength)
-	longHost := strings.Repeat("a", programnetwork.MaxAddressLength-len(".example.org:7010")) + ".example.org:7010"
-	text := "group global global - - global\ngroup " + longGroup + " global - - global\n" +
-		"peer 203.0.113.5:7010 global public\npeer 198.51.100.17:7010 global public\n" +
-		"peer [2001:db8::5]:7010 global public\npeer node7.example.org:7010 global public\n" +
-		"peer " + longHost + " " + longGroup + " public\n"
+	// Five public IPv6 peers, 25-byte entries, and a private one that is
+	// never sent.
+	text := "[peers]\n[2001:db8::5]:7010, 1795478400, 1\n[2001:db8::6]:7010, 1795478400, 1\n[2001:db8::7]:7010, 1795478400, 1\n" +
+		"[2001:db8::8]:7010, 1795478400, 1\n[2001:db8::9]:7010, 1795478400, 1\n[2001:db8::a]:7010, 1795478400, 0\n"
 	if f.peers, err = programnetwork.ParsePeerList(text); err != nil {
 		t.Fatal(err)
 	}
@@ -263,18 +259,24 @@ func announceRun(forms programblocks.Forms, ops ...byte) func(*testing.T, *fixtu
 	}
 }
 
-func peersRun(forms programblocks.Forms) func(*testing.T, *fixture, int) (int, int, error) {
+// peersRun asks a node for its five public peers. A reply holds as many
+// as fit, so at least one is wanted.
+func peersRun() func(*testing.T, *fixture, int) (int, int, error) {
 	return func(t *testing.T, f *fixture, size int) (int, int, error) {
 		tl := newTally()
-		server, serverAddr := f.node(t, size, forms, tl)
+		server, serverAddr := f.node(t, size, full, tl)
 		server.SetPeers(f.peers)
-		asker, _ := f.node(t, size, forms, tl)
+		asker, _ := f.node(t, size, full, tl)
+		server.Now, asker.Now = func() time.Time { return date }, func() time.Time { return date }
 		got, err := asker.GetPeers(serverAddr)
 		if err != nil {
 			return 0, 0, err
 		}
-		if len(got) != len(f.peers.Peers) {
-			return 0, 0, fmt.Errorf("%d peers, want %d", len(got), len(f.peers.Peers))
+		if want := min(5, (size-7)/25); len(got) != want {
+			return 0, 0, fmt.Errorf("%d peers, want %d", len(got), want)
+		}
+		if len(got) == 0 {
+			return 0, 0, programblocks.ErrPacketTooSmall
 		}
 		p, b := tl.total()
 		return p, b, nil
@@ -326,8 +328,7 @@ var operations = []operation{
 	{"have 0x10", 50, "request: header 6, 32-byte address, lengths 4 and 8", announceRun(short, byte(programnetwork.OperationHave))},
 	{"announce and request one program, forms=full", 560, "get blocks", announceRun(full)},
 	{"announce and request one program, forms=short", 50, "the have", announceRun(short)},
-	{"get peers 0x12, forms=full", 110, "reply 11 plus the longest peer entry, 99", peersRun(full)},
-	{"get peer part 0x13, forms=short", 13, "reply: header 6, total 2, index 2, length 1, offset 1, one byte", peersRun(short)},
+	{"get peers 0x12", 32, "reply: header 6, count 1, one 25-byte IPv6 entry", peersRun()},
 }
 
 func fetchProgram(c *programblocks.Client, f *fixture) error {

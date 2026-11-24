@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
+	"net/netip"
 	"sync"
 	"syscall"
 	"time"
@@ -36,7 +37,7 @@ var ErrClosed = errors.New("node closed")
 type Node struct {
 	// PacketSize bounds every packet the node sends, 1200 by default.
 	PacketSize int
-	// Forms is the forms flag of the node's downloads and get peers, as in
+	// Forms is the forms flag of the node's downloads, as in
 	// programblocks.Client.
 	Forms programblocks.Forms
 	// Lease is the longest subscription the node grants.
@@ -51,6 +52,8 @@ type Node struct {
 	FirstTimeout time.Duration
 	MaxTimeout   time.Duration
 	MaxTries     int
+	// Now, when set, is the node's clock for peer exchange, for tests.
+	Now func() time.Time
 
 	conn     net.PacketConn
 	store    *programstore.Store
@@ -69,6 +72,7 @@ type Node struct {
 	nextID      uint32
 	stats       Stats
 	peers       *PeerList
+	peerAnswers map[string]peerAnswer
 	pins        pinList
 	// reservedBytes are the bytes of the downloads under way, counted
 	// against the budget with stats.StoredBytes.
@@ -136,7 +140,7 @@ func NewTypedNode(conn net.PacketConn, store *programstore.Store, trusted []ciph
 		conn: conn, store: store, trusted: trusted, settings: settings, pins: pinList{path: settings.PinsFile}, haves: newHaveQueue(),
 		catalog: programblocks.EmptyCatalog(), requested: map[programblocks.Hash]bool{},
 		announcers: map[programblocks.Hash][]net.Addr{}, relayed: map[programblocks.Hash]bool{},
-		subscribers: map[string]subscriber{}, subscribing: map[string]bool{}, pending: map[uint32]chan []byte{},
+		subscribers: map[string]subscriber{}, subscribing: map[string]bool{}, pending: map[uint32]chan []byte{}, peerAnswers: map[string]peerAnswer{},
 		nextID: rand.Uint32(), closed: make(chan struct{}),
 	}
 	subs, err := readSubscribers(n.subscribersPath(), time.Now())
@@ -311,42 +315,11 @@ func (n *Node) handle(b []byte, from net.Addr) {
 		}
 		n.send(EncodeSubscribeReply(id, n.subscribe(from, lease)), from)
 	case op == OperationGetPeers:
-		first, err := DecodeGetPeers(b)
-		if err != nil {
+		if err := DecodeGetPeers(b); err != nil {
 			fail(err)
 			return
 		}
-		shared := n.sharedWith(from)
-		var page []PeerEntry
-		if int(first) < len(shared) {
-			page = shared[first:]
-		}
-		r, _, err := EncodeGetPeersReply(id, uint16(len(shared)), first, page, n.PacketSize)
-		if err != nil {
-			fail(err)
-			return
-		}
-		n.send(r, from)
-	case op == OperationGetPeerPart:
-		index, offset, err := DecodeGetPeerPart(b)
-		if err != nil {
-			fail(err)
-			return
-		}
-		shared := n.sharedWith(from)
-		var entry []byte
-		if int(index) < len(shared) {
-			if entry, err = EncodePeerEntry(shared[index]); err != nil {
-				fail(err)
-				return
-			}
-		}
-		r, err := EncodeGetPeerPartReply(id, uint16(len(shared)), index, entry, offset, n.PacketSize)
-		if err != nil {
-			fail(err)
-			return
-		}
-		n.send(r, from)
+		n.send(n.peersReply(id, from), from)
 	default:
 		n.mu.Lock()
 		r := n.catalog.Reply(b, n.PacketSize)
@@ -519,88 +492,93 @@ func (n *Node) subscribeOnce(to net.Addr, fresh bool) (uint32, error) {
 	return DecodeLease(r)
 }
 
-// GetPeers asks the node at address for every peer it shares with this
-// node, a page at a time.
+// GetPeers asks the node at address for peers, as Bitcoin's getaddr, and
+// learns the shareable, fresh entries of the reply into the node's peer
+// list (#41). It returns the entries the reply held.
 func (n *Node) GetPeers(address string) ([]PeerEntry, error) {
 	to, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return nil, err
 	}
-	var all []PeerEntry
-	total := -1
-	for total < 0 || len(all) < total {
-		if n.Forms != programblocks.FormsShort {
-			id := n.newRequestID()
-			b, err := n.request(to, id, EncodeGetPeers(id, uint16(len(all))))
-			if err != nil {
-				return nil, err
-			}
-			r, err := DecodeGetPeersReply(b)
-			if err != nil {
-				return nil, err
-			}
-			if int(r.First) != len(all) {
-				return nil, fmt.Errorf("%w: get peers page at %d, asked %d", programblocks.ErrPacket, r.First, len(all))
-			}
-			total = int(r.Total)
-			all = append(all, r.Entries...)
-			if len(r.Entries) == 0 && len(all) < total {
-				return all, programblocks.PacketTooSmall(n.PacketSize, n.Forms, MaxPeerEntryLength+getPeersReplyFixed, "peer %d in a get peers reply", len(all))
-			}
-			continue
-		}
-		e, t, err := n.getPeerByParts(to, uint16(len(all)))
-		if err != nil {
-			return all, err
-		}
-		if total = t; e != nil {
-			all = append(all, *e)
-		}
+	id := n.newRequestID()
+	b, err := n.request(to, id, EncodeGetPeers(id))
+	if err != nil {
+		return nil, err
 	}
-	return all, nil
-}
-
-// getPeerByParts reads the peer entry at index with get peer part, a range
-// at a time. It returns nil and the total when index is past the total.
-func (n *Node) getPeerByParts(to net.Addr, index uint16) (*PeerEntry, int, error) {
-	var entry []byte
-	for offset := 0; entry == nil || offset < len(entry); {
-		id := n.newRequestID()
-		b, err := n.request(to, id, EncodeGetPeerPart(id, index, offset))
-		if err != nil {
-			return nil, 0, err
-		}
-		p, err := DecodeGetPeerPartReply(b)
-		if err != nil {
-			return nil, 0, err
-		}
-		if p.Index != index || p.Offset != offset || (entry != nil && p.EntryLength != len(entry)) {
-			return nil, 0, fmt.Errorf("%w: get peer part of entry %d at %d, asked %d at %d", programblocks.ErrPacket, p.Index, p.Offset, index, offset)
-		}
-		if p.EntryLength == 0 {
-			return nil, int(p.Total), nil
-		}
-		if entry == nil {
-			entry = make([]byte, p.EntryLength)
-		}
-		offset += copy(entry[offset:], p.Data)
-		if offset == len(entry) {
-			e, err := DecodePeerEntry(entry)
-			return &e, int(p.Total), err
-		}
+	entries, err := DecodeGetPeersReply(b)
+	if err != nil {
+		return nil, err
 	}
-	return nil, 0, nil
-}
-
-// sharedWith returns the peers this node shares with the asker at from.
-func (n *Node) sharedWith(from net.Addr) []PeerEntry {
+	now := n.now()
 	n.mu.Lock()
-	peers := n.peers
-	n.mu.Unlock()
-	if peers == nil {
-		return nil
+	if n.peers == nil {
+		n.peers = &PeerList{}
 	}
-	return peers.SharedWith(from.String())
+	added := n.peers.Learn(entries, now)
+	if from, ok := addrPort(to); ok {
+		if e, ok := n.peers.Peer(from); ok && e.Shareable() {
+			e.LastSeen = now
+			n.peers.SetPeer(e)
+		}
+	}
+	n.mu.Unlock()
+	n.logf("get peers from %s: %d entries, %d new", address, len(entries), added)
+	return entries, nil
+}
+
+// peerAnswer is the last get peers reply a node sent one asker.
+type peerAnswer struct {
+	at        time.Time
+	requestID uint32
+	reply     []byte
+}
+
+// peersReply answers a get peers. An asker gets entries at most once per
+// PeerAnswerInterval; a retransmission of that request gets the same reply,
+// and any other request within the interval a reply with no entries. The
+// entries are the fresh shareable ones in random order, as Bitcoin picks.
+func (n *Node) peersReply(id uint32, from net.Addr) []byte {
+	now := n.now()
+	key := from.String()
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for k, a := range n.peerAnswers {
+		if now.Sub(a.at) >= PeerAnswerInterval {
+			delete(n.peerAnswers, k)
+		}
+	}
+	if a, ok := n.peerAnswers[key]; ok {
+		if a.requestID == id {
+			return a.reply
+		}
+		r, _ := EncodeGetPeersReply(id, nil, n.PacketSize)
+		return r
+	}
+	var shared []PeerEntry
+	if n.peers != nil {
+		asker, _ := addrPort(from)
+		shared = n.peers.Shareable(now, asker)
+	}
+	rand.Shuffle(len(shared), func(i, j int) { shared[i], shared[j] = shared[j], shared[i] })
+	r, _ := EncodeGetPeersReply(id, shared, n.PacketSize)
+	n.peerAnswers[key] = peerAnswer{at: now, requestID: id, reply: r}
+	return r
+}
+
+func addrPort(a net.Addr) (netip.AddrPort, bool) {
+	u, ok := a.(*net.UDPAddr)
+	if !ok {
+		return netip.AddrPort{}, false
+	}
+	p := u.AddrPort()
+	return netip.AddrPortFrom(p.Addr().Unmap(), p.Port()), true
+}
+
+func (n *Node) now() time.Time {
+	if n.Now != nil {
+		return n.Now()
+	}
+	return time.Now()
 }
 
 // sendHave announces h to one subscriber and waits for the acknowledgement.
@@ -970,12 +948,22 @@ func packFromFiles(m *programblocks.Manifest, files map[string][]byte) []byte {
 	return pack
 }
 
-// SetPeers sets the peer list get peers answers from. The node does not
-// change the list. With no list it shares no peer.
+// SetPeers sets the node's peer list, a copy of l. Get peers answers from
+// it and GetPeers learns into it.
 func (n *Node) SetPeers(l *PeerList) {
 	n.mu.Lock()
-	n.peers = l
+	n.peers = l.Clone()
 	n.mu.Unlock()
+}
+
+// Peers returns a copy of the node's peer list, learned peers included.
+func (n *Node) Peers() *PeerList {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if n.peers == nil {
+		return &PeerList{}
+	}
+	return n.peers.Clone()
 }
 
 // Store is the store the node keeps its programs in.

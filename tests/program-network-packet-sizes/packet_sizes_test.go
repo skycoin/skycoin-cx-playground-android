@@ -1,16 +1,17 @@
 // Package programnetworkpacketsizes checks the have, subscribe and get
-// peers packets: each decodes to what was encoded, has the length the
-// document gives, and no get peers reply exceeds 1200 or 1024 bytes, also
-// with the longest entries and over a real node with many peers.
+// peers packets: each decodes to what was encoded and has the length the
+// document gives, a peer entry is 13 bytes for IPv4 and 25 for IPv6, and a
+// get peers reply holds at most MaxPeersPerReply entries and never exceeds
+// the packet size, also over a real node with many peers.
 package programnetworkpacketsizes
 
 import (
-	"fmt"
 	"net"
+	"net/netip"
 	"reflect"
-	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/skycoin/skycoin-cx-playground-android/programblocks"
 	"github.com/skycoin/skycoin-cx-playground-android/programnetwork"
@@ -38,9 +39,9 @@ func TestFixedPackets(t *testing.T) {
 			t.Fatalf("subscribe packet %x: lease %d, %v", p, lease, err)
 		}
 	}
-	g := programnetwork.EncodeGetPeers(9, 12)
-	if first, err := programnetwork.DecodeGetPeers(g); len(g) != 8 || err != nil || first != 12 {
-		t.Fatalf("get peers %x: first %d, %v", g, first, err)
+	g := programnetwork.EncodeGetPeers(9)
+	if err := programnetwork.DecodeGetPeers(g); len(g) != 6 || err != nil {
+		t.Fatalf("get peers %x: %v", g, err)
 	}
 	if _, err := programnetwork.DecodeHave(b[:49]); err == nil {
 		t.Error("short have accepted")
@@ -48,43 +49,67 @@ func TestFixedPackets(t *testing.T) {
 	if _, err := programnetwork.DecodeHaveReply(ack[:37]); err == nil {
 		t.Error("short have reply accepted")
 	}
-	if _, err := programnetwork.DecodeGetPeers(g[:7]); err == nil {
-		t.Error("short get peers accepted")
+	if err := programnetwork.DecodeGetPeers(append(g, 0)); err == nil {
+		t.Error("long get peers accepted")
 	}
-	t.Logf("have 50 bytes, have reply 38, subscribe and its reply 10, get peers 8")
+	t.Logf("have 50 bytes, have reply 38, subscribe and its reply 10, get peers 6")
 }
 
-func longEntries(n int) []programnetwork.PeerEntry {
+// entries returns n public entries, IPv6 when v6, seen at the fixed time.
+func entries(n int, v6 bool) []programnetwork.PeerEntry {
 	var out []programnetwork.PeerEntry
 	for i := range n {
-		host := fmt.Sprintf("host%03d.", i) + strings.Repeat("a", programnetwork.MaxAddressLength-13)
-		out = append(out, programnetwork.PeerEntry{Scope: programnetwork.ScopeGlobal, Address: host + ":7010",
-			Group: strings.Repeat("g", programnetwork.MaxGroupNameLength)})
+		a := netip.AddrFrom4([4]byte{203, 0, byte(113 + i/250), byte(1 + i%250)})
+		if v6 {
+			a = netip.AddrFrom16([16]byte{0x20, 0x01, 0x0d, 0xb8, 14: byte(i / 256), 15: byte(i)})
+		}
+		out = append(out, programnetwork.PeerEntry{Address: netip.AddrPortFrom(a, 7010), LastSeen: seen, Flags: programnetwork.PeerShareable})
 	}
 	return out
 }
 
+var seen = time.Unix(1795478400, 0).UTC()
+
+func TestPeerEntries(t *testing.T) {
+	for _, c := range []struct {
+		v6     bool
+		length int
+	}{{false, 13}, {true, 25}} {
+		e := entries(1, c.v6)[0]
+		b := programnetwork.EncodePeerEntry(e)
+		if len(b) != c.length {
+			t.Fatalf("%v: %d bytes, want %d", e.Address, len(b), c.length)
+		}
+		got, n, err := programnetwork.DecodePeerEntry(b)
+		if err != nil || n != c.length || got != e {
+			t.Fatalf("%v: round trip %+v, %d, %v", e.Address, got, n, err)
+		}
+	}
+	b := programnetwork.EncodePeerEntry(entries(1, false)[0])
+	b[5] = 4 // TORv3, a network id this prototype does not carry
+	if _, _, err := programnetwork.DecodePeerEntry(b); err == nil {
+		t.Error("an entry of network 4 was decoded")
+	}
+}
+
 func TestGetPeersReplyFitsOnePacket(t *testing.T) {
-	entries := longEntries(40)
-	if len(entries[0].Address) != programnetwork.MaxAddressLength {
-		t.Fatalf("test address of %d bytes", len(entries[0].Address))
-	}
-	for _, size := range []int{programblocks.DefaultPacketSize, programblocks.SmallPacketSize} {
-		b, n, err := programnetwork.EncodeGetPeersReply(1, 40, 0, entries, size)
-		if err != nil {
-			t.Fatal(err)
+	all := entries(40, true)
+	for _, c := range []struct{ size, want int }{
+		{programblocks.DefaultPacketSize, programnetwork.MaxPeersPerReply},
+		{programblocks.SmallPacketSize, programnetwork.MaxPeersPerReply},
+		{512, (512 - 7) / 25},
+		{32, 1},
+		{31, 0},
+	} {
+		b, n := programnetwork.EncodeGetPeersReply(1, all, c.size)
+		if len(b) > c.size || n != c.want {
+			t.Fatalf("packet %d: reply of %d bytes with %d IPv6 entries, want %d", c.size, len(b), n, c.want)
 		}
-		if len(b) > size || n != (size-11)/programnetwork.MaxPeerEntryLength {
-			t.Fatalf("packet %d: reply of %d bytes with %d longest entries", size, len(b), n)
+		got, err := programnetwork.DecodeGetPeersReply(b)
+		if err != nil || len(got) != n || (n > 0 && !reflect.DeepEqual(got, all[:n])) {
+			t.Fatalf("packet %d: round trip %v, %d entries", c.size, err, len(got))
 		}
-		r, err := programnetwork.DecodeGetPeersReply(b)
-		if err != nil || r.Total != 40 || !reflect.DeepEqual(r.Entries, entries[:n]) {
-			t.Fatalf("packet %d: round trip %v, %d entries", size, err, len(r.Entries))
-		}
-		t.Logf("packet %d: %d longest entries in %d bytes", size, n, len(b))
-	}
-	if _, _, err := programnetwork.EncodeGetPeersReply(1, 1, 0, []programnetwork.PeerEntry{{Address: strings.Repeat("a", 65)}}, 1200); err == nil {
-		t.Error("an address of 65 bytes was encoded")
+		t.Logf("packet %d: %d IPv6 entries in %d bytes", c.size, n, len(b))
 	}
 }
 
@@ -104,17 +129,15 @@ func (c *recordingConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 	return c.PacketConn.WriteTo(b, addr)
 }
 
-func TestGetPeersPagesOverANode(t *testing.T) {
+func TestGetPeersOverANode(t *testing.T) {
 	list := &programnetwork.PeerList{}
-	if err := list.SetGroup(programnetwork.Group{Name: "global", Scope: programnetwork.ScopeGlobal, Owner: "-", Operator: "-", SecurityGroup: "global"}); err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range longEntries(60) {
-		if err := list.SetPeer(programnetwork.Peer{Address: e.Address, Group: "global", Class: programnetwork.ClassPublic}); err != nil {
+	for _, e := range entries(60, true) {
+		if err := list.SetPeer(e); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, size := range []int{programblocks.DefaultPacketSize, programblocks.SmallPacketSize} {
+	now := func() time.Time { return seen.Add(time.Hour) }
+	for _, size := range []int{programblocks.DefaultPacketSize, programblocks.SmallPacketSize, 128} {
 		pc, err := net.ListenPacket("udp", "127.0.0.1:0")
 		if err != nil {
 			t.Fatal(err)
@@ -122,18 +145,20 @@ func TestGetPeersPagesOverANode(t *testing.T) {
 		rec := &recordingConn{PacketConn: pc}
 		server := newNode(t, rec)
 		server.SetPeers(list)
-		server.PacketSize = size
+		server.PacketSize, server.Now = size, now
 		go server.Run()
 		client := newNode(t, nil)
+		client.Now = now
 		go client.Run()
 		got, err := client.GetPeers(pc.LocalAddr().String())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(got) != 60 || int(rec.longest.Load()) > size {
-			t.Fatalf("packet %d: %d peers, longest reply %d bytes", size, len(got), rec.longest.Load())
+		want := min(programnetwork.MaxPeersPerReply, (size-7)/25)
+		if len(got) != want || int(rec.longest.Load()) > size || len(client.Peers().Peers) != want {
+			t.Fatalf("packet %d: %d peers, %d learned, longest reply %d bytes", size, len(got), len(client.Peers().Peers), rec.longest.Load())
 		}
-		t.Logf("packet %d: 60 peers in pages, longest reply %d bytes", size, rec.longest.Load())
+		t.Logf("packet %d: %d of 60 peers in one reply of %d bytes", size, len(got), rec.longest.Load())
 		server.Close()
 		client.Close()
 	}

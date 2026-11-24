@@ -1,7 +1,7 @@
 // Package programnetwork is the DHT prototype of #18: nodes that subscribe
 // to each other, announce the programs they hold with have packets, put
 // every have they receive in a have queue, request only what their policy
-// keeps (#42), and share peers by class, group and address scope. A thin
+// keeps (#42), and exchange public peers as Bitcoin does (#41). A thin
 // node is Get, a one-shot fetch (#44). See "DHT prototype (#18)" in
 // docs/ProgramDistribution.md.
 package programnetwork
@@ -9,40 +9,38 @@ package programnetwork
 import (
 	"encoding/binary"
 	"fmt"
+	"net/netip"
+	"time"
 
 	"github.com/skycoin/skycoin-cx-playground-android/programblocks"
 )
 
 // The operations this package adds to those of programblocks. A reply adds
 // programblocks.ReplyFlag, and an error reply is programblocks.OperationError.
+// Get peers is Bitcoin's getaddr, and its reply is addr in the shape of
+// BIP155 addrv2 (#41).
 const (
 	OperationHave      programblocks.Operation = 0x10
 	OperationSubscribe programblocks.Operation = 0x11
 	OperationGetPeers  programblocks.Operation = 0x12
-	// OperationGetPeerPart reads a range of one encoded peer entry, so a peer
-	// entry longer than a get peers reply can hold still arrives (#31).
-	OperationGetPeerPart programblocks.Operation = 0x13
 )
 
 // The packet lengths, header included.
 const (
-	haveRequestLength        = programblocks.PacketHeaderLength + 32 + 4 + 8
-	haveReplyLength          = programblocks.PacketHeaderLength + 32
-	subscribeRequestLength   = programblocks.PacketHeaderLength + 4
-	subscribeReplyLength     = programblocks.PacketHeaderLength + 4
-	getPeersRequestLength    = programblocks.PacketHeaderLength + 2
-	getPeersReplyFixed       = programblocks.PacketHeaderLength + 2 + 2 + 1
-	getPeerPartRequestLength = programblocks.PacketHeaderLength + 2 + 1
-	getPeerPartReplyFixed    = programblocks.PacketHeaderLength + 2 + 2 + 1 + 1
+	haveRequestLength      = programblocks.PacketHeaderLength + 32 + 4 + 8
+	haveReplyLength        = programblocks.PacketHeaderLength + 32
+	subscribeRequestLength = programblocks.PacketHeaderLength + 4
+	subscribeReplyLength   = programblocks.PacketHeaderLength + 4
+	getPeersRequestLength  = programblocks.PacketHeaderLength
+	getPeersReplyFixed     = programblocks.PacketHeaderLength + 1
 )
 
-// The limits of a peer entry in a get peers reply.
+// The lengths of a peer entry: last seen u32, flags u8, network id u8,
+// address length u8, the address, port u16.
 const (
-	MaxAddressLength   = 64
-	MaxGroupNameLength = 32
-	peerEntryFixed     = 1 + 1 + 1
-	// MaxPeerEntryLength is the longest peer entry.
-	MaxPeerEntryLength = peerEntryFixed + MaxAddressLength + MaxGroupNameLength
+	peerEntryFixed = 4 + 1 + 1 + 1 + 2
+	// MaxPeerEntryLength is the length of an IPv6 entry, the longest.
+	MaxPeerEntryLength = peerEntryFixed + 16
 )
 
 // Have announces that the sender holds the program whose manifest address
@@ -52,21 +50,6 @@ type Have struct {
 	Address        programblocks.Hash
 	ManifestLength uint32
 	PackLength     uint64
-}
-
-// PeerEntry is one peer in a get peers reply.
-type PeerEntry struct {
-	Scope   AddressScope
-	Address string
-	Group   string
-}
-
-// GetPeersReply is one page of a peer's shareable peers. Total is the
-// number of peers shared with the asker, First the index of Entries[0].
-type GetPeersReply struct {
-	Total   uint16
-	First   uint16
-	Entries []PeerEntry
 }
 
 func header(op programblocks.Operation, id uint32, length int) []byte {
@@ -146,152 +129,84 @@ func DecodeLease(b []byte) (uint32, error) {
 	return binary.BigEndian.Uint32(b[6:]), nil
 }
 
-// EncodeGetPeers asks for the shareable peers from index first on.
-func EncodeGetPeers(id uint32, first uint16) []byte {
-	return binary.BigEndian.AppendUint16(header(OperationGetPeers, id, getPeersRequestLength), first)
+// EncodeGetPeers asks for shareable peers, as Bitcoin's getaddr.
+func EncodeGetPeers(id uint32) []byte {
+	return header(OperationGetPeers, id, getPeersRequestLength)
 }
 
-// DecodeGetPeers parses a get peers request and returns its first index.
-func DecodeGetPeers(b []byte) (uint16, error) {
+// DecodeGetPeers checks a get peers request.
+func DecodeGetPeers(b []byte) error {
 	if len(b) != getPeersRequestLength {
-		return 0, malformed(OperationGetPeers, len(b))
+		return malformed(OperationGetPeers, len(b))
 	}
-	return binary.BigEndian.Uint16(b[6:]), nil
+	return nil
 }
 
-// EncodeGetPeersReply returns a get peers reply with as many of entries,
-// starting at index first of total, as fit in packetSize, and the number
-// of entries it holds. An entry with a field too long is an error.
-func EncodeGetPeersReply(id uint32, total, first uint16, entries []PeerEntry, packetSize int) ([]byte, int, error) {
+// EncodeGetPeersReply returns a get peers reply with as many of entries as
+// fit in packetSize, at most MaxPeersPerReply, and the number it holds.
+func EncodeGetPeersReply(id uint32, entries []PeerEntry, packetSize int) ([]byte, int) {
 	b := header(OperationGetPeers|programblocks.ReplyFlag, id, packetSize)
-	b = binary.BigEndian.AppendUint16(b, total)
-	b = binary.BigEndian.AppendUint16(b, first)
 	b = append(b, 0)
 	n := 0
 	for _, e := range entries {
-		eb, err := EncodePeerEntry(e)
-		if err != nil {
-			return nil, 0, err
-		}
-		if len(b)+len(eb) > packetSize || n == 255 {
+		eb := EncodePeerEntry(e)
+		if len(b)+len(eb) > packetSize || n == MaxPeersPerReply {
 			break
 		}
 		b = append(b, eb...)
 		n++
 	}
 	b[getPeersReplyFixed-1] = byte(n)
-	return b, n, nil
+	return b, n
 }
 
-// DecodeGetPeersReply parses a get peers reply.
-func DecodeGetPeersReply(b []byte) (GetPeersReply, error) {
-	var r GetPeersReply
+// DecodeGetPeersReply parses a get peers reply and returns its entries.
+func DecodeGetPeersReply(b []byte) ([]PeerEntry, error) {
 	bad := malformed(OperationGetPeers|programblocks.ReplyFlag, len(b))
-	if len(b) < getPeersReplyFixed {
-		return r, bad
+	if len(b) < getPeersReplyFixed || int(b[6]) > MaxPeersPerReply {
+		return nil, bad
 	}
-	r.Total, r.First = binary.BigEndian.Uint16(b[6:]), binary.BigEndian.Uint16(b[8:])
-	count := int(b[10])
+	var out []PeerEntry
 	rest := b[getPeersReplyFixed:]
-	for range count {
-		if len(rest) < 2 {
-			return r, bad
+	for range int(b[6]) {
+		e, n, err := DecodePeerEntry(rest)
+		if err != nil {
+			return nil, err
 		}
-		e := PeerEntry{Scope: AddressScope(rest[0])}
-		n := int(rest[1])
-		if len(rest) < 2+n+1 {
-			return r, bad
-		}
-		e.Address = string(rest[2 : 2+n])
-		rest = rest[2+n:]
-		g := int(rest[0])
-		if len(rest) < 1+g {
-			return r, bad
-		}
-		e.Group, rest = string(rest[1:1+g]), rest[1+g:]
-		r.Entries = append(r.Entries, e)
+		out, rest = append(out, e), rest[n:]
 	}
 	if len(rest) != 0 {
-		return r, bad
+		return nil, bad
 	}
-	return r, nil
+	return out, nil
 }
 
-// EncodePeerEntry returns the bytes of one peer entry as a get peers reply
-// carries it.
-func EncodePeerEntry(e PeerEntry) ([]byte, error) {
-	if len(e.Address) == 0 || len(e.Address) > MaxAddressLength || len(e.Group) > MaxGroupNameLength {
-		return nil, fmt.Errorf("peer entry %q in group %q is too long", e.Address, e.Group)
-	}
-	b := append(make([]byte, 0, peerEntryFixed+len(e.Address)+len(e.Group)), byte(e.Scope), byte(len(e.Address)))
-	b = append(b, e.Address...)
-	b = append(b, byte(len(e.Group)))
-	return append(b, e.Group...), nil
+// EncodePeerEntry returns the bytes of one peer entry: last seen in Unix
+// seconds (u32), the flag byte, the BIP155 network id, the address length
+// and bytes, and the port (u16).
+func EncodePeerEntry(e PeerEntry) []byte {
+	addr := e.Address.Addr().Unmap()
+	raw := addr.AsSlice()
+	b := binary.BigEndian.AppendUint32(make([]byte, 0, peerEntryFixed+len(raw)), uint32(e.LastSeen.Unix()))
+	b = append(b, e.Flags, e.Network(), byte(len(raw)))
+	b = append(b, raw...)
+	return binary.BigEndian.AppendUint16(b, e.Address.Port())
 }
 
-// DecodePeerEntry parses the bytes of exactly one peer entry.
-func DecodePeerEntry(b []byte) (PeerEntry, error) {
-	bad := fmt.Errorf("%w: peer entry of %d bytes", programblocks.ErrPacket, len(b))
+// DecodePeerEntry parses the peer entry at the start of b and returns it
+// with its length. An unknown network id or an address of the wrong length
+// is malformed.
+func DecodePeerEntry(b []byte) (PeerEntry, int, error) {
+	bad := fmt.Errorf("%w: peer entry in %d bytes", programblocks.ErrPacket, len(b))
 	if len(b) < peerEntryFixed {
-		return PeerEntry{}, bad
+		return PeerEntry{}, 0, bad
 	}
-	n := int(b[1])
-	if len(b) < 2+n+1 || len(b) != 2+n+1+int(b[2+n]) {
-		return PeerEntry{}, bad
+	network, n := b[5], int(b[6])
+	if (network != NetworkIPv4 || n != 4) && (network != NetworkIPv6 || n != 16) || len(b) < peerEntryFixed+n {
+		return PeerEntry{}, 0, bad
 	}
-	return PeerEntry{Scope: AddressScope(b[0]), Address: string(b[2 : 2+n]), Group: string(b[3+n:])}, nil
-}
-
-// PeerPart is a get peer part reply: Data is the range from Offset of the
-// encoded entry at Index, which is EntryLength bytes long. EntryLength 0
-// means Index is past the Total peers shared with the asker.
-type PeerPart struct {
-	Total       uint16
-	Index       uint16
-	EntryLength int
-	Offset      int
-	Data        []byte
-}
-
-// EncodeGetPeerPart asks for the encoded peer entry at index from offset on.
-func EncodeGetPeerPart(id uint32, index uint16, offset int) []byte {
-	b := binary.BigEndian.AppendUint16(header(OperationGetPeerPart, id, getPeerPartRequestLength), index)
-	return append(b, byte(offset))
-}
-
-// DecodeGetPeerPart parses a get peer part request.
-func DecodeGetPeerPart(b []byte) (uint16, int, error) {
-	if len(b) != getPeerPartRequestLength {
-		return 0, 0, malformed(OperationGetPeerPart, len(b))
-	}
-	return binary.BigEndian.Uint16(b[6:]), int(b[8]), nil
-}
-
-// EncodeGetPeerPartReply returns as much of entry from offset as fits in
-// packetSize. A nil entry answers an index past total.
-func EncodeGetPeerPartReply(id uint32, total, index uint16, entry []byte, offset, packetSize int) ([]byte, error) {
-	if offset > len(entry) || (len(entry) > 0 && offset == len(entry)) {
-		return nil, fmt.Errorf("offset %d past a peer entry of %d bytes", offset, len(entry))
-	}
-	room := packetSize - getPeerPartReplyFixed
-	if room < 1 {
-		return nil, fmt.Errorf("%w: a get peer part reply needs %d bytes", programblocks.ErrPacketTooSmall, getPeerPartReplyFixed+1)
-	}
-	b := header(OperationGetPeerPart|programblocks.ReplyFlag, id, packetSize)
-	b = binary.BigEndian.AppendUint16(b, total)
-	b = binary.BigEndian.AppendUint16(b, index)
-	b = append(b, byte(len(entry)), byte(offset))
-	return append(b, entry[offset:offset+min(room, len(entry)-offset)]...), nil
-}
-
-// DecodeGetPeerPartReply parses a get peer part reply.
-func DecodeGetPeerPartReply(b []byte) (PeerPart, error) {
-	if len(b) < getPeerPartReplyFixed {
-		return PeerPart{}, malformed(OperationGetPeerPart|programblocks.ReplyFlag, len(b))
-	}
-	p := PeerPart{Total: binary.BigEndian.Uint16(b[6:]), Index: binary.BigEndian.Uint16(b[8:]), EntryLength: int(b[10]), Offset: int(b[11]), Data: b[getPeerPartReplyFixed:]}
-	if p.Offset+len(p.Data) > p.EntryLength || (p.EntryLength > 0 && len(p.Data) == 0) {
-		return p, malformed(OperationGetPeerPart|programblocks.ReplyFlag, len(b))
-	}
-	return p, nil
+	addr, _ := netip.AddrFromSlice(b[7 : 7+n])
+	port := binary.BigEndian.Uint16(b[7+n:])
+	e := PeerEntry{Address: netip.AddrPortFrom(addr, port), LastSeen: time.Unix(int64(binary.BigEndian.Uint32(b)), 0).UTC(), Flags: b[4]}
+	return e, peerEntryFixed + n, nil
 }

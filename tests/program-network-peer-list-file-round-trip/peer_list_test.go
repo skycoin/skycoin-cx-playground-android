@@ -1,7 +1,8 @@
 // Package programnetworkpeerlistfileroundtrip builds a peer list with the
 // programnetwork peers command, one change per run, and checks the file
-// it writes: it parses back to the same list, formats to the same bytes,
-// and every command shows up in it.
+// it writes: the text form of #41 (a header line, one entry per line),
+// which parses back to the same list and formats to the same bytes, with
+// public peers shareable and private peers not.
 package programnetworkpeerlistfileroundtrip
 
 import (
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -31,55 +33,57 @@ func TestPeerCommandRoundTrip(t *testing.T) {
 		}
 		return string(out)
 	}
-	run("group-add", "lan1", "lan", "moe", "moe", "home")
-	run("group-add", "china1", "internal", "lab", "isp-a", "china")
-	run("group-add", "global", "global", "-", "-", "global")
-	run("add", "192.168.1.5:7010", "lan1", "lan-group", "laptop", "in", "the", "office")
-	run("add", "10.1.0.1:7010", "china1", "own-infrastructure")
-	run("add", "203.0.113.5:7010", "global", "user-shareable")
-	run("add", "203.0.113.6:7010", "global", "private")
-	run("set-class", "203.0.113.5:7010", "public")
-	run("set-group", "10.1.0.1:7010", "global")
+	run("add", "192.168.1.5:7010", "private")
+	run("add", "10.1.0.1:7010", "private")
+	run("add", "203.0.113.5:7010", "public")
+	run("add", "[2001:db8::5]:7010", "public")
+	run("add", "203.0.113.6:7010", "public")
+	run("add", "10.1.0.1:7010", "public")
 	run("remove", "203.0.113.6:7010")
-	run("group-remove", "china1")
-	if out, err := exec.Command(bin, "peers", "-file", file, "group-remove", "lan1").CombinedOutput(); err == nil {
-		t.Fatalf("a group with a peer was removed: %s", out)
-	}
-	if out, err := exec.Command(bin, "peers", "-file", file, "add", "10.9.9.9:1", "nogroup", "public").CombinedOutput(); err == nil {
-		t.Fatalf("a peer of an unknown group was added: %s", out)
+	for _, bad := range [][]string{{"add", "node7.example.org:7010", "public"}, {"add", "203.0.113.7:7010", "shared"}, {"remove", "203.0.113.99:7010"}} {
+		if out, err := exec.Command(bin, append([]string{"peers", "-file", file}, bad...)...).CombinedOutput(); err == nil {
+			t.Fatalf("peers %s worked: %s", strings.Join(bad, " "), out)
+		}
 	}
 
-	want := `# group NAME SCOPE OWNER OPERATOR SECURITY-GROUP
-group global global - - global
-group lan1 lan moe moe home
-# peer ADDRESS GROUP CLASS [COMMENT]
-peer 10.1.0.1:7010 global own-infrastructure
-peer 192.168.1.5:7010 lan1 lan-group laptop in the office
-peer 203.0.113.5:7010 global public
-`
 	b, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(b) != want {
+	// Last seen is the time of each add, so it is matched as digits.
+	want := `; CX peer list, text form. Flags bit 0 marks a peer shareable; private peers are never sent or learned.
+[peers]
+; address, last_seen, flags
+10.1.0.1:7010, N, 1
+192.168.1.5:7010, N, 0
+203.0.113.5:7010, N, 1
+[2001:db8::5]:7010, N, 1
+`
+	if got := regexp.MustCompile(`, \d+, `).ReplaceAllString(string(b), ", N, "); got != want {
 		t.Fatalf("peers.txt:\n%s\nwant:\n%s", b, want)
 	}
-	if got := run("list"); got != want {
+	if got := run("list"); got != string(b) {
 		t.Fatalf("list printed:\n%s", got)
 	}
 	l, err := programnetwork.ParsePeerList(string(b))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(l.Format()) != want {
+	if string(l.Format()) != string(b) {
 		t.Fatalf("format after parse:\n%s", l.Format())
 	}
 	l2, err := programnetwork.ParsePeerList(string(l.Format()))
 	if err != nil || !reflect.DeepEqual(l, l2) {
 		t.Fatalf("second round trip differs: %v", err)
 	}
-	if got := run("shared-with", "203.0.113.200:7010"); got != "203.0.113.5:7010 global global\n" {
-		t.Fatalf("shared with a stranger: %q", got)
+	shareable := run("shareable")
+	if strings.Contains(shareable, "192.168.1.5") || strings.Count(shareable, "\n") != 3 {
+		t.Fatalf("shareable peers:\n%s", shareable)
 	}
-	t.Logf("peers.txt after 11 commands:\n%s", b)
+	for _, bad := range []string{"[peers]\nnode.example.org:1, 0, 1\n", "203.0.113.5:7010, 0, 1\n", "[groups]\n", "[peers]\n203.0.113.5:7010, 0, 2\n", "[peers]\n203.0.113.5:7010, 0\n"} {
+		if _, err := programnetwork.ParsePeerList(bad); err == nil {
+			t.Errorf("parsed %q", bad)
+		}
+	}
+	t.Logf("peers.txt after 7 commands:\n%s", b)
 }
