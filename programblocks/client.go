@@ -300,8 +300,8 @@ func (c *Client) trusted(key cipher.PubKey) bool {
 }
 
 // FetchManifest fetches the manifest at addr in reply-sized pieces. It
-// checks the address, signature and signer as soon as the header is in,
-// each array as soon as it is complete, and the whole manifest at the end.
+// checks the address, signature and signer as soon as the envelope header
+// is in, and the hash of the data and the whole manifest at the end.
 func (c *Client) FetchManifest(addr Hash) (*Manifest, []byte, error) {
 	m, b, _, err := c.fetchManifest(addr, len(addr))
 	return m, b, err
@@ -345,11 +345,10 @@ func (c *Client) fetchManifest(addr Hash, known int) (*Manifest, []byte, Hash, e
 	var have []bool
 	var header *Header
 	var full Hash
-	verified := map[int]bool{}
 	err := c.exchange([]Request{ask(0, piece)}, func(req Request, r Reply) ([]Request, error) {
 		var next []Request
 		if buf == nil {
-			if r.Total < HeaderFixedLength || r.Total > MaxManifestLength {
+			if int(r.Total) < MinEnvelopeLength || r.Total > MaxManifestLength {
 				return nil, fmt.Errorf("%w: manifest length %d", ErrMalformed, r.Total)
 			}
 			buf, have = make([]byte, r.Total), make([]bool, r.Total)
@@ -381,18 +380,6 @@ func (c *Client) fetchManifest(addr Hash, known int) (*Manifest, []byte, Hash, e
 					return nil, fmt.Errorf("%w: %s", ErrUntrusted, h.SignerPublicKey.Hex())
 				}
 				header, full = &h, got
-			}
-		}
-		if header != nil {
-			for i, e := range header.Arrays {
-				end := uint64(e.Offset) + uint64(e.Length)
-				if verified[i] || end > uint64(len(have)) || !allTrue(have[e.Offset:end]) {
-					continue
-				}
-				if !ArrayVerified(buf, e) {
-					return nil, fmt.Errorf("%w: kind %d", ErrArrayHash, e.Kind)
-				}
-				verified[i] = true
 			}
 		}
 		return next, nil

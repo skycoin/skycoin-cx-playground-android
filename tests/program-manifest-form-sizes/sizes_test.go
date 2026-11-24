@@ -1,6 +1,7 @@
-// Package programmanifestformsizes measures the binary and text forms of a
-// real app manifest, raw and compressed, and how long each takes to parse.
-// Run with -v to see the table that decision D30 quotes.
+// Package programmanifestformsizes measures the manifest envelope of a real
+// app, with its text form plain and as LZ4 (#lz), and how long each takes to
+// decode. Run with -v to see the table of "Text form" in
+// docs/ProgramDistribution.md.
 package programmanifestformsizes
 
 import (
@@ -10,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pierrec/lz4/v4"
 	"github.com/skycoin/skycoin/src/cipher"
 
 	"github.com/skycoin/skycoin-cx-playground-android/manifest"
@@ -25,18 +25,13 @@ func gzipLength(b []byte) int {
 	return out.Len()
 }
 
-func lz4Length(b []byte) int {
-	out := make([]byte, lz4.CompressBlockBound(len(b)))
-	n, _ := lz4.CompressBlock(b, out, nil)
-	return n
-}
-
-func signed(t testing.TB, files map[string][]byte) *programblocks.Manifest {
+func signed(t testing.TB, files map[string][]byte, compressed bool) *programblocks.Manifest {
 	_, secret := cipher.MustGenerateDeterministicKeyPair([]byte("program manifest form sizes"))
 	m, _, err := programblocks.Build(files, programblocks.DefaultBlockSize, time.Unix(1795478400, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.Compressed = compressed
 	if err := m.Sign(secret); err != nil {
 		t.Fatal(err)
 	}
@@ -67,41 +62,37 @@ func TestFormSizes(t *testing.T) {
 		name  string
 		files map[string][]byte
 	}{{"apps/benchmarks", benchmarkApp(t)}, {"64 KB program", program64KB()}} {
-		m := signed(t, c.files)
-		bin, text := m.Encode(), m.EncodeText()
-		t.Logf("%-16s blocks %4d  binary %6d gzip %6d lz4 %6d  text %6d gzip %6d lz4 %6d",
-			c.name, len(m.Blocks), len(bin), gzipLength(bin), lz4Length(bin), len(text), gzipLength(text), lz4Length(text))
-		_, b2, _, err := programblocks.DecodeText(text)
-		if err != nil || !bytes.Equal(b2, bin) {
-			t.Fatalf("%s: text form does not round trip: %v", c.name, err)
+		m := signed(t, c.files, false)
+		plain, text := m.Encode(), m.EncodeText()
+		lz := signed(t, c.files, true).Encode()
+		t.Logf("%-16s blocks %4d  text %6d  envelope %6d  #lz envelope %6d  text gzip %6d",
+			c.name, len(m.Blocks), len(text), len(plain), len(lz), gzipLength(text))
+		for _, b := range [][]byte{plain, lz} {
+			d, _, err := programblocks.Decode(b, programblocks.Hash{})
+			if err != nil || !bytes.Equal(d.EncodeText(), text) {
+				t.Fatalf("%s: envelope does not round trip: %v", c.name, err)
+			}
 		}
 	}
 }
 
-func BenchmarkDecodeBinary(b *testing.B) {
-	bin := signed(b, program64KB()).Encode()
+func benchmarkDecode(b *testing.B, compressed bool) {
+	envelope := signed(b, program64KB(), compressed).Encode()
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, _, err := programblocks.Decode(bin, programblocks.Hash{}); err != nil {
+		if _, _, err := programblocks.Decode(envelope, programblocks.Hash{}); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func BenchmarkDecodeText(b *testing.B) {
-	text := signed(b, program64KB()).EncodeText()
-	b.ReportAllocs()
-	for b.Loop() {
-		if _, _, _, err := programblocks.DecodeText(text); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
+func BenchmarkDecodeText(b *testing.B) { benchmarkDecode(b, false) }
+func BenchmarkDecodeLZ4(b *testing.B)  { benchmarkDecode(b, true) }
 
-// BenchmarkSignatureVerify is the part both forms share, for scale.
+// BenchmarkSignatureVerify is the envelope header alone, for scale.
 func BenchmarkSignatureVerify(b *testing.B) {
-	bin := signed(b, program64KB()).Encode()
+	envelope := signed(b, program64KB(), false).Encode()
 	for b.Loop() {
-		programblocks.ParseHeader(bin)
+		programblocks.ParseHeader(envelope)
 	}
 }

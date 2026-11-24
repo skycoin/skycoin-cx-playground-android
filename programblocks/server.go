@@ -194,15 +194,9 @@ func (c *Catalog) findBlock(req Request) ([]byte, *errorReply) {
 	return block, nil
 }
 
-// blockListBytes returns the encoded block list array of cm.
-func blockListBytes(cm catalogManifest) []byte {
-	for _, e := range cm.manifest.Arrays {
-		if e.Kind == ArrayKindBlockList {
-			return cm.encoded[e.Offset : e.Offset+e.Length]
-		}
-	}
-	return nil
-}
+// blockListBytes returns the block list of cm as 48-byte entries, the
+// form get block list bytes reads in pieces.
+func blockListBytes(cm catalogManifest) []byte { return encodeBlockList(cm.manifest.Blocks) }
 
 // Reply answers one request packet. The reply never exceeds packetSize. It
 // returns nil for a packet too short to answer.
