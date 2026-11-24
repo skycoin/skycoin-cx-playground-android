@@ -10,6 +10,7 @@ import (
 
 	"github.com/skycoin/skycoin-cx-playground-android/manifest"
 	"github.com/skycoin/skycoin-cx-playground-android/programblocks"
+	"github.com/skycoin/skycoin-cx-playground-android/programcheck"
 )
 
 // fetchKind marks an app that fetches its program over UDP instead of
@@ -49,4 +50,20 @@ func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[
 		return nil, nil, err
 	}
 	return app, p.Files, nil
+}
+
+// checkedProgram checks a program that came over the network against
+// programcheck.PolicyFetched, writes the report to out and refuses to run
+// the program when the report has a violation.
+func checkedProgram(m *manifest.Manifest, files map[string][]byte, out io.Writer) (*preparedProgram, error) {
+	policy := programcheck.PolicyFetched()
+	r, err := programcheck.CheckApp(m, files, policy)
+	if err != nil {
+		return nil, fmt.Errorf("check failed: %v", err)
+	}
+	fmt.Fprintf(out, "check of %s before it runs:\n%s", m.Name, r.Text())
+	if !r.Allowed() {
+		return nil, fmt.Errorf("refused to run %s: %d sandbox violations", m.Name, len(r.Violations))
+	}
+	return &preparedProgram{app: m, files: files, libraries: r.LibrariesToEnable(policy)}, nil
 }

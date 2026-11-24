@@ -34,6 +34,7 @@ import (
 
 	"github.com/skycoin/skycoin-cx-playground-android/apprun"
 	"github.com/skycoin/skycoin-cx-playground-android/cxrun"
+	"github.com/skycoin/skycoin-cx-playground-android/manifest"
 	"github.com/skycoin/skycoin-cx-playground-android/store"
 )
 
@@ -85,6 +86,7 @@ type ui struct {
 	// Set while a program is selected.
 	cur      *store.App
 	bench    *benchmarkScreen // set instead of host for a benchmark app
+	programs *programsScreen  // the program loader of a programs app, kept while one of its programs runs
 	host     *host
 	out      *console
 	done     chan struct{}
@@ -231,7 +233,8 @@ func (u *ui) layoutList(gtx layout.Context) {
 func (u *ui) start(a *store.App) {
 	u.cur, u.result, u.leaveReq, u.focused, u.edit = a, "", false, false, nil
 	u.runID++
-	if a.Manifest.Kind == "benchmark" {
+	switch a.Manifest.Kind {
+	case "benchmark":
 		u.host, u.bench = nil, newBenchmarkScreen(u.src, *a, u.w.Invalidate, u.trace)
 		u.trace.printf("start app=%q hash=%s", a.Manifest.Name, a.Hash)
 		if u.test.benchmarkRuns > 0 && u.bench.files != nil {
@@ -239,8 +242,41 @@ func (u *ui) start(a *store.App) {
 			u.bench.start(u.w.Invalidate)
 		}
 		return
+	case programsKind:
+		u.host, u.bench = nil, nil
+		u.trace.printf("start app=%q hash=%s", a.Manifest.Name, a.Hash)
+		u.programs = newProgramsScreen(*a, u.w.Invalidate, u.trace)
+		return
 	}
 	u.bench = nil
+	u.launch(a, func(out io.Writer) (*preparedProgram, error) {
+		files, err := store.Load(u.src, *a)
+		if err != nil {
+			return nil, fmt.Errorf("verification failed: %v", err)
+		}
+		if a.Manifest.Kind == fetchKind {
+			m, files, err := fetchProgram(a.Manifest, out)
+			if err != nil {
+				return nil, fmt.Errorf("fetch failed: %v", err)
+			}
+			return checkedProgram(m, files, out)
+		}
+		return &preparedProgram{app: a.Manifest, files: files, libraries: cxrun.LibrariesAll()}, nil
+	})
+}
+
+// preparedProgram is a verified program ready to run, with the system
+// libraries its run enables.
+type preparedProgram struct {
+	app       *manifest.Manifest
+	files     map[string][]byte
+	libraries []string
+}
+
+// launch prepares and runs the program of a on its own goroutine, giving it
+// the canvas and the console.
+func (u *ui) launch(a *store.App, prepare func(out io.Writer) (*preparedProgram, error)) {
+	u.cur, u.result, u.leaveReq, u.focused, u.edit = a, "", false, false, nil
 	u.host = newHost(u.w.Invalidate, u.trace)
 	u.out = &console{invalidate: u.w.Invalidate, trace: u.trace}
 	u.drawn, u.tracedFrame, u.tracedTexts = programFrame{}, 0, ""
@@ -251,27 +287,20 @@ func (u *ui) start(a *store.App) {
 	go func() {
 		defer close(done)
 		defer u.w.Invalidate()
-		files, err := store.Load(u.src, *a)
+		p, err := prepare(out)
 		if err != nil {
-			fmt.Fprintf(out, "verification failed: %v\n", err)
+			fmt.Fprintf(out, "%v\n", err)
+			u.trace.printf("finished app=%q err=%v", a.Manifest.Name, err)
 			return
 		}
-		m := a.Manifest
-		if m.Kind == fetchKind {
-			if m, files, err = fetchProgram(a.Manifest, out); err != nil {
-				fmt.Fprintf(out, "fetch failed: %v\n", err)
-				u.trace.printf("finished app=%q err=%v", a.Manifest.Name, err)
-				return
-			}
-		}
-		opts := cxrun.Options{Args: m.Args, Stderr: out, Libraries: cxrun.LibrariesAll()}
-		if opts.Dir, err = writeDataFiles(*a, files); err != nil {
+		opts := cxrun.Options{Args: p.app.Args, Stderr: out, Libraries: p.libraries}
+		if opts.Dir, err = writeDataFiles(*a, p.files); err != nil {
 			fmt.Fprintf(out, "data files: %v\n", err)
 			return
 		}
 		log.Printf("cxplayground: running %s (%s)", a.Manifest.Name, a.Hash)
 		var stdout bytes.Buffer
-		err = apprun.Run(m, files, opts, h, io.MultiWriter(out, &stdout))
+		err = apprun.Run(p.app, p.files, opts, h, io.MultiWriter(out, &stdout))
 		if err != nil {
 			fmt.Fprintf(out, "error: %v\n", err)
 		}
@@ -317,12 +346,23 @@ func (u *ui) layoutRun(gtx layout.Context) {
 		u.layoutBenchmark(gtx)
 		return
 	}
+	if u.programs != nil && u.host == nil {
+		u.layoutPrograms(gtx)
+		return
+	}
 	done := u.finished()
 	if done && u.result == "" {
 		u.result = fmt.Sprintf("finished in %d ms", time.Since(u.started).Milliseconds())
 	}
 	if done && u.leaveReq {
 		gtx.Execute(key.SoftKeyboardCmd{Show: false})
+		if u.programs != nil {
+			u.cur, u.host, u.leaveReq = &u.programs.app, nil, false
+			u.trace.printf("programs back")
+			u.w.Invalidate()
+			u.layoutPrograms(gtx)
+			return
+		}
 		u.cur, u.host = nil, nil
 		u.w.Invalidate()
 		u.layoutList(gtx)

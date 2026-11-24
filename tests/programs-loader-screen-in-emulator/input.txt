@@ -1,0 +1,26 @@
+# Taps at screen pixels of the 720x1280 rig display: row 1 at y 481, row 2
+# at y 559, download, validate and run at y 637, unload and clear at y 715.
+screenshot list
+tap 200 481
+tap 110 637
+wait-for programs download fib-and-primes done
+tap 330 637
+wait-for programs validate fib-and-primes done
+screenshot validated
+tap 520 637
+wait-for stdout saved
+pull cxtest/stdout.txt stdout.txt
+screenshot ran
+key BACK
+wait-for programs back
+tap 200 559
+tap 110 637
+wait-for programs download reads-a-file done
+tap 330 637
+wait-for programs validate reads-a-file done
+tap 520 637
+wait-for programs run refused
+screenshot refused
+tap 290 715
+wait-for programs clear reads-a-file done
+screenshot cleared

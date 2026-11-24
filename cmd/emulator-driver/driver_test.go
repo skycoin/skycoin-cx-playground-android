@@ -162,15 +162,15 @@ func TestParseNewSteps(t *testing.T) {
 
 func TestParseSettings(t *testing.T) {
 	var tf testFolder
-	err := tf.parseSettings(strings.NewReader("app Benchmark suite\nready start app=\nsetprop debug.x 1\nbefore settings put secure a 1\nafter settings put secure a 0\ntimeout 90\n"))
+	err := tf.parseSettings(strings.NewReader("app Benchmark suite\nready start app=\nsetprop debug.x 1\nbefore settings put secure a 1\nafter settings put secure a 0\ntimeout 90\ninput untimed\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if tf.appName != "Benchmark suite" || tf.ready != "start app=" || tf.props[0] != [2]string{"debug.x", "1"} ||
-		tf.before[0] != "settings put secure a 1" || tf.after[0] != "settings put secure a 0" || tf.timeout != 90*time.Second {
+		tf.before[0] != "settings put secure a 1" || tf.after[0] != "settings put secure a 0" || tf.timeout != 90*time.Second || !tf.untimedInput {
 		t.Fatalf("%+v", tf)
 	}
-	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app"} {
+	for _, bad := range []string{"fly 1", "setprop x", "timeout -1", "app", "input fast"} {
 		if err := new(testFolder).parseSettings(strings.NewReader(bad)); err == nil {
 			t.Errorf("%q parsed", bad)
 		}

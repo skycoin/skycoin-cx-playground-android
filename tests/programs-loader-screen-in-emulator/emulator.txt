@@ -1,0 +1,7 @@
+# The loader lists the two programs that programblocks serve offers from
+# the rig container, which the emulator reaches as 10.0.2.2. One is
+# downloaded, validated and run, the other reads a file and is refused.
+ready programs open done
+program-server 7003 served cx playground test signer
+timeout 60
+input untimed

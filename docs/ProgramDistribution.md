@@ -498,7 +498,8 @@ program, so it never holds unverified data for long.
 ## Validation before running (#16)
 
 This section describes the check made on a downloaded program before it
-runs, and how the result is shown. Validation is not part of this batch.
+runs, and how the result is shown. Package `programcheck` holds the checks
+(#25), and the app shows the report before a fetched program runs.
 
 The check reads the program without running it:
 
@@ -527,13 +528,22 @@ violations none`. A failing program can be inspected but not run.
 ## Loader, lister and runner (#17)
 
 This section describes the screen and the storage layer that hold programs
-on the phone, and the path to the ESP32. It is not part of this batch.
+on the phone, and the path to the ESP32. `programstore` holds the storage
+layer (#26) and an app of kind `programs` opens the screen.
 
 ### Screen
 
 The screen stays monospaced at one text size, as today. Each row shows the
-program number, the name, whether it is cached, held in RAM or remote, and
-its length. Selecting a row offers download (or cache), validate and run.
+program number, the name, whether it is remote, partial or cached, with
+`+ram` when the loader holds it, and its length. Tapping a row selects it,
+and `[ download ]`, `[ validate ]` and `[ run ]` act on it, with
+`[ unload ]` to drop it from RAM and `[ clear ]` to remove its packing too.
+Validate loads the program into RAM and shows its report under the
+buttons. Run starts only a program whose report allows it, and leaving the
+program returns to the list. `[ refresh ]` fetches the server's list again.
+
+An app of kind `programs` opens the screen. Its args are the server address
+and the signer keys to trust, which are added to `programs/trusted.txt`.
 
 ### Storage layout
 
@@ -574,10 +584,58 @@ than held whole.
 
 ### ESP32 path
 
-On the ESP32, the runner is cx-forth (skycoin-cx-forth), which runs a CX IR
-subset as Forth, or a `cx build` core when it fits. The program is stored as
-the serialized IR or the Forth form in the linear packing. The fetcher is the
-same packet code, built with TinyGo.
+This section is the design for the loader on an ESP32. Nothing of it is
+built yet, and nothing here was run on a board.
+
+The goal is the phone's flow on a board with an SD card, a serial console
+or a small display, and Wi-Fi: list the programs of a server, download one
+to the SD card, check it, load it and run it.
+
+Runner. The runner is cx-forth (skycoin-cx-forth), which already runs on
+the ESP32 and translates a subset of the CX IR to Forth. A program for the
+board is published in the Forth form, or as serialized IR that the board
+translates once after the download and keeps as Forth. A `cx build` core
+(skycoin-cx #496 links only the system libraries a program uses) is the
+second runner, for programs that need more than the subset, once a core fits
+in flash next to the loader.
+
+Fetcher. The fetcher is the `programblocks` client built with TinyGo. It
+needs a UDP socket on the board's Wi-Fi stack, which TinyGo does not give on
+the ESP32 today, so the first board version fetches over the serial line
+through a host that runs `programblocks serve` and relays packets, with the
+same packets and checks. The relay is a few lines on the host and changes
+nothing in the format.
+
+Store. The SD card holds the same layout as the phone, `programs/list.bin`,
+`m/`, `p/`, `index.txt` and `trusted.txt`, on FAT, which method A of the
+storage tests (#19, skycoin-cx-forth #11) measures. A packing is written
+one 512-byte block at a time, which is one SD sector, and synced every 32
+blocks, as on the phone. If FAT proves too slow or too large, method B
+keeps one preallocated packing area of raw sectors and the index in its
+first sector.
+
+Memory. About 300 KB of RAM is free. The loader keeps one program in RAM
+(`programstore.Memory` with a limit of 1). It does not decode a whole
+manifest: the header and the array directory are read first, and a block
+entry is read at `(n - 1) * 48` inside the block array when it is needed,
+which the fixed offsets of the binary form allow (D30). Resuming reads one
+block at a time to check its hash, so it needs one 512-byte buffer.
+cx-forth's stacks and memory have fixed sizes, set when the program loads.
+
+Check. The checks of `programcheck` read the compiled IR, which the board
+does not hold. The board trusts the signer key list in `trusted.txt` and
+runs only programs whose manifest names the Forth form, and cx-forth has no
+file, network or process words unless the board adds them. The check
+report of the serialized IR can be made on the host and published as a file
+of the program, so the board shows it without computing it.
+
+Screen. The list is the same monospaced rows over the serial console or on
+the display: number, name, state, length. Keys select a row, then download,
+check, load and run, as the taps do on the phone.
+
+Order of work: the serial relay and the TinyGo build of the client, the FAT
+store with the resume test in QEMU, the one-program loader with the Forth
+runner, then the board, where the timings of #19 are measured.
 
 ### Suspend and resume (later)
 

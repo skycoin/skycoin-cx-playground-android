@@ -108,6 +108,16 @@ programblocks list -addr HOST:7002 -signer PUBKEY
 programblocks fetch -addr HOST:7002 -signer PUBKEY -out OUT -text PROGRAM
 ```
 
+An app of kind `programs` opens the program loader instead: its `args` are
+the server address and the signer keys to trust, which go to
+`programs/trusted.txt` in the files dir. The screen lists the server's
+programs (number, name, remote, partial or cached, `+ram` when loaded,
+length) and offers download, validate, run, unload and clear for the
+selected one. Downloads land in `programs/` block by block and resume after
+a stop. Validate shows the `programcheck` report, and run starts only a
+program the report allows, with the system libraries it allows. A `fetch`
+app shows the same report and refuses the same programs.
+
 ### Checking a program before it runs
 
 `programcheck` reads a CX program without running it, compiled from source
@@ -216,6 +226,7 @@ the comparison. `suite -update-references` writes the captured regions to
 | `setprop <name> <value>` | sets a property before the start and clears it after |
 | `before <command>`, `after <command>` | device shell commands around the test |
 | `timeout <seconds>` | for `wait-for` and the checks, 10 by default |
+| `input untimed` | sends the `input.txt` events without timing them, for a screen of the app that is not a program canvas |
 | `echo-server <port>` | runs `net-echo-server` on that TCP and UDP port in the rig container, which the emulator reaches as 10.0.2.2 |
 | `program-server <port> <dir> <seed>` | runs `programblocks serve` on that UDP port in the rig container for the program directories under `<dir>` of the test folder, signed with the key derived from `<seed>` |
 | `netem <args>` | `tc qdisc ... netem <args>` on the packets of that port in both directions, for example `delay 200ms loss 30%` |
@@ -269,6 +280,7 @@ suite at once with that many runs.
 | `forth-key-echo` | typed keys reach Forth `KEY` and are echoed line by line |
 | `net-tcp-echo` | five lines through the TCP echo server on the host |
 | `net-udp-echo` | 20 datagrams through the UDP echo server, no loss and no delay |
+| `programs-loader-screen-in-emulator` | the loader lists two programs from the rig, downloads, validates and runs one, and refuses the other, which reads a file |
 | `net-udp-delay-loss` | the same program with 200 ms delay and 30% loss each way, reports both, and the capture holds its datagrams |
 | `cx-forms-same-output` (go) | the bundled apps of each form print the expected files on the host |
 | `net-echo-on-host` (go) | the network programs against `netecho` on the host |

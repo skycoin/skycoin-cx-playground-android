@@ -1,0 +1,36 @@
+package main
+
+// This program is the example of docs/ProgramDistribution.md. It is
+// longer than one 512-byte block, so its manifest shows two blocks for
+// one file, and it prints a fixed text the tests can compare.
+
+func fib(n i32) (r i32) {
+	if n < 2 {
+		r = n
+		return
+	}
+	r = fib(n-1) + fib(n-2)
+}
+
+func prime(n i32) (r bool) {
+	r = n > 1
+	for d := 2; d*d <= n && r; d++ {
+		if n%d == 0 {
+			r = false
+		}
+	}
+}
+
+func main() {
+	printf("downloaded program running\n")
+	for i := 0; i < 15; i++ {
+		printf("fib %d = %d\n", i, fib(i))
+	}
+	var count i32 = 0
+	for n := 0; n < 100; n++ {
+		if prime(n) {
+			count = count + 1
+		}
+	}
+	printf("primes below 100: %d\n", count)
+}

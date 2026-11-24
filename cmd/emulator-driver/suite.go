@@ -191,6 +191,13 @@ func (s *session) runTest(ctx context.Context, t testFolder, apk string, table *
 			} else {
 				pulled[step.args[1]] = path
 			}
+		case step.injected() && t.untimedInput:
+			start := time.Now()
+			_, err := d.shell(ctx, step.inputCommand()...)
+			table.rows = append(table.rows, timingRow{step: "event " + step.line, host: time.Since(start), note: "untimed, a screen of the app"})
+			if err != nil {
+				fail("%s: %v", step.line, err)
+			}
 		case step.injected():
 			row, err := measureEvent(ctx, d, w, step)
 			table.rows = append(table.rows, row)
@@ -438,6 +445,7 @@ func waitCanvasFocus(ctx context.Context, w *logWatch, timeout time.Duration) er
 		}
 	}
 }
+
 // lastInputFocus reports whether the latest "input focused" line says true.
 func lastInputFocus(lines []logLine) bool {
 	for i := len(lines) - 1; i >= 0; i-- {
