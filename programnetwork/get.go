@@ -13,8 +13,8 @@ import (
 
 // GetOptions are the settings of a thin get.
 type GetOptions struct {
-	Trusted    []cipher.PubKey
-	PacketSize int // programblocks.DefaultPacketSize when 0
+	Pinned     []cipher.PubKey // when set, only these signers are accepted; any valid signer otherwise
+	PacketSize int             // programblocks.DefaultPacketSize when 0
 	Forms      programblocks.Forms
 	MaxTries   int // programblocks.DefaultMaxTries when 0
 }
@@ -36,7 +36,7 @@ func Get(node, target string, o GetOptions) (Held, programblocks.ClientStats, er
 		return Held{}, programblocks.ClientStats{}, err
 	}
 	defer conn.Close()
-	c := programblocks.NewClient(conn, o.Trusted...)
+	c := programblocks.NewClient(conn, o.Pinned...)
 	c.Forms = o.Forms
 	if o.PacketSize != 0 {
 		c.PacketSize = o.PacketSize

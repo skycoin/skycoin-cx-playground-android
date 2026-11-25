@@ -9,6 +9,8 @@ entry = programs.txt
 10.0.2.2:7003
 03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d
 This app holds no program. It opens the program loader on the server its
-args give, trusting the signer keys of its args: a list of the server's
-programs, each of which can be downloaded into the store, validated and
-run. See "Loader, lister and runner (#17)" in docs/ProgramDistribution.md.
+args give: a list of the server's programs, each of which can be
+downloaded into the store, validated and run. A program signed by one of
+the trusted keys of its args runs at once, and one from any other key
+once the user confirms it. See "Loader, lister and runner (#17)" in
+docs/ProgramDistribution.md.

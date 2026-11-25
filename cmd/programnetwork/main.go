@@ -7,7 +7,7 @@
 //	                    [-publish DIR (-seed TEXT | -secret HEX) [-date RFC3339]]
 //	                    [-config FILE] [-type medium|super] [-budget BYTES]
 //	                    [-pins FILE] [-relay] [-fetch HASH,...]
-//	programnetwork get -signer PUBKEY [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE
+//	programnetwork get [-signer PUBKEY,...] [-yes] [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE
 //	programnetwork getpeers HOST:PORT
 //	programnetwork pins [-file pins.txt] list
 //	programnetwork pins [-file pins.txt] add HASH-OR-PREFIX...
@@ -20,7 +20,9 @@
 //	programnetwork peers [-file peers.txt] remove ADDRESS
 //
 // A node downloads only programs signed by a -signer key or its own
-// publishing key. With -publish, every subdirectory of DIR is published as
+// publishing key. Pinning the signers of what a node relays is decision
+// D109. get accepts any valid signer and prints its key (D27), and keeps a
+// program whose signer is not in -signer only with -yes. With -publish, every subdirectory of DIR is published as
 // a program and announced to the subscribers. Peer exchange follows
 // Bitcoin (#41): get peers answers with fresh public peers only, getpeers
 // learns them, and private peers stay in the local peer file.
@@ -345,19 +347,21 @@ func get(args []string) error {
 	fl := flag.NewFlagSet("get", flag.ExitOnError)
 	packet := fl.Int("packet", programblocks.DefaultPacketSize, "largest packet in bytes, 1200 by default, 16 to 65507")
 	formsName := fl.String("forms", "full", "request forms, full or short; an address prefix needs short")
-	signers := fl.String("signer", "", "comma separated public keys, hex, whose programs are accepted")
+	signers := fl.String("signer", "", "comma separated public keys, hex, of trusted signers")
+	yes := fl.Bool("yes", false, "keep a program whose signer is not in -signer")
 	out := fl.String("out", "", "directory to write the program's files to")
 	fl.Parse(args)
-	if fl.NArg() != 2 || *signers == "" {
-		return fmt.Errorf("usage: programnetwork get -signer PUBKEY [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE")
+	if fl.NArg() != 2 {
+		return fmt.Errorf("usage: programnetwork get [-signer PUBKEY,...] [-yes] [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE")
 	}
 	o := programnetwork.GetOptions{PacketSize: *packet}
+	var trusted []cipher.PubKey
 	for _, s := range splitList(*signers) {
 		k, err := cipher.PubKeyFromHex(s)
 		if err != nil {
 			return fmt.Errorf("-signer %s: %v", s, err)
 		}
-		o.Trusted = append(o.Trusted, k)
+		trusted = append(trusted, k)
 	}
 	var err error
 	if o.Forms, err = programblocks.ParseForms(*formsName); err != nil {
@@ -369,6 +373,15 @@ func get(args []string) error {
 	}
 	fmt.Printf("got %s %s from %s in %d ms, %d files, %d bytes, verified, %d requests\n",
 		p.Name, p.Address, p.From, p.Elapsed.Milliseconds(), len(p.Files), p.Manifest.PackLength, stats.RequestsSent)
+	signer := p.Manifest.SignerPublicKey
+	if programblocks.KeyListed(trusted, signer) {
+		fmt.Printf("signer %s verified, trusted\n", signer.Hex())
+	} else {
+		fmt.Printf("signer %s verified, not in -signer\n", signer.Hex())
+		if err := programblocks.ConfirmSigner(signer, trusted, func(cipher.PubKey) bool { return *yes }); err != nil {
+			return fmt.Errorf("%w, pass -yes to keep it", err)
+		}
+	}
 	if *out == "" {
 		return nil
 	}

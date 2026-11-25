@@ -127,7 +127,7 @@ func decodeSigned(b []byte, want programblocks.Hash, signer cipher.PubKey) (*pro
 		return nil, addr, err
 	}
 	if m.SignerPublicKey != signer {
-		return nil, addr, fmt.Errorf("%w: %s", programblocks.ErrUntrusted, m.SignerPublicKey.Hex())
+		return nil, addr, fmt.Errorf("%w: %s", programblocks.ErrNotPinned, m.SignerPublicKey.Hex())
 	}
 	return m, addr, nil
 }

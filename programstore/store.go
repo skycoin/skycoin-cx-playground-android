@@ -10,7 +10,7 @@
 //	                    as blocks are verified, so a stopped download resumes
 //	index.txt           one line per program: number, address, state,
 //	                    length and name, which the lister reads alone
-//	trusted.txt         the trusted signer keys, one per line (D27)
+//	trusted.txt         the signer keys whose programs run without asking, one per line (D27)
 //
 // A medium or super programnetwork node also keeps subscriptions.txt and
 // subscribers.txt there (#34).
@@ -88,27 +88,26 @@ func writeFileSynced(path string, b []byte) error {
 	return os.Rename(tmp, path)
 }
 
-// SaveManifest verifies an encoded manifest, which must be signed by one of
-// trusted, and keeps it under its address.
-func (s *Store) SaveManifest(encoded []byte, trusted []cipher.PubKey) (*programblocks.Manifest, programblocks.Hash, error) {
-	m, addr, err := decodeTrusted(encoded, programblocks.Hash{}, trusted)
+// SaveManifest verifies an encoded manifest and keeps it under its address.
+// Any valid signature is accepted (D27), or with pinned keys only one of
+// theirs, as programblocks.Client.PinnedSigners.
+func (s *Store) SaveManifest(encoded []byte, pinned []cipher.PubKey) (*programblocks.Manifest, programblocks.Hash, error) {
+	m, addr, err := decodePinned(encoded, programblocks.Hash{}, pinned)
 	if err != nil {
 		return nil, addr, err
 	}
 	return m, addr, writeFileSynced(s.manifestPath(addr), encoded)
 }
 
-func decodeTrusted(encoded []byte, want programblocks.Hash, trusted []cipher.PubKey) (*programblocks.Manifest, programblocks.Hash, error) {
+func decodePinned(encoded []byte, want programblocks.Hash, pinned []cipher.PubKey) (*programblocks.Manifest, programblocks.Hash, error) {
 	m, addr, err := programblocks.Decode(encoded, want)
 	if err != nil {
 		return nil, addr, err
 	}
-	for _, k := range trusted {
-		if k == m.SignerPublicKey {
-			return m, addr, nil
-		}
+	if len(pinned) > 0 && !programblocks.KeyListed(pinned, m.SignerPublicKey) {
+		return nil, addr, fmt.Errorf("%w: %s", programblocks.ErrNotPinned, m.SignerPublicKey.Hex())
 	}
-	return nil, addr, fmt.Errorf("%w: %s", programblocks.ErrUntrusted, m.SignerPublicKey.Hex())
+	return m, addr, nil
 }
 
 // Manifest reads and verifies the manifest kept under addr.
@@ -123,11 +122,11 @@ func (s *Store) Manifest(addr programblocks.Hash) (*programblocks.Manifest, erro
 
 // SaveList keeps a verified manifest list, encoded, with its programs'
 // manifests, which are the list's files keyed by program name. Every
-// manifest must be signed by one of trusted. It rewrites index.txt with the
-// programs of the list in name order, keeping the state of the ones whose
-// packing is here.
-func (s *Store) SaveList(encoded []byte, programs map[string][]byte, trusted []cipher.PubKey) ([]Row, error) {
-	if _, _, err := decodeTrusted(encoded, programblocks.Hash{}, trusted); err != nil {
+// manifest must have a valid signature, from one of pinned when it is set.
+// It rewrites index.txt with the programs of the list in name order,
+// keeping the state of the ones whose packing is here.
+func (s *Store) SaveList(encoded []byte, programs map[string][]byte, pinned []cipher.PubKey) ([]Row, error) {
+	if _, _, err := decodePinned(encoded, programblocks.Hash{}, pinned); err != nil {
 		return nil, fmt.Errorf("manifest list: %w", err)
 	}
 	names := make([]string, 0, len(programs))
@@ -137,7 +136,7 @@ func (s *Store) SaveList(encoded []byte, programs map[string][]byte, trusted []c
 	sort.Strings(names)
 	rows := make([]Row, 0, len(names))
 	for i, name := range names {
-		m, addr, err := s.SaveManifest(programs[name], trusted)
+		m, addr, err := s.SaveManifest(programs[name], pinned)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}

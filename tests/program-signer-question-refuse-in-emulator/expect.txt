@@ -1,0 +1,3 @@
+out signer 03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d verified, not trusted, asking the user
+signer answer run=false
+out fetch failed: the signer is not trusted and the user did not confirm the run

@@ -21,8 +21,8 @@ import (
 // subscribeKind marks an app that runs a super programnetwork node on the
 // phone. It subscribes to nodes, reads every have from its have queue, and
 // requests each program, until the wanted one is held (#42). Its args are
-// the comma separated nodes to subscribe to, the trusted signer key in hex
-// and the name in the wanted program's cxapp.txt, see "Announce and
+// the comma separated nodes to subscribe to, the comma separated trusted
+// signer keys in hex and the name in the wanted program's cxapp.txt, see "Announce and
 // request" in docs/ProgramDistribution.md.
 const subscribeKind = "subscribe"
 
@@ -32,13 +32,14 @@ const subscribeWait = 30 * time.Second
 // subscribeProgram runs a node with an empty store in the files dir,
 // subscribes to the nodes the app names, prints every have it reads, and
 // returns the program once the node holds it, verified, reporting each step
-// to out.
-func subscribeProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[string][]byte, error) {
+// to out. The node accepts any valid signer, and confirm asks the user
+// about one that is not trusted.
+func subscribeProgram(m *manifest.Manifest, out io.Writer, confirm func(cipher.PubKey) bool) (*manifest.Manifest, map[string][]byte, error) {
 	if len(m.Args) != 3 {
 		return nil, nil, fmt.Errorf("a subscribe app takes the nodes, the signer key and the program name as args")
 	}
-	upstream, signerHex, name := strings.Split(m.Args[0], ","), m.Args[1], m.Args[2]
-	signer, err := cipher.PubKeyFromHex(signerHex)
+	upstream, name := strings.Split(m.Args[0], ","), m.Args[2]
+	trusted, err := parseKeys(m.Args[1])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,7 +60,7 @@ func subscribeProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, 
 	if err != nil {
 		return nil, nil, err
 	}
-	node, err := programnetwork.NewNode(conn, st, []cipher.PubKey{signer})
+	node, err := programnetwork.NewNode(conn, st, nil)
 	if err != nil {
 		conn.Close()
 		return nil, nil, err
@@ -95,7 +96,9 @@ func subscribeProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, 
 			}
 			fmt.Fprintf(out, "requested %s from %s, held in %d ms\n", name, h.From, time.Since(start).Milliseconds())
 			fmt.Fprintf(out, "manifest %s\n", h.Address)
-			fmt.Fprintf(out, "signer %s verified\n", h.Manifest.SignerPublicKey.Hex())
+			if err := reportSigner(out, h.Manifest.SignerPublicKey, trusted, confirm); err != nil {
+				return nil, nil, err
+			}
 			fmt.Fprintf(out, "%d files, %d blocks, %d bytes, every block verified\n", len(h.Manifest.Files), len(h.Manifest.Blocks), h.Manifest.PackLength)
 			// Let the have from the second node arrive, so the count shows
 			// every have was read and the program requested once.

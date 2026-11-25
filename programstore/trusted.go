@@ -14,8 +14,8 @@ import (
 
 // TrustedSigners reads trusted.txt: one public key in hex per line, then
 // an optional comment after a space. Empty lines and lines starting with #
-// are skipped. Only manifests signed by these keys are accepted, decision
-// D27 of docs/ProgramDistribution.md.
+// are skipped. Programs signed by these keys run without asking, and
+// programs from any other valid signer only once the user confirms (D27).
 func (s *Store) TrustedSigners() ([]cipher.PubKey, error) {
 	b, err := os.ReadFile(s.TrustedPath())
 	if errors.Is(err, fs.ErrNotExist) {
@@ -65,18 +65,17 @@ func (s *Store) TrustSigner(key cipher.PubKey, comment string) error {
 	return writeFileSynced(s.TrustedPath(), append(b, line+"\n"...))
 }
 
+// SignerTrusted reports whether key is in trusted.txt.
+func (s *Store) SignerTrusted(key cipher.PubKey) (bool, error) {
+	keys, err := s.TrustedSigners()
+	return programblocks.KeyListed(keys, key), err
+}
+
 // Sync fetches the manifest list of the server c talks to and every program
-// manifest in it, verifies them against the trusted signers and keeps them,
-// and returns the new index rows.
+// manifest in it, verifies their signatures, keeps them and returns the new
+// index rows. Any valid signer is accepted, or only the client's pinned
+// signers when it has some (D27).
 func (s *Store) Sync(c *programblocks.Client) ([]Row, error) {
-	trusted, err := s.TrustedSigners()
-	if err != nil {
-		return nil, err
-	}
-	if len(trusted) == 0 {
-		return nil, fmt.Errorf("no trusted signer in %s", s.TrustedPath())
-	}
-	c.TrustedSigners = trusted
 	list, encoded, listAddr, err := c.FetchManifestList()
 	if err != nil {
 		return nil, fmt.Errorf("manifest list: %w", err)
@@ -85,5 +84,5 @@ func (s *Store) Sync(c *programblocks.Client) ([]Row, error) {
 	if err != nil {
 		return nil, fmt.Errorf("manifest list: %w", err)
 	}
-	return s.SaveList(encoded, programs, trusted)
+	return s.SaveList(encoded, programs, c.PinnedSigners)
 }

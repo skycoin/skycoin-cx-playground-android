@@ -14,6 +14,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/0magnet/gio/app"
@@ -98,6 +99,12 @@ type ui struct {
 	focused  bool
 	edit     []rune // what the IME believes the text field holds
 	leaveReq bool
+
+	// The signer question of the program being prepared, see confirmSigner.
+	askMu     sync.Mutex
+	ask       *signerQuestion
+	askRun    widget.Clickable
+	askRefuse widget.Clickable
 
 	// Test mode, see testmode.go. drawn is the program frame on screen.
 	test        testSettings
@@ -257,28 +264,28 @@ func (u *ui) start(a *store.App) {
 			return nil, fmt.Errorf("verification failed: %v", err)
 		}
 		if a.Manifest.Kind == fetchKind {
-			m, files, err := fetchProgram(a.Manifest, out)
+			m, files, err := fetchProgram(a.Manifest, out, u.confirmSigner)
 			if err != nil {
 				return nil, fmt.Errorf("fetch failed: %v", err)
 			}
 			return checkedProgram(m, files, out)
 		}
 		if a.Manifest.Kind == subscribeKind {
-			m, files, err := subscribeProgram(a.Manifest, out)
+			m, files, err := subscribeProgram(a.Manifest, out, u.confirmSigner)
 			if err != nil {
 				return nil, fmt.Errorf("announce and request failed: %v", err)
 			}
 			return checkedProgram(m, files, out)
 		}
 		if a.Manifest.Kind == programloader.Kind {
-			m, files, err := loaderProgram(a.Manifest, files, out)
+			m, files, err := loaderProgram(a.Manifest, files, out, u.confirmSigner)
 			if err != nil {
 				return nil, fmt.Errorf("load failed: %v", err)
 			}
 			return checkedProgram(m, files, out)
 		}
 		if a.Manifest.Kind == thinKind {
-			m, files, err := thinProgram(a.Manifest, out)
+			m, files, err := thinProgram(a.Manifest, out, u.confirmSigner)
 			if err != nil {
 				return nil, fmt.Errorf("thin get failed: %v", err)
 			}
@@ -347,6 +354,7 @@ func (u *ui) finished() bool {
 // leave asks the program to stop and returns to the list once it has.
 func (u *ui) leave() {
 	u.leaveReq = true
+	u.answerSigner(false)
 	if u.host != nil {
 		u.host.closed.Store(true)
 	}
@@ -402,6 +410,7 @@ func (u *ui) layoutRun(gtx layout.Context) {
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return u.topBar(gtx, done)
 		}),
+		layout.Rigid(u.layoutSignerQuestion),
 		layout.Flexed(1, func(gtx layout.Context) layout.Dimensions {
 			if gfx || (u.cur.Manifest.Kind == "gfx" && !done) {
 				return u.layoutCanvas(gtx, cmds)

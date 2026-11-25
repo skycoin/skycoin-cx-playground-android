@@ -1,0 +1,16 @@
+; CX app, text form.
+[app]
+name = Programs: signer question, refuse
+description = Test demo: a program signed by a key that is not trusted runs only once the user confirms it
+kind = fetch
+entry = fetch.txt
+
+[args]
+10.0.2.2:7006
+022ba343b1998705a6a0b2a1b42fc9ee329f29fbd69d6321c6f538fb360ea2d844
+fib-and-primes
+This app holds no program. It fetches the program its args name from the
+server its args give, over UDP, and checks the manifest signature and
+every block hash. A program signed by one of the trusted keys of its args
+runs at once, and one from any other key runs only once the user
+confirms it. See docs/ProgramDistribution.md.

@@ -182,24 +182,24 @@ func TestMixedNodeTypes(t *testing.T) {
 	// A thin get connects to the super node, downloads one program by
 	// address, verifies it and is done.
 	start := time.Now()
-	p, stats, err := programnetwork.Get(super.Addr().String(), addrs[2].String(), programnetwork.GetOptions{Trusted: []cipher.PubKey{pub}})
+	p, stats, err := programnetwork.Get(super.Addr().String(), addrs[2].String(), programnetwork.GetOptions{Pinned: []cipher.PubKey{pub}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	sameFiles(t, p.Files, progs[2])
 	t.Logf("thin get of %s from %s in %d ms, %d requests", p.Name, p.From, time.Since(start).Milliseconds(), stats.RequestsSent)
 	prefix := addrs[0].String()[:16]
-	if _, _, err := programnetwork.Get(super.Addr().String(), prefix, programnetwork.GetOptions{Trusted: []cipher.PubKey{pub}}); err == nil {
+	if _, _, err := programnetwork.Get(super.Addr().String(), prefix, programnetwork.GetOptions{Pinned: []cipher.PubKey{pub}}); err == nil {
 		t.Error("a prefix get in the full forms worked, want an error naming the forms flag")
 	}
-	p, _, err = programnetwork.Get(super.Addr().String(), prefix, programnetwork.GetOptions{Trusted: []cipher.PubKey{pub}, Forms: programblocks.FormsShort})
+	p, _, err = programnetwork.Get(super.Addr().String(), prefix, programnetwork.GetOptions{Pinned: []cipher.PubKey{pub}, Forms: programblocks.FormsShort})
 	if err != nil || p.Address != addrs[0] {
 		t.Fatalf("thin get by prefix %s: %v, got %s", prefix, err, p.Address)
 	}
 	sameFiles(t, p.Files, progs[0])
 	other, _ := cipher.MustGenerateDeterministicKeyPair([]byte("another signer"))
-	if _, _, err := programnetwork.Get(super.Addr().String(), addrs[1].String(), programnetwork.GetOptions{Trusted: []cipher.PubKey{other}, MaxTries: 2}); !errors.Is(err, programblocks.ErrUntrusted) {
-		t.Errorf("thin get from an untrusted signer: %v", err)
+	if _, _, err := programnetwork.Get(super.Addr().String(), addrs[1].String(), programnetwork.GetOptions{Pinned: []cipher.PubKey{other}, MaxTries: 2}); !errors.Is(err, programblocks.ErrNotPinned) {
+		t.Errorf("thin get pinned to another signer: %v", err)
 	}
 }
 

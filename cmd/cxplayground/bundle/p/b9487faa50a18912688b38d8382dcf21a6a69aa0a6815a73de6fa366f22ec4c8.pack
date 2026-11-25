@@ -12,6 +12,7 @@ Downloaded: fib and primes
 This app holds no program. It runs a programnetwork node and subscribes to
 the nodes its args give. Every have they send goes in its have queue, it
 reads each one, and its policy requests the program from a node that
-announced it. It checks the signer key of its args and every block hash,
-then runs the program.
+announced it. It checks the signature and every block hash, then runs
+the program, at once when a trusted key of its args signed it and
+otherwise once the user confirms it.
 See "Announce and request" in docs/ProgramDistribution.md.

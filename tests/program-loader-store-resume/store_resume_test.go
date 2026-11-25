@@ -80,8 +80,10 @@ func TestResumeAfterStoppedDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Sync(client(t, addr)); err == nil {
-		t.Fatal("synced with no trusted signer")
+	// An empty trusted.txt does not stop a sync: any valid signer is listed
+	// (D27), and trusted.txt only decides which programs run without asking.
+	if _, err := s.Sync(client(t, addr)); err != nil {
+		t.Fatalf("sync with no trusted signer: %v", err)
 	}
 	if err := s.TrustSigner(pub, "test server"); err != nil {
 		t.Fatal(err)
@@ -157,10 +159,31 @@ func TestResumeAfterStoppedDownload(t *testing.T) {
 		t.Fatalf("after the resume: %v %+v", err, listed)
 	}
 
-	// A list signed by a stranger is refused, and the kept list stays.
-	stranger, _ := serveStranger(t)
-	if _, err := reopened.Sync(client(t, stranger)); !errors.Is(err, programblocks.ErrUntrusted) {
-		t.Fatalf("stranger's list: %v", err)
+	// A client that pins the trusted key refuses a stranger's list, and the
+	// kept list stays (D27 strict mode).
+	stranger, strangerKey := serveStranger(t)
+	pinned := client(t, stranger)
+	pinned.PinnedSigners = []cipher.PubKey{pub}
+	if _, err := reopened.Sync(pinned); !errors.Is(err, programblocks.ErrNotPinned) {
+		t.Fatalf("stranger's list with a pin: %v", err)
+	}
+	if _, listAddr, err := reopened.List(); err != nil || listAddr.String() == "" {
+		t.Fatalf("kept list: %v", err)
+	}
+
+	// Without a pin the stranger's valid list is accepted, and its signer is
+	// not trusted, so its programs run only once the user confirms (D27).
+	rows, err = reopened.Sync(client(t, stranger))
+	if err != nil || len(rows) == 0 {
+		t.Fatalf("stranger's list: %v %+v", err, rows)
+	}
+	for _, k := range []struct {
+		key     cipher.PubKey
+		trusted bool
+	}{{pub, true}, {strangerKey, false}} {
+		if trusted, err := reopened.SignerTrusted(k.key); err != nil || trusted != k.trusted {
+			t.Fatalf("SignerTrusted(%s) = %v, %v, want %v", k.key.Hex(), trusted, err, k.trusted)
+		}
 	}
 	if _, listAddr, err := reopened.List(); err != nil || listAddr.String() == "" {
 		t.Fatalf("kept list: %v", err)

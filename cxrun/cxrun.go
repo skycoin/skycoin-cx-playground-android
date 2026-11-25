@@ -154,6 +154,10 @@ type Options struct {
 	// ProgramFile receives each file a loader program hands over with
 	// app.ProgramFile, see docs/ProgramDistribution.md. Nil refuses them.
 	ProgramFile func(path string, data []byte) bool
+	// ProgramSigner answers app.ProgramSigner: whether the program a loader
+	// verified, signed by key in hex, may run. trusted says the key is in the
+	// loader's trusted list. Nil runs trusted keys only (D27).
+	ProgramSigner func(key string, trusted bool) bool
 }
 
 // RunWith is Run with options.
@@ -209,8 +213,8 @@ func compileWith(files map[string][]byte, entry string, opts Options, h Host, ou
 	}
 	defer restore()
 
-	host, cmds, programFile = h, cmds[:0], opts.ProgramFile
-	defer func() { host, programFile = nil, nil; netRunStop() }()
+	host, cmds, programFile, programSigner = h, cmds[:0], opts.ProgramFile, opts.ProgramSigner
+	defer func() { host, programFile, programSigner = nil, nil, nil; netRunStop() }()
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("cx panic: %v", r)

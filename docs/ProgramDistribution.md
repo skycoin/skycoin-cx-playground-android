@@ -99,8 +99,10 @@ CXPM 3
   zero.
 - The envelope carries no public key. The signature recovers the key that
   made it, and verification checks that the signature matches the hash and
-  reports that key, not who it is (D27). A caller that pins a signer
-  compares the recovered key, as the Go client does with its trusted keys.
+  reports that key, not who it is (D27). A program from a trusted key runs
+  at once, and one from any other valid key runs once the user confirms
+  it, see "Signer trust (D27)". A caller in the strict mode pins signers
+  and refuses every other recovered key.
 - A changed data byte changes the hash, and a changed hash or signature no
   longer recovers the signer, so the address names the content and the
   signature names who published it.
@@ -199,8 +201,8 @@ be larger than one packet.
   1200-byte packet size.
 - Once the four header lines are in, the client checks the header line,
   that the hash is the address it asked for, that the signature matches the
-  hash, and, in the Go client, that the recovered signer is trusted. A
-  manifest that fails is dropped before the rest is fetched.
+  hash, and, when the client pins signers, that the recovered signer is
+  one of them. A manifest that fails is dropped before the rest is fetched.
 - The client then asks for the remaining pieces, several at a time, and
   checks the length and the hash of the data once all of it is in, then
   parses the text and recomputes the Merkle hash of every file and of the
@@ -402,8 +404,8 @@ manifest the server holds.
 - A client always checks the full value. It checks the address it computes
   from the header against the address it knows, or against the prefix when
   it knows only the prefix (the manifest list), and it checks every block
-  against its full hash in the manifest. The signature and the trusted
-  signer decide trust, as in the full forms, so a short prefix only names a
+  against its full hash in the manifest. The signature and the signer
+  trust of D27 decide, as in the full forms, so a short prefix only names a
   unit and never makes a forged one acceptable.
 - A client that gets error 5 can ask again with a longer prefix. With 8
   bytes, a server needs about 2^32 different blocks before two share a
@@ -647,15 +649,18 @@ buttons. Run starts only a program whose report allows it, and leaving the
 program returns to the list. `[ refresh ]` fetches the server's list again.
 
 An app of kind `programs` opens the screen. Its args are the server address
-and the signer keys to trust, which are added to `programs/trusted.txt`.
+and optional signer keys to trust, which are added to `programs/trusted.txt`.
+The list holds the programs of any valid signer. Validate prints the
+signer and whether it is trusted, and run asks the user first about a
+signer that is not in `trusted.txt` (D27).
 
 ### Loader in CX (#39)
 
 The lead decided D28 as option b: "loader is cx program, pure cx, that uses
 network and lists, downloads, verifies." `programloader/loader.cx` is that
 program. It uses `sys/net` for the UDP packets, `sys/cipher` for the hash
-and the signature, and `sys/string`, and nothing of Go but the one app call
-that hands the result over.
+and the signature, and `sys/string`, and nothing of Go but the two app
+calls that ask whether the program may run and hand it over.
 
 - It opens a UDP socket with `net.UDPDial` and sends the full forms of "UDP
   operations": list manifests (0x01), get manifest (0x02) and get blocks
@@ -667,15 +672,20 @@ that hands the result over.
 - It verifies an envelope as "Envelope" says: the header line, the hash
   line against the address it asked for, the length, the hash of the data
   with `cipher.HashOfBytes`, and the signature with
-  `cipher.SignatureRecoverPubKey` and `cipher.SignatureVerify`. With no
-  `signer=` setting any matching signature is accepted (D27), and with one
-  the recovered key must be that key. A `#lz` envelope is decompressed by an
+  `cipher.SignatureRecoverPubKey` and `cipher.SignatureVerify`. Any
+  matching signature is accepted (D27). With a `signer=` setting, the
+  strict mode, the recovered key must be that key. A `#lz` envelope is decompressed by an
   LZ4 block decoder written in CX.
 - It parses the text form and fetches the named program's envelope as a
   file of the manifest list, so every block of it is checked against the
   list, then each file of the program, checking every block and every file
   hash. The hash is one CX function, `contentHash`, which calls
   `cipher.HashOfBytes`, BLAKE3-256 (D23).
+- Before it fetches any file of the program it calls
+  `app.ProgramSigner(key, trusted) (run bool)` with the program's signer
+  in hex and whether that key is the `signer=` key or a `trusted=` key.
+  The runner answers at once for a trusted key and asks the user about any
+  other, and the loader stops when the answer is no.
 - It hands each verified file to the runner with
   `app.ProgramFile(path, data) (accepted bool)`, prints the address, the
   signer and the counts, and ends. `programloader.Load` runs it with only
@@ -689,9 +699,46 @@ the tests, and is the reference: `tests/program-loader-cx-matches-go` loads
 both programs of a local server with the CX loader and with the Go client
 and requires the same bytes, also with `#lz` envelopes, at 128-byte
 packets and through a link that drops a fifth of the packets each way. It
-also checks that a pinned signer and an unknown program are refused, and
-that the loaded program runs. `tests/program-loader-in-emulator` runs the
+also checks that a pinned signer and an unknown program are refused, that
+the loaded program runs, and the four signer cases of D27 in
+`TestLoaderSignerTrust`. `tests/program-loader-in-emulator` runs the
 loader app on the phone against `programblocks serve` in the rig.
+
+### Signer trust (D27)
+
+The lead decided D27 as "verification is if signature matches, not who
+signed", and the owner chose option b of D88: any valid signature passes,
+and a trusted key list only lets programs run without asking. Every
+client applies the same four rules, `programblocks.ConfirmSigner` in Go
+and `signerTrusted` with `app.ProgramSigner` in the CX loader.
+
+- An invalid or missing signature is refused, whatever the settings.
+- A valid signature from any key is accepted, and the key is shown.
+- A program from a trusted key runs without a question.
+- A program from any other valid key runs only once the user confirms it.
+  The app shows "the signature is valid, but the signer is not trusted:",
+  the key, and `[ run it ]` and `[ refuse ]` on the run screen, and going
+  back refuses. The host commands `programblocks fetch` and
+  `programnetwork get` take `-yes` instead, and refuse without it.
+
+The trusted keys are the `-signer` keys of the host commands, the second
+arg of `fetch`, `subscribe` and `thin` apps (comma separated), the
+`trusted=` settings of the CX loader and `programs/trusted.txt` of the
+programs screen. Pinning stays as the strict mode, which refuses every
+other key after the first packet: the CX loader's `signer=`,
+`programblocks.Client.PinnedSigners`, `programnetwork.GetOptions.Pinned`
+and a node's `-signer` keys (D109). The app's own bundle stays pinned to
+the bundle key, since it is part of the binary.
+
+The envelope names no key, so a changed signature digit either recovers
+no key and is refused, or recovers another key, which no one holds and
+which is not trusted, so the user is asked (D110).
+
+Tests: `tests/program-signer-trust` for the Go client,
+`TestLoaderSignerTrust` for the CX loader, and
+`tests/program-signer-question-run-in-emulator` and
+`tests/program-signer-question-refuse-in-emulator` for the question on
+the phone.
 
 The loader does not yet resume into the program store, read block hashes
 with get block list, or keep several requests in flight, see D89.
@@ -710,8 +757,8 @@ The SD card (or the app's files directory on the phone) holds, as package
   the name may hold spaces, which the lister reads without opening any
   manifest, for example
   `1 <address in 64 hex digits> cached 9216 benchmarks`;
-- `programs/trusted.txt`, the trusted signer keys of D27, one key in hex
-  per line with an optional comment after it.
+- `programs/trusted.txt`, the signer keys whose programs run without
+  asking (D27), one key in hex per line with an optional comment after it.
 
 A packing file has no record of which blocks it holds. Opening it reads
 every block back and keeps the ones whose hash matches, and a block never
@@ -774,7 +821,8 @@ block at a time to check its hash, so it needs one 512-byte buffer.
 cx-forth's stacks and memory have fixed sizes, set when the program loads.
 
 Check. The checks of `programcheck` read the compiled IR, which the board
-does not hold. The board trusts the signer key list in `trusted.txt` and
+does not hold. The board runs programs from the signer keys in
+`trusted.txt` without asking, asks about any other valid signer (D27), and
 runs only programs whose manifest names the Forth form, and cx-forth has no
 file, network or process words unless the board adds them. The check
 report of the serialized IR can be made on the host and published as a file
@@ -1000,7 +1048,8 @@ programnetwork peers -file peers.txt shareable
 peers reply could hold.
 
 `programnetwork node` runs a node: `-store` names its store, `-peers` its
-peer list, `-signer` the trusted keys, `-subscribe` the nodes it subscribes
+peer list, `-signer` the pinned keys whose programs it downloads and
+relays (D109), `-subscribe` the nodes it subscribes
 to, and `-publish DIR` with `-seed` or `-secret` publishes every program
 directory in DIR, dated `-date` or now, and announces it. The node prints
 every have it reads from its queue. `programnetwork get` is the thin node,
@@ -1011,10 +1060,11 @@ node gives the caller.
 
 An app of kind `subscribe` runs a super node on the phone with an empty
 store in the app's files dir. Its args are the nodes to subscribe to, the
-trusted signer key and the name in the wanted program's `cxapp.txt`. It
+trusted signer keys and the name in the wanted program's `cxapp.txt`. It
 prints every have it reads from its queue, its policy requests each
 program, and it waits up to 30 s for the wanted one, then checks and runs
-it like a `fetch` app.
+it like a `fetch` app. Its node pins no signer, so it accepts any valid
+one, and the app asks the user about a key that is not trusted.
 
 `tests/program-network-announce-request-in-emulator` starts three nodes in
 the rig container with the `program-nodes` setting of the emulator driver:
@@ -1042,18 +1092,20 @@ request.
 | survives a restart | nothing | programs, subscriptions, subscribers | programs, subscriptions, subscribers |
 
 A thin node is wget for the DHT (D39). `programnetwork.Get` connects to
-one node, downloads the program at a manifest address, verifies the signer
-and every block, and returns. An address prefix works with the short forms,
+one node, downloads the program at a manifest address, verifies the
+signature and every block, and returns. An address prefix works with the short forms,
 since only get manifest by prefix (0x06) takes one. A thin node does not
 subscribe, has no have queue, receives no announces and keeps no state
 between runs; there is no `Node` of type thin and `Node.Known` is gone. The
 command is
 
 ```
-programnetwork get -signer PUBKEY [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE
+programnetwork get [-signer PUBKEY,...] [-yes] [-packet 1200] [-forms full] [-out DIR] ADDRESS NODE
 ```
 
-which prints the program it got, or writes its files with `-out`.
+which prints the program it got and its signer, or writes its files with
+`-out`. A signer that is not in `-signer` needs `-yes`, the host form of
+the app's question (D27).
 `programnetwork node -type thin` points at `get`.
 
 A medium node keeps a persistent subscription to its peers and reads every
@@ -1134,7 +1186,7 @@ Tests, each over UDP on the host:
   and the node behind them only the pinned program. A thin get then
   downloads one program by address from the super node in about 2 ms,
   another by prefix in the short forms, refuses a prefix in the full forms
-  and refuses an untrusted signer.
+  and refuses a signer that is not pinned.
 - `tests/program-network-super-full-no-eviction`: a super node with a
   capacity of two programs keeps both, does not request the third, still
   serves the first, and after a manual remove and a restart requests the
@@ -1151,7 +1203,7 @@ Tests, each over UDP on the host:
   counts the same.
 
 On the phone, an app of kind `thin` is a thin get. Its args are the node,
-the trusted signer key and the manifest address. It downloads the program,
+the trusted signer keys and the manifest address. It downloads the program,
 checks and runs it like a `fetch` app, and keeps nothing. The emulator
 driver's `program-node-type` setting gives the rig's nodes their `-type`.
 `tests/program-network-thin-fetch-in-emulator` runs one super node on port
@@ -1301,8 +1353,9 @@ D27 ProgramTrustedSignerDecision
   files, and only a pinned key keeps a stranger's program from running.
 - Decided by the lead: verification is that the signature matches, not who
   signed. Built: the envelope carries no key, and the signature recovers
-  it. The Go client and store still compare the recovered key with their
-  trusted keys, see D88.
+  it. With D88 decided as option b, any valid signer is accepted, a
+  trusted key runs without asking and any other key asks the user first,
+  see "Signer trust (D27)".
 
 D28 ProgramFetchClientPlacementDecision
 - What exists now: CX programs reach UDP through `app.NetDial` and friends,
@@ -1591,6 +1644,9 @@ D88 GoClientTrustedSignerDecision
   key is all that stops a server from handing out its own program under a
   name, and removing the check from nodes that relay to phones is easy to
   do later but not to undo. Built: nothing changed.
+- Decided by the owner: option b, adjusted so that a trusted list does not
+  refuse other keys but only skips the question before a run. Built: see
+  "Signer trust (D27)". Pinning stays as an explicit strict mode.
 
 D89 CxLoaderScopeDecision
 - What exists now: the CX loader is a one-shot get into RAM: it lists,
@@ -1608,6 +1664,56 @@ D89 CxLoaderScopeDecision
   file access, and the other parts gain nothing from moving while the Go
   code is their reference. A window of several requests is a small change
   inside option a if a slow link needs it.
+
+D109 NodeRelaySignerPinDecision
+- What exists now: after D27 and D88, phones and host commands accept any
+  valid signer and ask before a program from an untrusted key runs. A
+  `programnetwork` node still downloads and relays only programs signed by
+  its `-signer` keys (`Node.pinned`), and `programnetwork node` refuses to
+  start without one. The `subscribe` app's node on the phone pins nothing.
+- Question: which programs does a node that relays to others download and
+  relay?
+- Option a: keep the pin, so a node operator chooses whose programs the
+  node stores and passes on, and a stranger cannot fill the network's
+  disks with validly signed programs.
+- Option b: drop the pin, so a node relays every validly signed program
+  within its budget, and only the phones decide trust.
+- Option c: make the pin optional, so a node with no `-signer` relays every
+  valid signer and one with keys relays only theirs.
+- Recommendation: option a, because relaying is storage and bandwidth the
+  operator pays for, which is a different question from whether a
+  signature verifies, and the phones already accept any valid signer.
+  Built: option a.
+
+D110 EnvelopeSignerKeyDecision
+- What exists now: the envelope carries the 65-byte recoverable signature
+  and no public key (D27). A changed signature digit either recovers no key,
+  which is refused, or recovers another key, whose valid "signature" is
+  then treated as a program from an untrusted signer and the user is asked.
+- Question: should the envelope name the signer key, so that a changed
+  signature is always invalid rather than another signer?
+- Option a: keep the envelope as it is. A changed signature can only ever
+  look like an unknown key that no one holds, which the user is asked
+  about and which never matches a trusted key.
+- Option b: add the 33-byte public key as a line of the envelope (a new
+  `CXPM 4` header), and refuse a signature that does not verify for that
+  key, so a corrupted signature is reported as corrupted.
+- Recommendation: option a, because no trusted key can be forged either
+  way, and option b changes the format of every published manifest for a
+  clearer error message only. Built: option a.
+
+D111 SignerQuestionRememberDecision
+- What exists now: the app asks about an untrusted signer each time one of
+  its programs is about to run, with `[ run it ]` and `[ refuse ]`. Only
+  app args and `programs/trusted.txt` make a key trusted.
+- Question: should the question also offer to trust the key from then on?
+- Option a: keep two answers, so trust is only ever given by the app's
+  args or `trusted.txt`.
+- Option b: add `[ always trust ]`, which writes the key to
+  `programs/trusted.txt` and runs the program.
+- Recommendation: option a until the lead asks, because one tap that
+  trusts a key for every later program is easy to give by mistake, and a
+  key can still be added to `trusted.txt`. Built: option a.
 
 ## Task breakdown
 

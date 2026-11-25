@@ -7,7 +7,11 @@ package main
 // docs/ProgramDistribution.md.
 //
 // Args: the server as host:port, the program name, then optional settings
-// packet=BYTES, tries=N, wait=MILLISECONDS and signer=PUBLIC KEY IN HEX.
+// packet=BYTES, tries=N, wait=MILLISECONDS, trusted=PUBLIC KEY IN HEX, which
+// may repeat, and signer=PUBLIC KEY IN HEX. Any valid signature verifies
+// (D27). A program from a trusted key runs at once, and the runner asks the
+// user before one from any other key runs. signer= is the strict mode: it
+// refuses every other key.
 
 import "sys/app"
 import "sys/os"
@@ -25,6 +29,7 @@ var packetSize i32
 var tries i32
 var waitMilliseconds i32
 var pinnedSigner str
+var trustedSigners []str
 var requestsSent i32
 var resent i32
 
@@ -522,7 +527,7 @@ func fetchFile(address []ui8, index i32) (data []ui8) { global fileHashes, fileS
 	}
 }
 
-func setting(arg str) { global packetSize, tries, waitMilliseconds, pinnedSigner
+func setting(arg str) { global packetSize, tries, waitMilliseconds, pinnedSigner, trustedSigners
 	var equals i32 = string.ByteIndexOfFirstSubstring(arg, "=")
 	if equals < 1 {
 		fail(sprintf("setting %s: want key=value", arg))
@@ -535,6 +540,8 @@ func setting(arg str) { global packetSize, tries, waitMilliseconds, pinnedSigner
 	number, ok = decimalAt(b, 0, len(b))
 	if string.EqualityByByteValue(key, "signer") {
 		pinnedSigner = value
+	} else if string.EqualityByByteValue(key, "trusted") {
+		trustedSigners = append(trustedSigners, value)
 	} else if !ok || number < 1L {
 		fail(sprintf("setting %s: want a number", arg))
 	} else if string.EqualityByByteValue(key, "packet") {
@@ -544,7 +551,7 @@ func setting(arg str) { global packetSize, tries, waitMilliseconds, pinnedSigner
 	} else if string.EqualityByByteValue(key, "wait") {
 		waitMilliseconds = i64.i32(number)
 	} else {
-		fail(sprintf("unknown setting %s, want packet=, tries=, wait= or signer=", arg))
+		fail(sprintf("unknown setting %s, want packet=, tries=, wait=, trusted= or signer=", arg))
 	}
 	if packetSize < 49 || packetSize > 2048 {
 		fail("packet must be from 49 to 2048 bytes")
@@ -594,7 +601,7 @@ func main() { global os.Args, packetSize, tries, waitMilliseconds, filePaths, fi
 	tries = 8
 	waitMilliseconds = 250
 	if len(os.Args) < 2 {
-		fail("args: server host:port, program name, then packet=, tries=, wait= or signer=")
+		fail("args: server host:port, program name, then packet=, tries=, wait=, trusted= or signer=")
 	}
 	var i i32
 	for i = 2; i < len(os.Args); i++ {
@@ -621,7 +628,14 @@ func main() { global os.Args, packetSize, tries, waitMilliseconds, filePaths, fi
 	var address []ui8 = hashLine(envelope)
 	parseManifest(verifyEnvelope(envelope, address))
 	printf("manifest %s\n", hexOf(address))
-	printf("signer %s matches\n", signerHex)
+	if signerTrusted(signerHex) {
+		printf("signer %s matches, trusted\n", signerHex)
+	} else {
+		printf("signer %s matches, not trusted, asking the user\n", signerHex)
+	}
+	if !app.ProgramSigner(signerHex, signerTrusted(signerHex)) {
+		fail(sprintf("the user did not confirm a program signed by %s", signerHex))
+	}
 	var total i64
 	var accepted bool
 	for i = 0; i < len(filePaths); i++ {
@@ -645,5 +659,17 @@ func hashLine(envelope []ui8) (hash []ui8) {
 	hash, ok = hexAt(envelope, start, 32)
 	if !ok {
 		fail("envelope hash is not hex")
+	}
+}
+
+// signerTrusted reports whether key is the pinned signer or one of the
+// trusted= keys, whose programs run without asking the user.
+func signerTrusted(key str) (trusted bool) { global pinnedSigner, trustedSigners
+	trusted = string.ByteLength(pinnedSigner) > 0
+	var i i32
+	for i = 0; i < len(trustedSigners); i++ {
+		if string.EqualityByByteValue(trustedSigners[i], key) {
+			trusted = true
+		}
 	}
 }

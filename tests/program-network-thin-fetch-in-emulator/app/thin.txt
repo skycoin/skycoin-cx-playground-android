@@ -1,5 +1,7 @@
 This app holds no program. It is a thin programnetwork node: it connects
 to the node its args give, downloads the program at the manifest address
-its args give, checks the signer key of its args and every block hash, and
-is done, with no subscription and nothing kept. Then it runs the program.
+its args give, checks the signature and every block hash, and is done,
+with no subscription and nothing kept. Then it runs the program, at once
+when a trusted key of its args signed it and otherwise once the user
+confirms it.
 See "Node types (#34, #44)" in docs/ProgramDistribution.md.

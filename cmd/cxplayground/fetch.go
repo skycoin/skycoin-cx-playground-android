@@ -17,13 +17,15 @@ import (
 
 // fetchKind marks an app that fetches its program over UDP instead of
 // holding it. Its args are the server address, the trusted signer public
-// key in hex and the program name, then optional settings packet=BYTES,
-// forms=full|short and tries=N, see docs/ProgramDistribution.md.
+// keys in hex, comma separated, and the program name, then optional
+// settings packet=BYTES, forms=full|short and tries=N, see
+// docs/ProgramDistribution.md. Any valid signer is accepted, and the user
+// confirms a program from a key that is not trusted before it runs (D27).
 const fetchKind = "fetch"
 
 // fetchClient returns a client for conn with the settings of args.
-func fetchClient(conn net.Conn, signer cipher.PubKey, args []string) (*programblocks.Client, error) {
-	c := programblocks.NewClient(conn, signer)
+func fetchClient(conn net.Conn, args []string) (*programblocks.Client, error) {
+	c := programblocks.NewClient(conn)
 	for _, a := range args {
 		key, value, _ := strings.Cut(a, "=")
 		if key == "forms" {
@@ -53,13 +55,14 @@ func fetchClient(conn net.Conn, signer cipher.PubKey, args []string) (*programbl
 }
 
 // fetchProgram fetches and verifies the program a fetch app names and
-// returns its app manifest and files, reporting each step to out.
-func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[string][]byte, error) {
+// returns its app manifest and files, reporting each step to out. confirm
+// asks the user about a signer that is not trusted.
+func fetchProgram(m *manifest.Manifest, out io.Writer, confirm func(cipher.PubKey) bool) (*manifest.Manifest, map[string][]byte, error) {
 	if len(m.Args) < 3 {
 		return nil, nil, fmt.Errorf("a fetch app takes the server, the signer key and the program name as args")
 	}
-	server, signerHex, name := m.Args[0], m.Args[1], m.Args[2]
-	signer, err := cipher.PubKeyFromHex(signerHex)
+	server, name := m.Args[0], m.Args[2]
+	trusted, err := parseKeys(m.Args[1])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,7 +72,7 @@ func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[
 	}
 	defer conn.Close()
 	start := time.Now()
-	c, err := fetchClient(conn, signer, m.Args[3:])
+	c, err := fetchClient(conn, m.Args[3:])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,7 +89,9 @@ func fetchProgram(m *manifest.Manifest, out io.Writer) (*manifest.Manifest, map[
 	}
 	fmt.Fprintf(out, "fetched %s from %s in %d ms\n", name, server, time.Since(start).Milliseconds())
 	fmt.Fprintf(out, "manifest %s\n", p.Address)
-	fmt.Fprintf(out, "signer %s verified\n", p.Manifest.SignerPublicKey.Hex())
+	if err := reportSigner(out, p.Manifest.SignerPublicKey, trusted, confirm); err != nil {
+		return nil, nil, err
+	}
 	fmt.Fprintf(out, "%d files, %d blocks, %d bytes, every block verified\n", len(p.Manifest.Files), len(p.Manifest.Blocks), p.Manifest.PackLength)
 	fmt.Fprintf(out, "packets %d requests, %d resent, largest reply %d bytes\n", c.Stats.RequestsSent, c.Stats.Retransmissions, c.Stats.LargestReply)
 	app, err := programblocks.AppManifest(p.Files)
@@ -110,4 +115,17 @@ func checkedProgram(m *manifest.Manifest, files map[string][]byte, out io.Writer
 		return nil, fmt.Errorf("refused to run %s: %d sandbox violations", m.Name, len(r.Violations))
 	}
 	return &preparedProgram{app: m, files: files, libraries: r.LibrariesToEnable(policy)}, nil
+}
+
+// parseKeys parses comma separated public keys in hex.
+func parseKeys(s string) ([]cipher.PubKey, error) {
+	var keys []cipher.PubKey
+	for _, h := range strings.Split(s, ",") {
+		k, err := cipher.PubKeyFromHex(strings.TrimSpace(h))
+		if err != nil {
+			return nil, fmt.Errorf("signer %q: %v", h, err)
+		}
+		keys = append(keys, k)
+	}
+	return keys, nil
 }

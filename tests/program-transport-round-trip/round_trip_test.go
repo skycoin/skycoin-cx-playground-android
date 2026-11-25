@@ -65,9 +65,9 @@ func TestRoundTrip(t *testing.T) {
 			t.Fatal("unknown program fetched")
 		}
 		other, _ := cipher.MustGenerateDeterministicKeyPair([]byte("someone else"))
-		c.TrustedSigners = []cipher.PubKey{other}
-		if _, err := c.FetchProgram("fib-and-primes"); !errors.Is(err, programblocks.ErrUntrusted) {
-			t.Fatalf("untrusted signer: %v", err)
+		c.PinnedSigners = []cipher.PubKey{other}
+		if _, err := c.FetchProgram("fib-and-primes"); !errors.Is(err, programblocks.ErrNotPinned) {
+			t.Fatalf("signer not pinned: %v", err)
 		}
 		conn.Close()
 		server.Close()

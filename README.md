@@ -94,19 +94,27 @@ A program can also come from a server over UDP as a signed manifest and
 512-byte blocks, as docs/ProgramDistribution.md describes. `programblocks`
 holds the format, the server and the client, and `cmd/programblocks` serves a
 directory of programs and fetches one. An app of kind `fetch` holds no
-program: its `args` are the server address, the trusted signer key and the
-program name, and the app fetches, verifies and runs that program.
+program: its `args` are the server address, the trusted signer keys (comma
+separated) and the program name, and the app fetches, verifies and runs
+that program. Any valid signature is accepted and its key shown (D27). A
+program from a trusted key runs at once, and one from any other key runs
+only after the user taps `[ run it ]` under "the signer is not trusted".
+An invalid signature is always refused.
 
 ```
 programblocks signer -seed "a test seed"
 programblocks serve -addr :7002 -seed "a test seed" DIR
-programblocks list -addr HOST:7002 -signer PUBKEY
+programblocks list -addr HOST:7002
 programblocks fetch -addr HOST:7002 -signer PUBKEY -out OUT -text PROGRAM
 ```
 
+On the host, `-signer` names the trusted keys, and `fetch` keeps a program
+from any other valid key only with `-yes`.
 An app of kind `programs` opens the program loader instead: its `args` are
-the server address and the signer keys to trust, which go to
-`programs/trusted.txt` in the files dir. The screen lists the server's
+the server address and optional signer keys to trust, which go to
+`programs/trusted.txt` in the files dir. The list shows the programs of any
+valid signer, and run asks the user first about one whose key is not in
+`trusted.txt`. The screen lists the server's
 programs (number, name, remote, partial or cached, `+ram` when loaded,
 length) and offers download, validate, run, unload and clear for the
 selected one. Downloads land in `programs/` block by block and resume after
@@ -117,11 +125,14 @@ app shows the same report and refuses the same programs.
 An app of kind `loader` runs the loader written in CX, `programloader/loader.cx`,
 which the app holds by `[include]` (#39). Its `args` are the server, the
 program name and optional settings `packet=BYTES`, `tries=N`,
-`wait=MILLISECONDS` and `signer=PUBKEY`. The loader lists, downloads and
-verifies the program with `sys/net` and `sys/cipher` only, hands each file
-over with `app.ProgramFile`, and the app checks and runs what it handed over
-like a `fetch` app. Without `signer=` it accepts any signature that matches
-(D27).
+`wait=MILLISECONDS`, `trusted=PUBKEY`, which may repeat, and
+`signer=PUBKEY`. The loader lists, downloads and verifies the program with
+`sys/net` and `sys/cipher` only, names its signer with `app.ProgramSigner`,
+hands each file over with `app.ProgramFile`, and the app checks and runs
+what it handed over like a `fetch` app. It accepts any signature that
+matches (D27): a `trusted=` key runs at once, and the app asks the user
+about any other key before a file is downloaded. `signer=` is the strict
+mode and refuses every other key.
 
 ### Programs by announce and request
 
@@ -138,14 +149,14 @@ program and edits the peer list file.
 ```
 programnetwork node -addr :7010 -store DIR -publish PROGRAMS -seed "a test seed"
 programnetwork node -addr :7011 -store DIR -signer PUBKEY -subscribe HOST:7010
-programnetwork get -signer PUBKEY ADDRESS HOST:7010
+programnetwork get -signer PUBKEY ADDRESS HOST:7010    # -yes keeps another valid signer's program
 programnetwork peers -file peers.txt add 192.168.1.5:7010 private
 programnetwork peers -file peers.txt add 203.0.113.5:7010 public
 programnetwork getpeers HOST:7010
 ```
 
 An app of kind `subscribe` runs a node on the phone: its `args` are the
-comma separated nodes to subscribe to, the trusted signer key and the name
+comma separated nodes to subscribe to, the trusted signer keys and the name
 in the wanted program's `cxapp.txt`. It reads every have, requests the
 program, verified block by block, then checks and runs it like a `fetch`
 app. An app of kind `thin` gets one program by address from one node.
@@ -195,6 +206,7 @@ package with `import "sys/app"`.
 | `app.NetRecv(conn i32, timeoutMs i32) (data str, err str)` | what arrived, one datagram for UDP, `err` is `timeout` when nothing did |
 | `app.NetClose(conn i32)` | closes it, as the end of the program does |
 | `app.ProgramFile(path str, data []ui8) (accepted bool)` | a loader hands one verified file of the program to run next, refused outside a `loader` app |
+| `app.ProgramSigner(key str, trusted bool) (run bool)` | a loader names the signer of the program it verified, and the app answers whether it runs, asking the user when `trusted` is false (D27) |
 
 The `app.Net*` calls run on the batched runtime of the CX net library,
 skycoin-cx `t1-netbatch` (skycoin-cx#508, #37). Sockets are read in the
@@ -340,7 +352,10 @@ suite at once with that many runs.
 | `program-validation-blocked-import` (go) | a fetched program importing `os` is refused |
 | `program-validation-opcode-sets` (go) | an app opcode in a core-only program fails, and the serialized form checks the same as the source |
 | `program-validation-report-text` (go) | the report text of two programs matches the expected lines |
-| `program-loader-store-resume` (go) | a download stopped part way resumes from the kept blocks, asking only for the missing ones; an untrusted list is refused |
+| `program-loader-store-resume` (go) | a download stopped part way resumes from the kept blocks, asking only for the missing ones; a list from any valid signer syncs, a client pinned to another key refuses it, and `trusted.txt` decides which signers run without asking |
+| `program-signer-trust` (go) | D27 in the Go client: an invalid signature is refused, any valid signer is accepted and its key reported, a trusted key runs without a question, another key only when confirmed, and pinning refuses other keys |
+| `program-signer-question-run-in-emulator` | a fetch app whose trusted key is another one asks the user, who taps run, and the program runs |
+| `program-signer-question-refuse-in-emulator` | the same question answered with refuse, and the program does not run |
 | `program-loader-lister` (go) | `index.txt` of 10 and 1000 programs reads back row for row with the same number of allocations |
 | `program-loader-memory` (go) | load, unload and reload from RAM give the same files, a limit of one keeps the last program |
 | `program-test-suite-report-format` (go) | result lines read back unchanged, malformed ones are refused, and both test programs run from the bundle print only passing lines |

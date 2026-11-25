@@ -11,6 +11,7 @@ entry = fetch.txt
 fib-and-primes
 tries=20
 This app holds no program. It fetches the program its args name from the
-server its args give, over UDP, checks the manifest signature against the
-signer key of its args and every block hash, then runs the program.
-See docs/ProgramDistribution.md.
+server its args give, over UDP, and checks the manifest signature and
+every block hash. A program signed by one of the trusted keys of its args
+runs at once, and one from any other key runs only once the user
+confirms it. See docs/ProgramDistribution.md.

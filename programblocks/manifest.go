@@ -116,7 +116,7 @@ var (
 	ErrAddress    = errors.New("manifest address is not the one asked for")
 	ErrBlockHash  = errors.New("block hash mismatch")
 	ErrFileHash   = errors.New("file hash mismatch")
-	ErrUntrusted  = errors.New("manifest signer is not trusted")
+	ErrNotPinned  = errors.New("manifest signer is not a pinned signer")
 )
 
 // MerkleHash returns the Merkle hash of leaves: inner nodes are the Sum of

@@ -1,0 +1,11 @@
+; CX app, text form.
+[app]
+name = Programs: signer question, run
+description = Test demo: a program signed by a key that is not trusted runs only once the user confirms it
+kind = fetch
+entry = fetch.txt
+
+[args]
+10.0.2.2:7006
+022ba343b1998705a6a0b2a1b42fc9ee329f29fbd69d6321c6f538fb360ea2d844
+fib-and-primes

@@ -75,17 +75,17 @@ func (c *Client) tooSmall(need int, format string, a ...any) error {
 // Client fetches and verifies programs from a server over a connected UDP
 // socket.
 type Client struct {
-	Conn           net.Conn
-	PacketSize     int
-	Forms          Forms
-	PrefixLength   int // longest prefix the short forms send, DefaultPrefixLength when 0
-	Window         int
-	FirstTimeout   time.Duration
-	MaxTimeout     time.Duration
-	MaxTries       int
-	TrustedSigners []cipher.PubKey
-	Stats          ClientStats
-	nextRequestID  uint32
+	Conn          net.Conn
+	PacketSize    int
+	Forms         Forms
+	PrefixLength  int // longest prefix the short forms send, DefaultPrefixLength when 0
+	Window        int
+	FirstTimeout  time.Duration
+	MaxTimeout    time.Duration
+	MaxTries      int
+	PinnedSigners []cipher.PubKey // when set, other signers are refused after the first packet
+	Stats         ClientStats
+	nextRequestID uint32
 }
 
 // ClientStats counts the packets of a client.
@@ -100,11 +100,12 @@ type ClientStats struct {
 	RangesRejected   int // get blocks replies that failed a block hash
 }
 
-// NewClient returns a client with the default settings that accepts
-// manifests signed by any of trusted.
-func NewClient(conn net.Conn, trusted ...cipher.PubKey) *Client {
+// NewClient returns a client with the default settings. It accepts any
+// manifest whose signature is valid (D27), or with pinned keys only those
+// signed by one of them.
+func NewClient(conn net.Conn, pinned ...cipher.PubKey) *Client {
 	return &Client{Conn: conn, PacketSize: DefaultPacketSize, PrefixLength: DefaultPrefixLength, Window: DefaultWindow, FirstTimeout: DefaultFirstTimeout,
-		MaxTimeout: DefaultMaxTimeout, MaxTries: DefaultMaxTries, TrustedSigners: trusted, nextRequestID: rand.Uint32()}
+		MaxTimeout: DefaultMaxTimeout, MaxTries: DefaultMaxTries, PinnedSigners: pinned, nextRequestID: rand.Uint32()}
 }
 
 // ShortForms reports whether the client uses the short forms.
@@ -290,13 +291,9 @@ func (c *Client) FetchManifestList() (*Manifest, []byte, Hash, error) {
 	return c.fetchManifest(addr, len(addr))
 }
 
-func (c *Client) trusted(key cipher.PubKey) bool {
-	for _, k := range c.TrustedSigners {
-		if k == key {
-			return true
-		}
-	}
-	return false
+// pinned reports whether a manifest signed by key is accepted.
+func (c *Client) pinned(key cipher.PubKey) bool {
+	return len(c.PinnedSigners) == 0 || KeyListed(c.PinnedSigners, key)
 }
 
 // FetchManifest fetches the manifest at addr in reply-sized pieces. It
@@ -376,8 +373,8 @@ func (c *Client) fetchManifest(addr Hash, known int) (*Manifest, []byte, Hash, e
 				if !got.HasPrefix(addr, known) {
 					return nil, fmt.Errorf("%w: got %s, want %x", ErrAddress, got, addr[:known])
 				}
-				if !c.trusted(h.SignerPublicKey) {
-					return nil, fmt.Errorf("%w: %s", ErrUntrusted, h.SignerPublicKey.Hex())
+				if !c.pinned(h.SignerPublicKey) {
+					return nil, fmt.Errorf("%w: %s", ErrNotPinned, h.SignerPublicKey.Hex())
 				}
 				header, full = &h, got
 			}
@@ -653,8 +650,8 @@ func (c *Client) FetchProgram(name string) (*FetchedProgram, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
-	if !c.trusted(m.SignerPublicKey) {
-		return nil, fmt.Errorf("%s: %w: %s", name, ErrUntrusted, m.SignerPublicKey.Hex())
+	if !c.pinned(m.SignerPublicKey) {
+		return nil, fmt.Errorf("%s: %w: %s", name, ErrNotPinned, m.SignerPublicKey.Hex())
 	}
 	files, err := c.FetchFiles(addr, m)
 	if err != nil {

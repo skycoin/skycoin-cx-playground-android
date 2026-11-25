@@ -57,7 +57,7 @@ type Node struct {
 
 	conn     net.PacketConn
 	store    *programstore.Store
-	trusted  []cipher.PubKey
+	pinned   []cipher.PubKey
 	settings Settings
 	haves    *HaveQueue
 
@@ -119,15 +119,16 @@ type Stats struct {
 }
 
 // NewNode returns a super node, see NewTypedNode.
-func NewNode(conn net.PacketConn, store *programstore.Store, trusted []cipher.PubKey) (*Node, error) {
-	return NewTypedNode(conn, store, trusted, Settings{Type: TypeSuper})
+func NewNode(conn net.PacketConn, store *programstore.Store, pinned []cipher.PubKey) (*Node, error) {
+	return NewTypedNode(conn, store, pinned, Settings{Type: TypeSuper})
 }
 
 // NewTypedNode returns a medium or super node that answers on conn and
-// keeps programs in store. It downloads only programs signed by one of
-// trusted. It starts out holding every cached program of the store, with
+// keeps programs in store. It downloads and relays only programs signed by
+// one of pinned, or every program with a valid signature when pinned is
+// empty (D27, D109). It starts out holding every cached program of the store, with
 // the subscribers of its subscribers.txt.
-func NewTypedNode(conn net.PacketConn, store *programstore.Store, trusted []cipher.PubKey, settings Settings) (*Node, error) {
+func NewTypedNode(conn net.PacketConn, store *programstore.Store, pinned []cipher.PubKey, settings Settings) (*Node, error) {
 	if _, err := ParseNodeType(string(settings.Type)); err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func NewTypedNode(conn net.PacketConn, store *programstore.Store, trusted []ciph
 	n := &Node{
 		PacketSize: programblocks.DefaultPacketSize, Lease: DefaultLease,
 		FirstTimeout: programblocks.DefaultFirstTimeout, MaxTimeout: programblocks.DefaultMaxTimeout, MaxTries: programblocks.DefaultMaxTries,
-		conn: conn, store: store, trusted: trusted, settings: settings, pins: pinList{path: settings.PinsFile}, haves: newHaveQueue(),
+		conn: conn, store: store, pinned: pinned, settings: settings, pins: pinList{path: settings.PinsFile}, haves: newHaveQueue(),
 		catalog: programblocks.EmptyCatalog(), requested: map[programblocks.Hash]bool{},
 		announcers: map[programblocks.Hash][]net.Addr{}, relayed: map[programblocks.Hash]bool{},
 		subscribers: map[string]subscriber{}, subscribing: map[string]bool{}, pending: map[uint32]chan []byte{}, peerAnswers: map[string]peerAnswer{},
@@ -709,7 +710,7 @@ func (n *Node) applyPolicy(q QueuedHave) {
 }
 
 // download fetches a requested program from the nodes that announced it,
-// verifies it, keeps it and relays it. A program from an untrusted signer,
+// verifies it, keeps it and relays it. A program from a signer that is not pinned,
 // or one whose lengths differ from the have, is dropped for good. A full
 // disk drops the partial program. Any other failure lets a later have
 // request it again.
@@ -736,7 +737,7 @@ func (n *Node) download(h Have) {
 			n.dropFull(h.Address)
 			return
 		}
-		if errors.Is(err, programblocks.ErrUntrusted) || errors.Is(err, errHaveMismatch) {
+		if errors.Is(err, programblocks.ErrNotPinned) || errors.Is(err, errHaveMismatch) {
 			return
 		}
 	}
@@ -771,7 +772,7 @@ func (n *Node) fetchFrom(h Have, from net.Addr) (Held, []byte, error) {
 		return Held{}, nil, err
 	}
 	defer conn.Close()
-	c := programblocks.NewClient(conn, n.trusted...)
+	c := programblocks.NewClient(conn, n.pinned...)
 	c.PacketSize, c.FirstTimeout, c.MaxTimeout, c.MaxTries = n.PacketSize, n.FirstTimeout, n.MaxTimeout, n.MaxTries
 	c.Forms = n.Forms
 	m, encoded, err := c.FetchManifest(h.Address)
@@ -783,7 +784,7 @@ func (n *Node) fetchFrom(h Have, from net.Addr) (Held, []byte, error) {
 	}
 	n.storeMu.Lock()
 	defer n.storeMu.Unlock()
-	if _, _, err := n.store.SaveManifest(encoded, n.trusted); err != nil {
+	if _, _, err := n.store.SaveManifest(encoded, n.pinned); err != nil {
 		return Held{}, nil, err
 	}
 	if err := n.setRow(h.Address, programstore.StateRemote, m.PackLength, h.Address.String()[:16]); err != nil {
@@ -842,7 +843,7 @@ func (n *Node) Fetch(addr programblocks.Hash, from ...string) (Held, error) {
 		}
 		last = fmt.Errorf("fetch %s from %s: %w", addr, from, err)
 		n.logf("%v", last)
-		if errors.Is(err, programblocks.ErrUntrusted) || errors.Is(err, errHaveMismatch) {
+		if errors.Is(err, programblocks.ErrNotPinned) || errors.Is(err, errHaveMismatch) {
 			break
 		}
 	}
@@ -904,7 +905,7 @@ func (n *Node) setRow(addr programblocks.Hash, state string, length uint64, name
 
 // Publish signs files as a new program with secret, keeps it, and
 // announces it to the subscribers. The signer must be one of the node's
-// trusted keys.
+// pinned keys when it has some.
 func (n *Node) Publish(files map[string][]byte, secret cipher.SecKey, date time.Time) (programblocks.Hash, error) {
 	m, pack, err := programblocks.Build(files, programblocks.DefaultBlockSize, date)
 	if err != nil {
@@ -925,7 +926,7 @@ func (n *Node) Publish(files map[string][]byte, secret cipher.SecKey, date time.
 }
 
 func (n *Node) keepPublished(addr programblocks.Hash, m *programblocks.Manifest, encoded, pack []byte, files map[string][]byte) error {
-	if _, _, err := n.store.SaveManifest(encoded, n.trusted); err != nil {
+	if _, _, err := n.store.SaveManifest(encoded, n.pinned); err != nil {
 		return err
 	}
 	p, err := n.store.CreatePacking(addr, m)

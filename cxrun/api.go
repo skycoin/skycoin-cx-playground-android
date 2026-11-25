@@ -52,6 +52,7 @@ func register(p *cxast.CXProgram) {
 	fn("NetRecv", opNetRecv, in(i32, i32), in(str, str))
 	fn("NetClose", opNetClose, in(i32), nil)
 	fn("ProgramFile", opProgramFile, in(str, cxast.Slice(types.UI8)), in(boolean))
+	fn("ProgramSigner", opProgramSigner, in(str, boolean), in(boolean))
 
 	for i, c := range []struct {
 		name string
@@ -231,4 +232,20 @@ func opProgramFile(p *cxast.CXProgram, in []cxast.CXValue, out []cxast.CXValue) 
 		accepted = programFile(in[0].Get_str(p), data)
 	}
 	out[0].Set_bool(p, accepted)
+}
+
+// programSigner answers app.ProgramSigner during a run, Options.ProgramSigner.
+var programSigner func(key string, trusted bool) bool
+
+// opProgramSigner is app.ProgramSigner(key str, trusted bool) (run bool): a
+// loader names the signer of the program it verified, before it hands any
+// file over, and learns whether the program may run (D27). Without
+// Options.ProgramSigner only a trusted key runs.
+func opProgramSigner(p *cxast.CXProgram, in []cxast.CXValue, out []cxast.CXValue) {
+	trusted := in[1].Get_bool(p)
+	run := trusted
+	if programSigner != nil {
+		run = programSigner(in[0].Get_str(p), trusted)
+	}
+	out[0].Set_bool(p, run)
 }

@@ -1,0 +1,6 @@
+# As program-signer-question-run-in-emulator, but the user taps refuse, so
+# the program does not run (D27).
+ready start app="Programs: signer question, refuse"
+program-server 7006 served cx playground test signer
+input untimed
+timeout 60

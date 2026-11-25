@@ -1,0 +1,6 @@
+# The app fetches fib-and-primes from programblocks serve in the rig. Its
+# trusted key is another one, so the app asks the user, who taps run (D27).
+ready start app="Programs: signer question, run"
+program-server 7006 served cx playground test signer
+input untimed
+timeout 60

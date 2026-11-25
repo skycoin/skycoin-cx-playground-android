@@ -1,0 +1,5 @@
+This app holds no program. It fetches the program its args name from the
+server its args give, over UDP, and checks the manifest signature and
+every block hash. A program signed by one of the trusted keys of its args
+runs at once, and one from any other key runs only once the user
+confirms it. See docs/ProgramDistribution.md.

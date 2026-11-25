@@ -24,7 +24,9 @@ import (
 )
 
 // programsKind marks the program loader: an app whose args are a server
-// address and the signer keys to trust. Its screen lists the server's
+// address and optional signer keys to trust. Programs from any valid signer
+// are listed, and the user confirms one from a key that is not trusted
+// before it runs (D27). Its screen lists the server's
 // programs, and downloads, validates and runs them, see "Loader, lister and
 // runner (#17)" in docs/ProgramDistribution.md.
 const programsKind = "programs"
@@ -56,8 +58,8 @@ type programsScreen struct {
 
 func newProgramsScreen(a store.App, invalidate func(), trace *tracer) *programsScreen {
 	s := &programsScreen{app: a, out: &console{invalidate: invalidate, trace: trace}, trace: trace, selected: -1, reports: map[string]*programcheck.Report{}}
-	if len(a.Manifest.Args) < 2 {
-		fmt.Fprintf(s.out, "a programs app takes the server and the trusted signer keys as args\n")
+	if len(a.Manifest.Args) < 1 {
+		fmt.Fprintf(s.out, "a programs app takes the server and optional trusted signer keys as args\n")
 		return s
 	}
 	s.server = a.Manifest.Args[0]
@@ -121,12 +123,7 @@ func (s *programsScreen) client() (*programblocks.Client, io.Closer, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	trusted, err := s.store.TrustedSigners()
-	if err != nil {
-		conn.Close()
-		return nil, nil, err
-	}
-	return programblocks.NewClient(conn, trusted...), conn, nil
+	return programblocks.NewClient(conn), conn, nil
 }
 
 // sync fetches the server's manifest list into the store.
@@ -216,14 +213,32 @@ func (s *programsScreen) validateSelected() error {
 		verdict = fmt.Sprintf("refused, %d sandbox violations", len(report.Violations))
 	}
 	fmt.Fprintf(s.out, "checked %s, loaded in RAM (%d bytes): %s\n", r.Name, p.Bytes, verdict)
+	if signer, trusted, err := s.signer(addr); err == nil && trusted {
+		fmt.Fprintf(s.out, "signer %s trusted\n", signer.Hex())
+	} else if err == nil {
+		fmt.Fprintf(s.out, "signer %s not trusted, run asks first\n", signer.Hex())
+	}
 	for _, line := range strings.Split(strings.TrimRight(report.Text(), "\n"), "\n") {
 		s.trace.printf("report %s", line)
 	}
 	return nil
 }
 
-// runnable returns the program to run when it is validated and allowed.
-func (s *programsScreen) runnable() (*store.App, *preparedProgram, error) {
+// signer returns the signer of the program at addr and whether it is in
+// trusted.txt.
+func (s *programsScreen) signer(addr programblocks.Hash) (cipher.PubKey, bool, error) {
+	m, err := s.store.Manifest(addr)
+	if err != nil {
+		return cipher.PubKey{}, false, err
+	}
+	trusted, err := s.store.SignerTrusted(m.SignerPublicKey)
+	return m.SignerPublicKey, trusted, err
+}
+
+// runnable returns the program to run when it is validated and allowed,
+// and the function that prepares it. That function asks confirm about a
+// signer that is not in trusted.txt before the program runs (D27).
+func (s *programsScreen) runnable(confirm func(cipher.PubKey) bool) (*store.App, func(io.Writer) (*preparedProgram, error), error) {
 	r, addr, err := s.selectedRow()
 	if err != nil {
 		return nil, nil, err
@@ -241,8 +256,22 @@ func (s *programsScreen) runnable() (*store.App, *preparedProgram, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	signer, _, err := s.signer(addr)
+	if err != nil {
+		return nil, nil, err
+	}
+	trusted, err := s.store.TrustedSigners()
+	if err != nil {
+		return nil, nil, err
+	}
 	a := &store.App{Hash: manifest.Hash(r.Address), Manifest: p.App}
-	return a, &preparedProgram{app: p.App, files: p.Files, libraries: report.LibrariesToEnable(programcheck.PolicyFetched())}, nil
+	prepared := &preparedProgram{app: p.App, files: p.Files, libraries: report.LibrariesToEnable(programcheck.PolicyFetched())}
+	return a, func(out io.Writer) (*preparedProgram, error) {
+		if err := reportSigner(out, signer, trusted, confirm); err != nil {
+			return nil, err
+		}
+		return prepared, nil
+	}, nil
 }
 
 func (s *programsScreen) unloadSelected(clearStore bool) error {
@@ -317,12 +346,12 @@ func (u *ui) layoutPrograms(gtx layout.Context) {
 		s.operate(onSelected("clear"), invalidate, func() error { return s.unloadSelected(true) })
 	}
 	if s.run.Clicked(gtx) && ready && busy == "" {
-		a, p, err := s.runnable()
+		a, prepare, err := s.runnable(u.confirmSigner)
 		if err != nil {
 			fmt.Fprintf(s.out, "run: %v\n", err)
 			u.trace.printf("programs run refused err=%v", err)
 		} else {
-			u.launch(a, func(io.Writer) (*preparedProgram, error) { return p, nil })
+			u.launch(a, prepare)
 			u.w.Invalidate()
 			return
 		}

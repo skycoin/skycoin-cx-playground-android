@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/skycoin/skycoin/src/cipher"
+
 	"github.com/skycoin/skycoin-cx-playground-android/cxrun"
 )
 
@@ -29,7 +31,8 @@ var Libraries = []string{"net", "cipher"}
 
 // Load runs the loader program, entry in files, with args: the server, the
 // program name and settings. It returns the files the loader handed over.
-// opts may set NetRecord or NetReplay.
+// opts may set NetRecord or NetReplay, and ProgramSigner, which decides
+// whether a program from a key the loader does not trust runs.
 func Load(files map[string][]byte, entry string, args []string, opts cxrun.Options, out io.Writer) (map[string][]byte, error) {
 	handed := map[string][]byte{}
 	var repeated []string
@@ -52,4 +55,16 @@ func Load(files map[string][]byte, entry string, args []string, opts cxrun.Optio
 		return nil, fmt.Errorf("loader handed no files")
 	}
 	return handed, nil
+}
+
+// Confirmer returns a cxrun.Options.ProgramSigner that runs a trusted key's
+// program and asks confirm about any other valid key (D27).
+func Confirmer(confirm func(cipher.PubKey) bool) func(key string, trusted bool) bool {
+	return func(key string, trusted bool) bool {
+		if trusted {
+			return true
+		}
+		k, err := cipher.PubKeyFromHex(key)
+		return err == nil && confirm != nil && confirm(k)
+	}
 }
