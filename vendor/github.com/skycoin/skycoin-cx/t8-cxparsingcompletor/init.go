@@ -2,7 +2,6 @@ package parsingcompletor
 
 import (
 	"github.com/skycoin/skycoin-cx/t4-actions"
-	"github.com/skycoin/skycoin-cx/t4-opcodes"     // thin: only RegisterOpcodes; no depth gain
 	"github.com/skycoin/skycoin-cx/t5-cxnet"       // thin: only InitConstants; only for the InitCXCore helper, goes with the init move (A)
 	"github.com/skycoin/skycoin-cx/t5-cxos"        // thin: only InitConstants; only for the InitCXCore helper, goes with the init move (A)
 	"github.com/skycoin/skycoin-cx/t6-cxfx"        // thin: only InitConstants; only for the InitCXCore helper, goes with the init move (A)
@@ -26,7 +25,6 @@ func InitCXCore() {
 			actions.AST = cxinit.MakeProgram()
 			cxinit.RegisterPackages(actions.AST)
 		}
-		opcodes.RegisterOpcodes(actions.AST)
 
 		Initialized = true
 	}

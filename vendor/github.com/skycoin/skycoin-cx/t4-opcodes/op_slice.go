@@ -9,7 +9,7 @@ import (
 )
 
 // TODO: Rework
-func opSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var inp0 *ast.CXArgument
 	var sliceLen types.Pointer
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
@@ -74,7 +74,7 @@ func opSliceLen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 }
 
 // TODO: Rework
-func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var inp0, out0 *ast.CXArgument
 	var inp0Type, inp1Type, out0Type types.Code
 	var input0IsSlice, outputIsSlice bool
@@ -232,7 +232,7 @@ func opSliceAppend(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 }
 
 // TODO: Rework
-func opSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var inpSize types.Pointer
 	var inpType, outType types.Code
 	var inpIsSlice, outIsSlice bool
@@ -286,7 +286,7 @@ func opSliceResize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXV
 }
 
 // TODO: Rework
-func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var inp0Type, inp2Type, out0Type types.Code
 	var inpIsSlice, outIsSlice bool
 	if inputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
@@ -376,7 +376,7 @@ func opSliceInsertElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 }
 
 // TODO: Rework
-func opSliceRemoveElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSliceRemoveElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var inpType, outType types.Code
 	var inpIsSlice, outIsSlice bool
 	var inpSize types.Pointer
@@ -430,7 +430,7 @@ func opSliceRemoveElement(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []
 	outputs[0].Set_ptr(prgrm, outputSliceOffset)
 }
 
-func opSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSliceCopy(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var dstType types.Code
 	var dstSize types.Pointer
 	var dstIsSlice bool

@@ -59,3 +59,9 @@ func (prgrm *CXProgram) CXProgramSourceFileIntern(path string) SourceFileGid {
 func (prgrm *CXProgram) CXProgramSourceFileText(gid SourceFileGid) string {
 	return prgrm.CxIrState.StringPool.StringPoolText(prgrm.CxIrState.SourceFileMng.SourceFilePath(gid))
 }
+
+// CXProgramSourceFileBytes returns the path of a source file viewed from the
+// string pool, for printing. The caller must not write to it.
+func (prgrm *CXProgram) CXProgramSourceFileBytes(gid SourceFileGid) []byte {
+	return prgrm.CxIrState.StringPool.StringPoolBytes(prgrm.CxIrState.SourceFileMng.SourceFilePath(gid))
+}

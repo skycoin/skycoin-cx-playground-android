@@ -51,15 +51,15 @@ func netBufferLength(buffer []byte, length int32) []byte {
 	return buffer[:max(0, min(int(length), len(buffer)))]
 }
 
-func opNetUpdate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetUpdate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netUpdate(inputs[0].Get_i32(prgrm)))
 }
 
-func opNetReadyCount(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetReadyCount(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netbatch.NetReadyCount())
 }
 
-func opNetReadyNext(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetReadyNext(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	handle, trigger, messageID, detail := netbatch.NetReadyNext()
 	outputs[0].Set_i32(prgrm, handle)
 	outputs[1].Set_i32(prgrm, int32(trigger))
@@ -67,62 +67,62 @@ func opNetReadyNext(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CX
 	outputs[3].Set_i32(prgrm, detail)
 }
 
-func opNetClock(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetClock(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i64(prgrm, netbatch.NetClock())
 }
 
-func opNetRead(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetRead(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	buffer := netBufferView(prgrm, &inputs[2])
 	outputs[0].Set_i32(prgrm, netbatch.NetRead(inputs[0].Get_i32(prgrm), inputs[1].Get_i32(prgrm), buffer, inputs[3].Get_i32(prgrm)))
 }
 
-func opNetWrite(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetWrite(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	buffer := netBufferLength(netBufferView(prgrm, &inputs[1]), inputs[2].Get_i32(prgrm))
 	outputs[0].Set_i32(prgrm, netbatch.NetWrite(inputs[0].Get_i32(prgrm), buffer))
 }
 
-func opNetClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_bool(prgrm, netbatch.NetClose(inputs[0].Get_i32(prgrm)))
 }
 
-func opNetTimeoutSet(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetTimeoutSet(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_bool(prgrm, netbatch.NetTimeoutSet(inputs[0].Get_i32(prgrm), inputs[1].Get_i32(prgrm)))
 }
 
 // VIOLATION STRHOT-329: B, hands an address to Go and the OS, #508.
-func opNetTCPListen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetTCPListen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netbatch.NetTCPListen(netAddress(inputs[0].Get_str(prgrm), inputs[1].Get_i32(prgrm))))
 }
 
 // VIOLATION STRHOT-330: B, hands an address to Go and the OS, #508.
-func opNetTCPDial(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetTCPDial(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netbatch.NetTCPDial(netAddress(inputs[0].Get_str(prgrm), inputs[1].Get_i32(prgrm))))
 }
 
 // VIOLATION STRHOT-331: B, hands an address to Go and the OS, #508.
-func opNetUDPListen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetUDPListen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netbatch.NetUDPListen(netAddress(inputs[0].Get_str(prgrm), inputs[1].Get_i32(prgrm))))
 }
 
 // VIOLATION STRHOT-332: B, hands an address to Go and the OS, #508.
-func opNetUDPDial(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetUDPDial(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netbatch.NetUDPDial(netAddress(inputs[0].Get_str(prgrm), inputs[1].Get_i32(prgrm))))
 }
 
-func opNetUDPReadFrom(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetUDPReadFrom(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	buffer := netBufferView(prgrm, &inputs[2])
 	length, peer := netbatch.NetUDPReadFrom(inputs[0].Get_i32(prgrm), inputs[1].Get_i32(prgrm), buffer, inputs[3].Get_i32(prgrm))
 	outputs[0].Set_i32(prgrm, length)
 	outputs[1].Set_i32(prgrm, peer)
 }
 
-func opNetUDPWriteTo(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetUDPWriteTo(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	buffer := netBufferLength(netBufferView(prgrm, &inputs[2]), inputs[3].Get_i32(prgrm))
 	outputs[0].Set_i32(prgrm, netbatch.NetUDPWriteTo(inputs[0].Get_i32(prgrm), inputs[1].Get_i32(prgrm), buffer))
 }
 
 // VIOLATION STRHOT-333: B, hands an address to Go, #508.
-func opNetUDPPeerResolve(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNetUDPPeerResolve(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, netbatch.NetUDPPeerResolve(netAddress(inputs[0].Get_str(prgrm), inputs[1].Get_i32(prgrm))))
 }
 
@@ -168,17 +168,17 @@ func (block *netBlock) blockStr() string {
 	return string(text)
 }
 
-func libraryNetUpdateVm(memory []byte, offset uint32) {
+func LibraryNetUpdateVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	block.blockI32Write(netUpdate(block.blockI32()))
 }
 
-func libraryNetReadyCountVm(memory []byte, offset uint32) {
+func LibraryNetReadyCountVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	block.blockI32Write(netbatch.NetReadyCount())
 }
 
-func libraryNetReadyNextVm(memory []byte, offset uint32) {
+func LibraryNetReadyNextVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	handle, trigger, messageID, detail := netbatch.NetReadyNext()
 	block.blockI32Write(handle)
@@ -187,59 +187,59 @@ func libraryNetReadyNextVm(memory []byte, offset uint32) {
 	block.blockI32Write(detail)
 }
 
-func libraryNetClockVm(memory []byte, offset uint32) {
+func LibraryNetClockVm(memory []byte, offset uint32) {
 	types.Write_i64(memory, types.Pointer(offset), netbatch.NetClock())
 }
 
-func libraryNetReadVm(memory []byte, offset uint32) {
+func LibraryNetReadVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	handle, messageID, buffer, payloadOffset := block.blockI32(), block.blockI32(), block.blockBuffer(), block.blockI32()
 	block.blockI32Write(netbatch.NetRead(handle, messageID, buffer, payloadOffset))
 }
 
-func libraryNetWriteVm(memory []byte, offset uint32) {
+func LibraryNetWriteVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	handle, buffer := block.blockI32(), block.blockBuffer()
 	buffer = netBufferLength(buffer, block.blockI32())
 	block.blockI32Write(netbatch.NetWrite(handle, buffer))
 }
 
-func libraryNetCloseVm(memory []byte, offset uint32) {
+func LibraryNetCloseVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	block.blockBoolWrite(netbatch.NetClose(block.blockI32()))
 }
 
-func libraryNetTimeoutSetVm(memory []byte, offset uint32) {
+func LibraryNetTimeoutSetVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	handle, milliseconds := block.blockI32(), block.blockI32()
 	block.blockBoolWrite(netbatch.NetTimeoutSet(handle, milliseconds))
 }
 
-func libraryNetTCPListenVm(memory []byte, offset uint32) {
+func LibraryNetTCPListenVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	host := block.blockStr()
 	block.blockI32Write(netbatch.NetTCPListen(netAddress(host, block.blockI32())))
 }
 
-func libraryNetTCPDialVm(memory []byte, offset uint32) {
+func LibraryNetTCPDialVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	host := block.blockStr()
 	block.blockI32Write(netbatch.NetTCPDial(netAddress(host, block.blockI32())))
 }
 
-func libraryNetUDPListenVm(memory []byte, offset uint32) {
+func LibraryNetUDPListenVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	host := block.blockStr()
 	block.blockI32Write(netbatch.NetUDPListen(netAddress(host, block.blockI32())))
 }
 
-func libraryNetUDPDialVm(memory []byte, offset uint32) {
+func LibraryNetUDPDialVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	host := block.blockStr()
 	block.blockI32Write(netbatch.NetUDPDial(netAddress(host, block.blockI32())))
 }
 
-func libraryNetUDPReadFromVm(memory []byte, offset uint32) {
+func LibraryNetUDPReadFromVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	handle, messageID, buffer, payloadOffset := block.blockI32(), block.blockI32(), block.blockBuffer(), block.blockI32()
 	length, peer := netbatch.NetUDPReadFrom(handle, messageID, buffer, payloadOffset)
@@ -247,14 +247,14 @@ func libraryNetUDPReadFromVm(memory []byte, offset uint32) {
 	block.blockI32Write(peer)
 }
 
-func libraryNetUDPWriteToVm(memory []byte, offset uint32) {
+func LibraryNetUDPWriteToVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	handle, peer, buffer := block.blockI32(), block.blockI32(), block.blockBuffer()
 	buffer = netBufferLength(buffer, block.blockI32())
 	block.blockI32Write(netbatch.NetUDPWriteTo(handle, peer, buffer))
 }
 
-func libraryNetUDPPeerResolveVm(memory []byte, offset uint32) {
+func LibraryNetUDPPeerResolveVm(memory []byte, offset uint32) {
 	block := netBlock{memory, offset}
 	host := block.blockStr()
 	block.blockI32Write(netbatch.NetUDPPeerResolve(netAddress(host, block.blockI32())))

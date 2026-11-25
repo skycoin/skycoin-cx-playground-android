@@ -99,7 +99,7 @@ func SliceResizeEx(prgrm *CXProgram, outputSliceOffset types.Pointer, count type
 	var newLen = count
 	var newCap = outputSliceCap
 	if newLen > newCap {
-		newCap = sliceCapacityGrow(newCap, newLen, sizeofElement)
+		newCap = sliceCapacityGrow(prgrm, newCap, newLen, sizeofElement)
 		var outputObjectSize = types.OBJECT_HEADER_SIZE + constants.SLICE_HEADER_SIZE + newCap*sizeofElement
 		outputSliceOffset = AllocateSeq(prgrm, outputObjectSize)
 		types.Write_ptr(types.Get_obj_header(prgrm.Memory, outputSliceOffset), types.OBJECT_GC_HEADER_SIZE, outputObjectSize)
@@ -115,11 +115,11 @@ func SliceResizeEx(prgrm *CXProgram, outputSliceOffset types.Pointer, count type
 }
 
 // SliceElementLimit is the most elements of sizeofElement bytes that one
-// slice object can hold within the heap.
-func SliceElementLimit(sizeofElement types.Pointer) types.Pointer {
+// slice object can hold within the heap cap of prgrm.
+func SliceElementLimit(prgrm *CXProgram, sizeofElement types.Pointer) types.Pointer {
 	var limit types.Pointer
-	if constants.MAX_HEAP_SIZE > types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE {
-		limit = constants.MAX_HEAP_SIZE - types.OBJECT_HEADER_SIZE - constants.SLICE_HEADER_SIZE
+	if heapCap := HeapCap(prgrm); heapCap > types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE {
+		limit = heapCap - types.OBJECT_HEADER_SIZE - constants.SLICE_HEADER_SIZE
 	}
 	if sizeofElement > 1 {
 		limit /= sizeofElement
@@ -129,10 +129,10 @@ func SliceElementLimit(sizeofElement types.Pointer) types.Pointer {
 
 // sliceCapacityGrow doubles capacity up to at least newLen elements. A slice too
 // large for the heap is a heap exhausted error, before its size can wrap.
-func sliceCapacityGrow(capacity types.Pointer, newLen types.Pointer, sizeofElement types.Pointer) types.Pointer {
-	limit := SliceElementLimit(sizeofElement)
+func sliceCapacityGrow(prgrm *CXProgram, capacity types.Pointer, newLen types.Pointer, sizeofElement types.Pointer) types.Pointer {
+	limit := SliceElementLimit(prgrm, sizeofElement)
 	if newLen > limit {
-		panic(constants.HEAP_EXHAUSTED_ERROR)
+		HeapOutOfMemory(prgrm, uint64(types.OBJECT_HEADER_SIZE+constants.SLICE_HEADER_SIZE)+uint64(newLen)*uint64(sizeofElement))
 	}
 	grown := limit
 	if capacity <= limit/2 {

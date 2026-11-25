@@ -4,24 +4,33 @@ import (
 	"github.com/skycoin/skycoin-cx/t1-constants"
 )
 
-// LibraryFunctionHandlers holds the handler of each function of each system
-// library, indexed by library number and then function number. A library
-// that is not linked into this binary has no handlers.
-// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
-var LibraryFunctionHandlers [constants.LibraryCount][]OpcodeHandler
+// LibraryDispatchFunction runs function of one system library on its
+// operands and reports false for a number the library does not define. The
+// switches are generated from constants.LibraryFunctionDefinitionTable
+// (decision D96).
+type LibraryDispatchFunction func(prgrm *CXProgram, function int, inputs []CXValue, outputs []CXValue) bool
 
-// libraryFunctionKeyShift leaves room for 65535 functions per library.
-const libraryFunctionKeyShift = 16
+// LibraryDispatches holds the switch of each system library this binary
+// links, by library number, nil for a library it leaves out. The
+// registration of the binary sets it, see opcodes.LibraryLink.
+// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
+var LibraryDispatches [constants.LibraryCount]LibraryDispatchFunction
 
 // LibraryFunctionKey returns the key of a library function in NativeNames
-// and Natives. It is negative, so it never meets an opcode number.
+// and NativeFunctionOf. It is negative, so it never meets an opcode number.
 func LibraryFunctionKey(library int, function int) int {
-	return -(library<<libraryFunctionKeyShift | function)
+	return constants.LibraryFunctionKey(library, function)
 }
 
-// LibraryLinked reports whether library has handlers in this binary.
+// LibraryLinked reports whether this binary links library.
 func LibraryLinked(library int) bool {
-	return len(LibraryFunctionHandlers[library]) > 0
+	return library > 0 && library < constants.LibraryCount && LibraryDispatches[library] != nil
+}
+
+// LibraryFunctionLinked reports whether this binary links library and the
+// library defines function.
+func LibraryFunctionLinked(library int, function int) bool {
+	return LibraryLinked(library) && constants.LibraryFunctionSignatureOf(library, function).LibraryFunctionSignatureDefined
 }
 
 // BuiltInName returns the name of the built-in fn calls, the library function
@@ -34,7 +43,16 @@ func (fn *CXFunction) BuiltInName() string {
 		row, _ := constants.LibraryFunctionLiveByNumber(fn.LibraryNumber, fn.LibraryFunctionNumber)
 		return row.Name
 	}
-	return NativeNames.NativeNameIndexCodeText(fn.AtomicOPCode)
+	return constants.OpcodeNameOf(fn.AtomicOPCode)
+}
+
+// BuiltInNameBytes returns the bytes of BuiltInName without building a
+// string, for printing on the run path. The caller must not write to them.
+func (fn *CXFunction) BuiltInNameBytes() []byte {
+	if fn.AtomicOPCode == constants.OP_LIBRARY_CALL {
+		return constants.LibraryFunctionLiveNameBytes(fn.LibraryNumber, fn.LibraryFunctionNumber)
+	}
+	return constants.OpcodeNameBytesOf(fn.AtomicOPCode)
 }
 
 // RuntimeLibraryDisabled is the panic value of a call into a system library
@@ -49,14 +67,17 @@ func RuntimeLibraryDisabledMessage(library int) string {
 	return "library " + name + " is not enabled, enable it with --enable=" + name
 }
 
-// libraryCall runs library function fn after the sandbox check, one indexed
-// load and compare.
+// libraryCall runs library function fn through the switch of its library
+// after the sandbox check, one indexed load and compare.
 // VIOLATION STRHOT-287: E, error or assert text, built on a failure branch only, #412.
 func libraryCall(prgrm *CXProgram, fn *CXFunction, inputs []CXValue, outputs []CXValue) {
 	if !prgrm.ProgramLibrariesEnabled[fn.LibraryNumber] {
 		panic(RuntimeLibraryDisabled(RuntimeLibraryDisabledMessage(fn.LibraryNumber)))
 	}
-	LibraryFunctionHandlers[fn.LibraryNumber][fn.LibraryFunctionNumber](prgrm, inputs, outputs)
+	dispatch := LibraryDispatches[fn.LibraryNumber]
+	if dispatch == nil || !dispatch(prgrm, fn.LibraryFunctionNumber, inputs, outputs) {
+		panic(RuntimeOpcodeUnlinked(constants.OP_LIBRARY_CALL))
+	}
 }
 
 // LibraryRunStarts holds what each linked library does before a run that

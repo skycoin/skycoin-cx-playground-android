@@ -137,7 +137,7 @@ func sliceLiteralExpressionOf(prgrm *ast.CXProgram, typeCode types.Code, strct *
 				// then it's a literal
 				// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 				// Now an arena insert, site S0991.
-				opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_APPEND])
+				opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_APPEND))
 				prgrm.CXAtomicOps[symExprAtomicOpIdx].Operator = opIdx
 
 				prgrm.CXAtomicOps[symExprAtomicOpIdx].Inputs = nil
@@ -216,7 +216,7 @@ func sliceLiteralExpressionOf(prgrm *ast.CXProgram, typeCode types.Code, strct *
 				result = append(result, expr)
 				// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 				// Now an arena insert, site S1000.
-				opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_APPEND])
+				opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_APPEND))
 				prgrm.CXAtomicOps[symExprAtomicOpIdx].Operator = opIdx
 
 				prgrm.CXAtomicOps[symExprAtomicOpIdx].Inputs = nil
@@ -247,7 +247,7 @@ func sliceLiteralExpressionOf(prgrm *ast.CXProgram, typeCode types.Code, strct *
 	symExprExprCXLine := MakeCXLineExpressionCurrent(prgrm)
 	// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 	// Now a constructor call, site S1005.
-	symExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_IDENTITY])
+	symExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 	// Now an arena getter, site S1006.
 	symExprAtomicOp, err := prgrm.GetCXAtomicOp(symExpr.Index)
@@ -365,7 +365,7 @@ func sliceLiteralStructElement(prgrm *ast.CXProgram, strct *ast.CXStruct, elemen
 		// A value: elementName = value, which type checks it.
 		value := prgrm.CXAtomicOps[element[last].Index].GetOutputs(prgrm)
 		result = append(result, element[:last]...)
-		assign := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_IDENTITY])
+		assign := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		prgrm.CXAtomicOps[assign.Index].Package = ast.CXPackageIndex(pkg.Index)
 		prgrm.CXAtomicOps[assign.Index].AddOutput(prgrm, elementAt())
 		prgrm.CXAtomicOps[assign.Index].AddInput(prgrm, value[0])
@@ -794,7 +794,7 @@ func arrayLiteralExpressionOf(prgrm *ast.CXProgram, arraySizes []types.Pointer, 
 				// then it's a literal
 				// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 				// Now an arena insert, site S1039.
-				opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_IDENTITY])
+				opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 				prgrm.CXAtomicOps[symExprAtomicOpIdx].Operator = opIdx
 				prgrm.CXAtomicOps[symExprAtomicOpIdx].Inputs = expression.Outputs
 			} else {
@@ -847,7 +847,7 @@ func arrayLiteralExpressionOf(prgrm *ast.CXProgram, arraySizes []types.Pointer, 
 	symExprCXLine := MakeCXLineExpressionCurrent(prgrm)
 	// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 	// Now a constructor call, site S1045.
-	symExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_IDENTITY])
+	symExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 	symExprAtomicOpIdx := symExpr.Index
 	prgrm.CXAtomicOps[symExprAtomicOpIdx].Package = ast.CXPackageIndex(pkg.Index)
 

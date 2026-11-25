@@ -66,7 +66,7 @@ const (
 	// of its function.
 	ReasonOperandOutsideFrame
 	// ReasonLibraryFunctionOutsideSubset is a call of a system library function
-	// that has no vm form, see vm.LibraryFunctionVmHandlers.
+	// that has no vm form, see vm.LibraryFunctionVmLinked.
 	ReasonLibraryFunctionOutsideSubset
 	// ReasonCount is one past the last reason.
 	ReasonCount
@@ -1055,7 +1055,7 @@ func (s *state) libraryBuffer(code []ir.Instr, signatureIndex ast.CXTypeSignatur
 // outputs at the offsets of the native function, ir.OpcodeLibraryCall runs
 // the function on it, and the outputs are copied out.
 func (s *state) libraryCall(code []ir.Instr, cxAtomicOp *ast.CXAtomicOperator, callee *ast.CXFunction) ([]ir.Instr, ReasonCode) {
-	if vm.LibraryFunctionVmHandler(callee.LibraryNumber, callee.LibraryFunctionNumber) == nil {
+	if !vm.LibraryFunctionVmLinked(callee.LibraryNumber, callee.LibraryFunctionNumber) {
 		return code, ReasonLibraryFunctionOutsideSubset
 	}
 	prgrm := s.statePrgrm
@@ -1086,7 +1086,7 @@ func (s *state) libraryCall(code []ir.Instr, cxAtomicOp *ast.CXAtomicOperator, c
 		return code, ReasonCalleeLayout
 	}
 	// The signatures give the sizes. The block packs the inputs and then the
-	// outputs, as opcodes.MakeNativeFunction lays them out.
+	// outputs in order, the layout the vm form of the function reads.
 	blockSize := uint32(0)
 	for _, slots := range [][]ir.Slot{inputSlots, outputSlots} {
 		for i := range slots {

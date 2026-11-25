@@ -13,9 +13,9 @@ import (
 
 // The envelope of a manifest is four lines and the data (D30):
 //
-//	CXPM 2          the header, "CXPM 2 #lz" when the data is one LZ4 block
+//	CXPM 3          the header, "CXPM 3 #lz" when the data is one LZ4 block
 //	<signature>     130 hex digits, secp256k1 over the hash
-//	<hash>          64 hex digits, Sum of the data bytes, the manifest address
+//	<hash>          64 hex digits, Sum (BLAKE3-256) of the data bytes, the address
 //	<length>        the data bytes, decimal
 //	<data>          the text form, or its LZ4 block
 //

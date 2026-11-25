@@ -2,12 +2,5 @@
 
 package cxfx
 
-import (
-	"github.com/skycoin/skycoin-cx/t3-ast"
-)
-
-func RegisterPackage(prgrm *ast.CXProgram) {
-
-}
-
+// InitConstants registers nothing in a cx built without cxfx.
 func InitConstants() {}

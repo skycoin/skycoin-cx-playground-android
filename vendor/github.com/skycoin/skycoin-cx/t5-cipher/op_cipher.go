@@ -118,48 +118,48 @@ func CipherSignatureVerify(hashView []byte, signatureView []byte, pubKeyView []b
 	return cipher.VerifyPubKeySignedHash(pubKey, signature, digest) == nil
 }
 
-// opCipherHashOfBytes is cipher.HashOfBytes, the digest of a []ui8.
-func opCipherHashOfBytes(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+// OpCipherHashOfBytes is cipher.HashOfBytes, the digest of a []ui8.
+func OpCipherHashOfBytes(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	digest := cxhash.CxHashOfBytes(cipherBytesView(prgrm, &inputs[0]))
 	cipherBytesOutput(prgrm, &outputs[0], digest[:])
 }
 
-// opCipherHashStateNew is cipher.HashStateNew, a new incremental hash.
-func opCipherHashStateNew(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+// OpCipherHashStateNew is cipher.HashStateNew, a new incremental hash.
+func OpCipherHashStateNew(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, cipherHashStateNew())
 }
 
-// opCipherHashStateWrite is cipher.HashStateWrite, which adds a []ui8 to a
+// OpCipherHashStateWrite is cipher.HashStateWrite, which adds a []ui8 to a
 // state.
-func opCipherHashStateWrite(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpCipherHashStateWrite(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cipherHashStateGet(inputs[0].Get_i32(prgrm)).Write(cipherBytesView(prgrm, &inputs[1]))
 }
 
-// opCipherHashStateSum is cipher.HashStateSum, the digest of what was written
+// OpCipherHashStateSum is cipher.HashStateSum, the digest of what was written
 // to a state. The state stays as it is and takes more writes.
-func opCipherHashStateSum(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpCipherHashStateSum(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	state := cipherHashStateGet(inputs[0].Get_i32(prgrm))
 	digest := state.Sum(cipherState.CipherDigestScratch[:0])
 	cipherBytesOutput(prgrm, &outputs[0], digest)
 }
 
-// opCipherHashStateRelease is cipher.HashStateRelease, which frees a state.
-func opCipherHashStateRelease(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+// OpCipherHashStateRelease is cipher.HashStateRelease, which frees a state.
+func OpCipherHashStateRelease(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cipherHashStateRelease(inputs[0].Get_i32(prgrm))
 }
 
-// opCipherSignatureVerify is cipher.SignatureVerify(hash, signature, pubKey).
+// OpCipherSignatureVerify is cipher.SignatureVerify(hash, signature, pubKey).
 // VIOLATION VMALLOC-024: secp256k1-go2 of Skycoin computes with math/big, #510.
-func opCipherSignatureVerify(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpCipherSignatureVerify(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	valid := CipherSignatureVerify(cipherBytesView(prgrm, &inputs[0]), cipherBytesView(prgrm, &inputs[1]), cipherBytesView(prgrm, &inputs[2]))
 	outputs[0].Set_bool(prgrm, valid)
 }
 
-// opCipherSignatureRecoverPubKey is cipher.SignatureRecoverPubKey(hash,
+// OpCipherSignatureRecoverPubKey is cipher.SignatureRecoverPubKey(hash,
 // signature), the public key that made signature, and false when there is
 // none.
 // VIOLATION VMALLOC-024: secp256k1-go2 of Skycoin computes with math/big, #510.
-func opCipherSignatureRecoverPubKey(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpCipherSignatureRecoverPubKey(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var digest cipher.SHA256
 	var signature cipher.Sig
 	var pubKey cipher.PubKey
@@ -173,10 +173,10 @@ func opCipherSignatureRecoverPubKey(prgrm *ast.CXProgram, inputs []ast.CXValue, 
 	outputs[1].Set_bool(prgrm, recovered)
 }
 
-// opCipherSignatureSign is cipher.SignatureSign(hash, secKey), the signature
+// OpCipherSignatureSign is cipher.SignatureSign(hash, secKey), the signature
 // of hash, and false for a secret key that is not valid or a hash of zeros.
 // VIOLATION VMALLOC-024: secp256k1-go2 of Skycoin computes with math/big, #510.
-func opCipherSignatureSign(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpCipherSignatureSign(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var digest cipher.SHA256
 	var secKey cipher.SecKey
 	var signature cipher.Sig
@@ -190,10 +190,10 @@ func opCipherSignatureSign(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs [
 	outputs[1].Set_bool(prgrm, signed)
 }
 
-// opCipherKeyPairGenerate is cipher.KeyPairGenerate, a new random public and
+// OpCipherKeyPairGenerate is cipher.KeyPairGenerate, a new random public and
 // secret key.
 // VIOLATION VMALLOC-024: secp256k1-go2 of Skycoin computes with math/big, #510.
-func opCipherKeyPairGenerate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpCipherKeyPairGenerate(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	pubKey, secKey := cipher.GenerateKeyPair()
 	cipherBytesOutput(prgrm, &outputs[0], pubKey[:])
 	cipherBytesOutput(prgrm, &outputs[1], secKey[:])
@@ -211,14 +211,14 @@ func cipherSliceOutput(prgrm *ast.CXProgram, output *ast.CXValue, data []byte, w
 	cipherBytesOutput(prgrm, output, data)
 }
 
-// libraryCipherHashStateNewVm is cipher.HashStateNew on vm, the i32 handle at
+// LibraryCipherHashStateNewVm is cipher.HashStateNew on vm, the i32 handle at
 // block.
-func libraryCipherHashStateNewVm(memory []byte, block uint32) {
+func LibraryCipherHashStateNewVm(memory []byte, block uint32) {
 	types.Write_i32(memory, types.Pointer(block), cipherHashStateNew())
 }
 
-// libraryCipherHashStateReleaseVm is cipher.HashStateRelease on vm, the i32
+// LibraryCipherHashStateReleaseVm is cipher.HashStateRelease on vm, the i32
 // handle at block.
-func libraryCipherHashStateReleaseVm(memory []byte, block uint32) {
+func LibraryCipherHashStateReleaseVm(memory []byte, block uint32) {
 	cipherHashStateRelease(types.Read_i32(memory, types.Pointer(block)))
 }

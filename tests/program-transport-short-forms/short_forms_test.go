@@ -83,7 +83,7 @@ func TestPacketLengths(t *testing.T) {
 	}
 }
 
-// collidingBlocks returns two different texts whose SHA-256 hashes share
+// collidingBlocks returns two different texts whose hashes share
 // their first 4 bytes, found by a birthday search.
 func collidingBlocks(t *testing.T) ([]byte, []byte) {
 	seen := map[[4]byte][]byte{}

@@ -7,7 +7,7 @@ import (
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
-func opIdentity(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpIdentity(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	var out1 *ast.CXArgument
 	if outputs[0].TypeSignature.Type == ast.TYPE_CXARGUMENT_DEPRECATE {
 		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
@@ -72,7 +72,7 @@ func opIdentity(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	}
 }
 
-func opGoto(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGoto(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call := prgrm.GetCurrentCall()
 	expr := call.Operator.Expressions[call.Line]
 
@@ -86,7 +86,7 @@ func opGoto(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call.Line = call.Line + cxAtomicOp.ThenLines
 }
 
-func opJmp(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpJmp(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
@@ -104,7 +104,7 @@ func opJmp(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	}
 }
 
-func opAbsJmp(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpAbsJmp(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call := prgrm.GetCurrentCall()
 	expr := inputs[0].Expr
 
@@ -122,7 +122,7 @@ func opAbsJmp(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue)
 	}
 }
 
-func opBreak(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpBreak(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call := prgrm.GetCurrentCall()
 	expr := call.Operator.Expressions[call.Line]
 
@@ -136,7 +136,7 @@ func opBreak(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) 
 	call.Line = call.Line + cxAtomicOp.ThenLines
 }
 
-func opContinue(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpContinue(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	call := prgrm.GetCurrentCall()
 	expr := call.Operator.Expressions[call.Line]
 
@@ -150,15 +150,15 @@ func opContinue(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValu
 	call.Line = call.Line + cxAtomicOp.ThenLines
 }
 
-func opNop(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpNop(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	// No Operation
 	// Do Nothing
 }
 
-func opPtrEq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpPtrEq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_bool(prgrm, inputs[0].Get_ptr(prgrm) == inputs[1].Get_ptr(prgrm))
 }
 
-func opPtrUneq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpPtrUneq(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_bool(prgrm, inputs[0].Get_ptr(prgrm) != inputs[1].Get_ptr(prgrm))
 }

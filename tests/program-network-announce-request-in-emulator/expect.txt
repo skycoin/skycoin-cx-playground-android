@@ -1,5 +1,5 @@
 out node on
-out read have 8cc5be3a0d13eb8f from 10.0.2.2:701
+out read have f05574335ba50614 from 10.0.2.2:701
 out requested Downloaded: fib and primes from 10.0.2.2:701
 out signer 03e489240a78d8a85713f5b6d22749632d8268e238c40b9aca99f54c44de11828d verified
 out 2 files, 3 blocks, 818 bytes, every block verified

@@ -6,7 +6,6 @@
 package programblocks
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -17,13 +16,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/skycoin/skycoin-cx/t0-cxhash"
 	"github.com/skycoin/skycoin/src/cipher"
 )
 
 // Format constants, see "Manifest format" in docs/ProgramDistribution.md.
 const (
 	Magic            = "CXPM"
-	FormatVersion    = 2
+	FormatVersion    = 3
 	DefaultBlockSize = 512
 	MaxBlockSize     = 1 << 16
 	PublicKeyLength  = 33
@@ -33,18 +33,17 @@ const (
 	// MaxManifestLength bounds what a reader accepts, envelope and
 	// uncompressed data alike, about 10000 blocks.
 	MaxManifestLength = 1 << 20
-	// HashName names the hash of Sum. D23 may change it, see
-	// docs/ProgramDistribution.md.
-	HashName                   = "sha256"
+	// HashName names the hash of Sum, the hash of CX (D23).
+	HashName                   = cxhash.CxHashName
 	merkleInnerNodePrefix byte = 0x01
 )
 
 // Hash is a digest of Sum.
 type Hash [32]byte
 
-// Sum returns the hash of b that names blocks, files and manifests. It is
-// SHA-256 until decision D23 picks another 32-byte hash.
-func Sum(b []byte) Hash { return sha256.Sum256(b) }
+// Sum returns the hash of b that names blocks, files and manifests, the
+// hash of CX that cipher.HashOfBytes gives the loader, BLAKE3-256 (D23).
+func Sum(b []byte) Hash { return cxhash.CxHashOfBytes(b) }
 
 func (h Hash) String() string { return hex.EncodeToString(h[:]) }
 
@@ -120,7 +119,7 @@ var (
 	ErrUntrusted  = errors.New("manifest signer is not trusted")
 )
 
-// MerkleHash returns the Merkle hash of leaves: inner nodes are SHA-256 of
+// MerkleHash returns the Merkle hash of leaves: inner nodes are the Sum of
 // 0x01, left and right, and an odd last node moves up unchanged.
 func MerkleHash(leaves []Hash) Hash {
 	if len(leaves) == 0 {

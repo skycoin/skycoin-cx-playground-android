@@ -10,7 +10,7 @@ import (
 	util "github.com/skycoin/skycoin-cx/t0-util"
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
-	printer "github.com/skycoin/skycoin-cx/t5-cx-runtime-printer"
+	printer "github.com/skycoin/skycoin-cx/t4-cx-runtime-printer"
 )
 
 // ExecutorAuto runs a program on the vm when every function lowers to it and

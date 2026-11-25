@@ -106,7 +106,7 @@ func TestCompressedRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := m.Encode()
-	if !bytes.HasPrefix(b, []byte(programblocks.Magic+" 2 "+programblocks.CompressedMark+"\n")) {
+	if !bytes.HasPrefix(b, []byte(programblocks.Magic+" 3 "+programblocks.CompressedMark+"\n")) {
 		t.Fatalf("header line of %q", b[:16])
 	}
 	decoded, addr, err := programblocks.Decode(b, programblocks.Hash{})

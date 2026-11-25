@@ -4,6 +4,7 @@ import (
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
 	objmodel "github.com/skycoin/skycoin-cx/t1-cx-core-objmodel"
+	stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
 )
 
 // CXTypeSignature_TYPE enum contains CXTypeSignature types.
@@ -246,107 +247,88 @@ func (typeSignature *CXTypeSignature) GetType(prgrm *CXProgram) types.Code {
 	return atomicType
 }
 
-// VIOLATION STRHOT-279: P, builds the text of a printed value, #412.
-func (typeSignature *CXTypeSignature) GetTypeString(prgrm *CXProgram) string {
-	var typeString string
-
+// typeNameOf returns what names the type of typeSignature, the name Gid of a
+// struct when named is true and the type code otherwise.
+func (typeSignature *CXTypeSignature) typeNameOf(prgrm *CXProgram) (code types.Code, name stringpool.StringGid, named bool) {
 	switch typeSignature.Type {
-	case TYPE_ATOMIC:
-		typeString = types.Code(typeSignature.Meta).Name()
-	case TYPE_POINTER_ATOMIC:
-		typeString = types.Code(typeSignature.Meta).Name()
-	case TYPE_ARRAY_ATOMIC:
+	case TYPE_ATOMIC, TYPE_POINTER_ATOMIC:
+		return types.Code(typeSignature.Meta), stringpool.StringGidNil, false
+	case TYPE_ARRAY_ATOMIC, TYPE_POINTER_ARRAY_ATOMIC, TYPE_SLICE_ATOMIC, TYPE_POINTER_SLICE_ATOMIC:
 		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
-		// Now an arena getter, site S0292.
+		// Now an arena getter, sites S0292 S0293 S0294.
 		arrDetails := prgrm.GetCXTypeSignatureArrayFromArray(typeSignature.Meta)
-		typeString = types.Code(arrDetails.Meta).Name()
-	case TYPE_POINTER_ARRAY_ATOMIC:
-		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
-		// Now an arena getter, site S0293.
-		arrDetails := prgrm.GetCXTypeSignatureArrayFromArray(typeSignature.Meta)
-		typeString = types.Code(arrDetails.Meta).Name()
-	case TYPE_SLICE_ATOMIC, TYPE_POINTER_SLICE_ATOMIC:
-		// OBJMODEL: state.CXTypeSignature_ArrayMng.CXTypeSignature_ArrayGet(gid), phase 5 #317.
-		// Now an arena getter, site S0294.
-		arrDetails := prgrm.GetCXTypeSignatureArrayFromArray(typeSignature.Meta)
-		typeString = types.Code(arrDetails.Meta).Name()
-	case TYPE_STRUCT:
+		return types.Code(arrDetails.Meta), stringpool.StringGidNil, false
+	case TYPE_STRUCT, TYPE_POINTER_STRUCT:
 		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
-		// Now an arena getter, site S0295.
+		// Now an arena getter, sites S0295 S0297.
 		structDetails := prgrm.GetCXTypeSignatureStructFromArray(typeSignature.Meta)
 		fldsLen := len(structDetails.Fields)
-		if fldsLen > 0 {
-			fldIdx := structDetails.Fields[fldsLen-1]
-			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
-			// Now an arena getter, site S0296.
-			fld := prgrm.GetCXArgFromArray(fldIdx)
-			elt := fld.GetAssignmentElement(prgrm)
-
-			if elt.StructType != nil {
-				// then it's custom type
-				typeString = prgrm.CXProgramNameText(elt.StructType.Name)
-			} else {
-				// then it's native type
-				typeString = elt.Type.Name()
-
-				if elt.Type == types.POINTER {
-					typeString = elt.PointerTargetType.Name()
-				}
-			}
-		} else {
-			typeString = prgrm.CXProgramNameText(structDetails.StructType.Name)
+		if fldsLen == 0 {
+			return types.UNDEFINED, structDetails.StructType.Name, true
 		}
-
-	case TYPE_POINTER_STRUCT:
-		// OBJMODEL: state.CXTypeSignature_StructMng.CXTypeSignature_StructGet(gid), phase 5 #322.
-		// Now an arena getter, site S0297.
-		structDetails := prgrm.GetCXTypeSignatureStructFromArray(typeSignature.Meta)
-		fldsLen := len(structDetails.Fields)
-		if fldsLen > 0 {
-			fldIdx := structDetails.Fields[fldsLen-1]
-			// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
-			// Now an arena getter, site S0298.
-			fld := prgrm.GetCXArgFromArray(fldIdx)
-			elt := fld.GetAssignmentElement(prgrm)
-
-			if elt.StructType != nil {
-				// then it's custom type
-				typeString = prgrm.CXProgramNameText(elt.StructType.Name)
-			} else {
-				// then it's native type
-				typeString = elt.Type.Name()
-
-				if elt.Type == types.POINTER {
-					typeString = elt.PointerTargetType.Name()
-				}
-			}
-		} else {
-			typeString = prgrm.CXProgramNameText(structDetails.StructType.Name)
-		}
-	default:
-		panic("type is not known")
-
+		// OBJMODEL: state.CXArgumentMng.CXArgumentGet(gid), phase 5 #327.
+		// Now an arena getter, sites S0296 S0298.
+		elt := prgrm.GetCXArgFromArray(structDetails.Fields[fldsLen-1]).GetAssignmentElement(prgrm)
+		return argumentTypeNameOf(elt)
 	}
-
-	return typeString
+	panic("type is not known")
 }
 
-// GetValueTypeName returns the type name printf gives an extra value, the
-// struct name for a struct and the element type name otherwise.
-// VIOLATION STRHOT-280: P, builds the text of a printed value, #412.
+// argumentTypeNameOf returns what names the type of elt, its struct or, for a
+// pointer, the type it points to.
+func argumentTypeNameOf(elt *CXArgument) (code types.Code, name stringpool.StringGid, named bool) {
+	if elt.StructType != nil {
+		return types.UNDEFINED, elt.StructType.Name, true
+	}
+	if elt.Type == types.POINTER {
+		return elt.PointerTargetType, stringpool.StringGidNil, false
+	}
+	return elt.Type, stringpool.StringGidNil, false
+}
+
+// GetTypeString returns the type name of typeSignature, for the compiler.
+func (typeSignature *CXTypeSignature) GetTypeString(prgrm *CXProgram) string {
+	code, name, named := typeSignature.typeNameOf(prgrm)
+	if named {
+		return prgrm.CXProgramNameText(name)
+	}
+	return code.Name()
+}
+
+// AppendValueTypeName appends the type name printf gives an extra value to
+// dst, the struct name for a struct and the element type name otherwise,
+// viewed from the string pool or the type table (#412).
+func (typeSignature *CXTypeSignature) AppendValueTypeName(dst []byte, prgrm *CXProgram) []byte {
+	code, name, named := typeSignature.valueTypeNameOf(prgrm)
+	if named {
+		return append(dst, prgrm.CXProgramNameBytes(name)...)
+	}
+	return append(dst, code.NameBytes()...)
+}
+
+// GetValueTypeName returns the name AppendValueTypeName appends, for the
+// compiler.
 func (typeSignature *CXTypeSignature) GetValueTypeName(prgrm *CXProgram) string {
+	code, name, named := typeSignature.valueTypeNameOf(prgrm)
+	if named {
+		return prgrm.CXProgramNameText(name)
+	}
+	return code.Name()
+}
+
+func (typeSignature *CXTypeSignature) valueTypeNameOf(prgrm *CXProgram) (code types.Code, name stringpool.StringGid, named bool) {
 	switch typeSignature.Type {
 	case TYPE_CXARGUMENT_DEPRECATE:
 		element := prgrm.GetCXArgFromArray(CXArgumentIndex(typeSignature.Meta)).GetAssignmentElement(prgrm)
 		if element.StructType != nil {
-			return prgrm.CXProgramNameText(element.StructType.Name)
+			return types.UNDEFINED, element.StructType.Name, true
 		}
-		return element.Type.Name()
+		return element.Type, stringpool.StringGidNil, false
 	case TYPE_ATOMIC, TYPE_POINTER_ATOMIC, TYPE_ARRAY_ATOMIC, TYPE_POINTER_ARRAY_ATOMIC,
 		TYPE_SLICE_ATOMIC, TYPE_POINTER_SLICE_ATOMIC, TYPE_STRUCT, TYPE_POINTER_STRUCT:
-		return typeSignature.GetTypeString(prgrm)
+		return typeSignature.typeNameOf(prgrm)
 	}
-	return types.UNDEFINED.Name()
+	return types.UNDEFINED, stringpool.StringGidNil, false
 }
 
 func (typeSignature *CXTypeSignature) GetCXArgFormat(prgrm *CXProgram) *CXArgument {

@@ -5,11 +5,13 @@ import (
 	"github.com/skycoin/skycoin-cx/t1-constants"
 	"github.com/skycoin/skycoin-cx/t1-netbatch"
 	"github.com/skycoin/skycoin-cx/t3-ast"
-	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only In, Out, RegisterLibraryFunction, RegisterLibraryFunctionVm; registration API, keep
+	"github.com/skycoin/skycoin-cx/t4-opcodes" // thin: only LibraryLink; registration API, keep
 )
 
-// RegisterPackage adds the net package to prgrm and registers the net
-// library, the functions of sys/net, see docs/Networking.md.
+// RegisterPackage adds the net package to prgrm and links the net
+// library, the functions of sys/net, see docs/Networking.md. Every function
+// has a vm form, which reads a str input from the data segment and takes a
+// buffer as the address and size the lowering passes.
 func RegisterPackage(prgrm *ast.CXProgram) {
 	netbatch.NetPrepare()
 	ast.LibraryRunStarts[constants.LibraryNumberNet] = LibraryNetRunStart
@@ -21,43 +23,7 @@ func RegisterPackage(prgrm *ast.CXProgram) {
 	// Now an arena insert, site S1428.
 	prgrm.AddPackage(netPkg)
 
-	library := constants.LibraryNumberNet
-	i32, i64, str, boolean := ast.ConstCxArg_I32, ast.ConstCxArg_I64, ast.ConstCxArg_STR, ast.ConstCxArg_BOOL
-	// A byte buffer is a ui8 array of any length, read or filled in place.
-	buffer := ast.ConstCxArg_UND_TYPE
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.Update", opNetUpdate, opcodes.In(i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.ReadyCount", opNetReadyCount, nil, opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.ReadyNext", opNetReadyNext, nil, opcodes.Out(i32, i32, i32, i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.Clock", opNetClock, nil, opcodes.Out(i64))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.Read", opNetRead, opcodes.In(i32, i32, buffer, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.Write", opNetWrite, opcodes.In(i32, buffer, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.Close", opNetClose, opcodes.In(i32), opcodes.Out(boolean))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.TimeoutSet", opNetTimeoutSet, opcodes.In(i32, i32), opcodes.Out(boolean))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.TCPListen", opNetTCPListen, opcodes.In(str, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.TCPDial", opNetTCPDial, opcodes.In(str, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.UDPListen", opNetUDPListen, opcodes.In(str, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.UDPDial", opNetUDPDial, opcodes.In(str, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.UDPReadFrom", opNetUDPReadFrom, opcodes.In(i32, i32, buffer, i32), opcodes.Out(i32, i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.UDPWriteTo", opNetUDPWriteTo, opcodes.In(i32, i32, buffer, i32), opcodes.Out(i32))
-	opcodes.RegisterLibraryFunction(prgrm, library, "net.UDPPeerResolve", opNetUDPPeerResolve, opcodes.In(str, i32), opcodes.Out(i32))
-
-	// Every function has a vm form. A str input is read from the data
-	// segment and a buffer is the address and size the lowering passes.
-	opcodes.RegisterLibraryFunctionVm(library, "net.Update", libraryNetUpdateVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.ReadyCount", libraryNetReadyCountVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.ReadyNext", libraryNetReadyNextVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.Clock", libraryNetClockVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.Read", libraryNetReadVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.Write", libraryNetWriteVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.Close", libraryNetCloseVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.TimeoutSet", libraryNetTimeoutSetVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.TCPListen", libraryNetTCPListenVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.TCPDial", libraryNetTCPDialVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.UDPListen", libraryNetUDPListenVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.UDPDial", libraryNetUDPDialVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.UDPReadFrom", libraryNetUDPReadFromVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.UDPWriteTo", libraryNetUDPWriteToVm)
-	opcodes.RegisterLibraryFunctionVm(library, "net.UDPPeerResolve", libraryNetUDPPeerResolveVm)
+	opcodes.LibraryLink(constants.LibraryNumberNet, LibraryNetDispatch, LibraryNetDispatchVm)
 }
 
 // The constant codes of the net.Trigger* and net.Error* constants.

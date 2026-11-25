@@ -27,33 +27,33 @@ func loadTrueType(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXVa
 	outputs[0].Set_i32(prgrm, handle)
 }
 
-func opGltextLoadTrueType(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextLoadTrueType(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	loadTrueType(prgrm, inputs, outputs, true)
 }
 
-func opGltextLoadTrueTypeCore(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextLoadTrueTypeCore(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	loadTrueType(prgrm, inputs, outputs, false)
 }
 
 // VIOLATION STRHOT-185: B, hands the text to gltext as a view of program memory, #432.
-func opGltextPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	if err := cxfxFontGet(inputs[0].Get_i32(prgrm)).Printf(inputs[1].Get_f32(prgrm), inputs[2].Get_f32(prgrm), "%s", util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[3]))); err != nil {
 		panic(err)
 	}
 }
 
 // VIOLATION STRHOT-186: B, hands the text to gltext as a view of program memory, #432.
-func opGltextMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	width, height := cxfxFontGet(inputs[0].Get_i32(prgrm)).Metrics(util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[1])))
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
 }
 
-func opGltextTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextTexture(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, int32(cxfxFontGet(inputs[0].Get_i32(prgrm)).Texture()))
 }
 
-func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	font := cxfxFontGet(inputs[0].Get_i32(prgrm))
 	text := ast.ProgramStringBytesRead(prgrm, &inputs[1])
 	index := int(inputs[2].Get_i32(prgrm))
@@ -74,19 +74,19 @@ func opGltextNextGlyph(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast
 	outputs[6].Set_i32(prgrm, int32(advance))
 }
 
-func opGltextGlyphBounds(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextGlyphBounds(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	maxGlyphWidth, maxGlyphHeight := cxfxFontGet(inputs[0].Get_i32(prgrm)).GlyphBounds()
 	outputs[0].Set_i32(prgrm, int32(maxGlyphWidth))
 	outputs[1].Set_i32(prgrm, int32(maxGlyphHeight))
 }
 
-func opGltextGlyphMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextGlyphMetrics(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	width, height := cxfxFontGet(inputs[0].Get_i32(prgrm)).GlyphMetrics(uint32(inputs[1].Get_i32(prgrm)))
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
 }
 
-func opGltextGlyphInfo(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGltextGlyphInfo(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	g := cxfxFontGet(inputs[0].Get_i32(prgrm)).Glyphs()[inputs[1].Get_i32(prgrm)]
 	outputs[0].Set_i32(prgrm, int32(g.X))
 	outputs[1].Set_i32(prgrm, int32(g.Y))

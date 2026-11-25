@@ -912,9 +912,9 @@ const (
 	OP_COPY   = 213
 )
 
-var (
-	// VIOLATION: state outside State. Owner: t1-constants; moves to CXNativeFunctionMng in phase 1.
-	START_PARSE_OPS int
-	// VIOLATION: state outside State. Owner: t1-constants; moves to CXNativeFunctionMng in phase 1.
-	END_PARSE_OPS int
+// The conversion opcodes, i8.str to f64.f32, lie strictly between these.
+// nolint golint
+const (
+	START_PARSE_OPS = 220
+	END_PARSE_OPS   = 321
 )

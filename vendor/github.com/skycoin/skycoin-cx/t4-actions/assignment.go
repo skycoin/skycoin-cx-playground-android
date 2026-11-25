@@ -170,7 +170,7 @@ func StructLiteralAssignment(prgrm *ast.CXProgram, toExprs []ast.CXExpression, f
 		assignExprCXLine := ast.MakeCXLineExpression(prgrm, lastFromCXLine.FileName, lastFromCXLine.LineNumber, lastFromCXLine.LineStr)
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0529.
-		assignExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_IDENTITY])
+		assignExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		assignExpressionIdx := assignExpr.Index
 
 		prgrm.CXAtomicOps[assignExpressionIdx].Package = lastFromExpression.Package
@@ -609,7 +609,7 @@ func processAssignment(prgrm *ast.CXProgram, toExprs []ast.CXExpression, fromExp
 	if fromExpressionOperator == nil {
 		// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 		// Now an arena insert, site S0580.
-		opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_IDENTITY])
+		opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		prgrm.CXAtomicOps[fromExpressionIdx].Operator = opIdx
 
 		// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
@@ -934,52 +934,52 @@ func Assignment(prgrm *ast.CXProgram, toExprs []ast.CXExpression, assignOp strin
 	case ">>=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0594.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BITSHR])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BITSHR))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "<<=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0595.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BITSHL])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BITSHL))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "+=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0596.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_ADD])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_ADD))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "-=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0597.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_SUB])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_SUB))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "*=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0598.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_MUL])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_MUL))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "/=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0599.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_DIV])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_DIV))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "%=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0600.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_MOD])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_MOD))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "&=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0601.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BITAND])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BITAND))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "^=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0602.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BITXOR])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BITXOR))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	case "|=":
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0603.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BITOR])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BITOR))
 		return ShortAssignment(prgrm, expr, exprCXLine, toExprs, fromExprs, pkg)
 	}
 

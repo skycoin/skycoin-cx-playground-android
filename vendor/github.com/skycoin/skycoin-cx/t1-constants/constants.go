@@ -7,7 +7,6 @@ import (
 // var COREPATH = ""
 
 const STACK_OVERFLOW_ERROR = "stack overflow"
-const HEAP_EXHAUSTED_ERROR = "heap exhausted"
 const MAIN_FUNC = "main"
 const SYS_INIT_FUNC = "*init"
 const MAIN_PKG = "main"

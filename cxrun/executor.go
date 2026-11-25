@@ -14,7 +14,7 @@ import (
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
 	lower "github.com/skycoin/skycoin-cx/t4-cx-compiler-lower"
 	execute "github.com/skycoin/skycoin-cx/t4-execute"
-	printer "github.com/skycoin/skycoin-cx/t5-cx-runtime-printer"
+	printer "github.com/skycoin/skycoin-cx/t4-cx-runtime-printer"
 )
 
 // Executor names the loop a program runs on, as the cx --executor flag does.

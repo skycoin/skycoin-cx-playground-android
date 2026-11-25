@@ -106,8 +106,8 @@ func wipeDeclarationMemory(prgrm *CXProgram, cxAtomicOp *CXAtomicOperator) error
 func processBuiltInOperators(prgrm *CXProgram, expr *CXExpression, cxAtomicOp *CXAtomicOperator, cxAtomicOpOperator *CXFunction, globalInputs *[]CXValue, globalOutputs *[]CXValue, fp types.Pointer) error {
 	inputs := cxAtomicOp.GetInputs(prgrm)
 	inputCount := len(inputs)
-	// VIOLATION VMALLOC-002: grows the operand buffers in a Callback loop only,
-	// RunBuffersPrepare sizes those of the run, #407.
+	// VIOLATION VMALLOC-002: grows the operand buffers only when RunBuffersPrepare
+	// has not sized them, #407.
 	if inputCount > len(*globalInputs) {
 		*globalInputs = make([]CXValue, inputCount)
 	}
@@ -182,8 +182,8 @@ func processBuiltInOperators(prgrm *CXProgram, expr *CXExpression, cxAtomicOp *C
 
 	if cxAtomicOpOperator.AtomicOPCode == constants.OP_LIBRARY_CALL {
 		libraryCall(prgrm, cxAtomicOpOperator, inputValues, outputValues)
-	} else {
-		OpcodeHandlers[cxAtomicOpOperator.AtomicOPCode](prgrm, inputValues, outputValues)
+	} else if !OpcodeDispatch(prgrm, cxAtomicOpOperator.AtomicOPCode, inputValues, outputValues) {
+		panic(RuntimeOpcodeUnlinked(cxAtomicOpOperator.AtomicOPCode))
 	}
 
 	// Expr points into fn.Expressions and is valid for this step only.

@@ -64,6 +64,12 @@ type CXProgram struct {
 	// opcodes format into, kept between them so they do not allocate (#412).
 	ProgramFormatBuffer []byte
 
+	// ProgramCallbackValues hold the operands of the nested loops Callback
+	// runs, one set per depth of nesting, and ProgramCallbackDepth counts the
+	// loops running. RunBuffersPrepare sizes the first set (#407).
+	ProgramCallbackValues []CXCallbackValues
+	ProgramCallbackDepth  int
+
 	// ProgramStdin is the one reader read() takes lines from for the whole run,
 	// set by ProgramStdinInit, see skycoin/cx#110. Nil reads as end of input.
 	ProgramStdin *bufio.Reader

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/skycoin/skycoin-cx/t1-constants"
 	stringpool "github.com/skycoin/skycoin-cx/t2-cx-core-stringpool"
 )
 
@@ -18,12 +19,16 @@ type NativeNameIndex struct {
 	// NativeNameIndexGeneration changes whenever an entry is added or the
 	// index is reset, which invalidates the lookups programs cached.
 	NativeNameIndexGeneration uint32
+	// NativeNameIndexLinkedOnly hides the entries NativeLinked does not report.
+	NativeNameIndexLinkedOnly bool
 }
 
 // NativeNameEntry is one registered built-in name and its code.
 type NativeNameEntry struct {
 	NativeNameEntryText string
 	NativeNameEntryCode int
+	// NativeNameEntryBytes is the text as bytes, for printing without a string.
+	NativeNameEntryBytes []byte
 }
 
 // NativeNameKey is the name a program looks a built-in up by, the Gids of its
@@ -44,10 +49,29 @@ type NativeNameFound struct {
 	NativeNameFoundGeneration uint32
 }
 
-// NativeNames holds the opcodes and library functions the registration
-// functions of t4-opcodes add, replacing the OpNames and OpCodes maps.
-// VIOLATION: state outside State. Owner: t3-ast; moves to CXNativeFunctionMng in phase 1.
-var NativeNames NativeNameIndex
+// NativeNames holds the names of constants.NativeNameTable, the opcodes and
+// the library functions. A lookup finds only those NativeLinked reports.
+// VIOLATION: init chaining. Init 2: built from the table at package init.
+var NativeNames = nativeNamesMake()
+
+func nativeNamesMake() NativeNameIndex {
+	entries := make([]NativeNameEntry, len(constants.NativeNameTable))
+	for i, name := range constants.NativeNameTable {
+		text := name.NativeNameText
+		entries[i] = NativeNameEntry{NativeNameEntryText: text, NativeNameEntryCode: name.NativeNameCode, NativeNameEntryBytes: []byte(text)[:len(text):len(text)]}
+	}
+	return NativeNameIndex{NativeNameIndexEntries: entries, NativeNameIndexSorted: true, NativeNameIndexLinkedOnly: true}
+}
+
+// NativeLinked reports whether this binary links the built-in code, an opcode,
+// a library function key or an opcode of NativeFunctionHost.
+func NativeLinked(code int) bool {
+	if code >= 0 {
+		return constants.OpcodeLinked(code) || NativeFunctionHost != nil && NativeFunctionHost(nil, code) != nil
+	}
+	library, function := constants.LibraryFunctionKeyParts(code)
+	return LibraryFunctionLinked(library, function)
+}
 
 // NativeNameIndexAdd registers text as the name of code. Registering a name
 // again replaces its code.
@@ -62,8 +86,14 @@ func (index *NativeNameIndex) NativeNameIndexAdd(code int, text string) {
 			return
 		}
 	}
-	index.NativeNameIndexEntries = append(index.NativeNameIndexEntries, NativeNameEntry{NativeNameEntryText: text, NativeNameEntryCode: code})
+	index.NativeNameIndexEntries = append(index.NativeNameIndexEntries, NativeNameEntry{NativeNameEntryText: text, NativeNameEntryCode: code, NativeNameEntryBytes: []byte(text)[:len(text):len(text)]})
 	index.NativeNameIndexSorted = false
+	index.NativeNameIndexGeneration++
+}
+
+// NativeNameIndexChanged invalidates the lookups programs cached, for when
+// what NativeLinked reports changes.
+func (index *NativeNameIndex) NativeNameIndexChanged() {
 	index.NativeNameIndexGeneration++
 }
 
@@ -113,7 +143,7 @@ func (index *NativeNameIndex) nativeNameIndexSort() {
 func (index *NativeNameIndex) NativeNameIndexText(text string) (NativeNameEntry, bool) {
 	index.nativeNameIndexSort()
 	position, found := slices.BinarySearchFunc(index.NativeNameIndexEntries, text, nativeNameEntryCompareText)
-	if !found {
+	if !found || (index.NativeNameIndexLinkedOnly && !NativeLinked(index.NativeNameIndexEntries[position].NativeNameEntryCode)) {
 		return NativeNameEntry{}, false
 	}
 	return index.NativeNameIndexEntries[position], true
@@ -130,6 +160,19 @@ func (index *NativeNameIndex) NativeNameIndexCodeText(code int) string {
 	return ""
 }
 
+// NativeNameIndexCodeBytes returns the bytes of NativeNameIndexCodeText
+// without building a string, nil when no name is. The caller must not write
+// to them.
+func (index *NativeNameIndex) NativeNameIndexCodeBytes(code int) []byte {
+	for i := range index.NativeNameIndexEntries {
+		entry := &index.NativeNameIndexEntries[i]
+		if entry.NativeNameEntryCode == code {
+			return entry.NativeNameEntryBytes
+		}
+	}
+	return nil
+}
+
 // NativeNameIndexPackage returns the entries whose name is "pkg." followed by
 // a member name, in name order.
 func (index *NativeNameIndex) NativeNameIndexPackage(pkg string) []NativeNameEntry {
@@ -142,7 +185,7 @@ func (index *NativeNameIndex) NativeNameIndexPackage(pkg string) []NativeNameEnt
 	}
 	// Within the range, a name such as "pkg" or "pkgx.y" is no member.
 	return slices.DeleteFunc(slices.Clone(entries[first:end]), func(entry NativeNameEntry) bool {
-		return len(entry.NativeNameEntryText) == len(pkg) || entry.NativeNameEntryText[len(pkg)] != '.'
+		return (index.NativeNameIndexLinkedOnly && !NativeLinked(entry.NativeNameEntryCode)) || len(entry.NativeNameEntryText) == len(pkg) || entry.NativeNameEntryText[len(pkg)] != '.'
 	})
 }
 
@@ -225,6 +268,9 @@ func (prgrm *CXProgram) CXProgramNativeFind(index *NativeNameIndex, pkg stringpo
 	}
 	parts := [3][]byte{prgrm.CXProgramNameBytes(pkg), prgrm.CXProgramNameBytes(receiver), prgrm.CXProgramNameBytes(name)}
 	entry, found := index.nativeNameIndexFind(&parts)
+	if found && index.NativeNameIndexLinkedOnly && !NativeLinked(entry.NativeNameEntryCode) {
+		entry, found = NativeNameEntry{}, false
+	}
 	if state.CxIrStateNativeNames == nil {
 		state.CxIrStateNativeNames = make(map[NativeNameKey]NativeNameFound)
 	}

@@ -11,7 +11,7 @@ import (
 // A window is an i32 handle into CxfxState.CxfxWindowTable, returned by
 // glfw.CreateWindow, see #432.
 
-func opGlfwFullscreen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwFullscreen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	window := cxfxWindowGet(inputs[0].Get_i32(prgrm))
 	monitor := glfw.GetPrimaryMonitor()
 	mode := monitor.GetVideoMode()
@@ -23,39 +23,39 @@ func opGlfwFullscreen(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.
 	window.MakeContextCurrent()
 }
 
-func opGlfwInit(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwInit(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	glfw.Init()
 	cxfxState.CxfxGlfwInitialized = true
 }
 
-func opGlfwSwapBuffers(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSwapBuffers(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SwapBuffers()
 }
 
-func opGlfwMakeContextCurrent(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwMakeContextCurrent(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).MakeContextCurrent()
 }
 
-func opGlfwWindowHint(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwWindowHint(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	glfw.WindowHint(glfw.Hint(inputs[0].Get_i32(prgrm)), int(inputs[1].Get_i32(prgrm)))
 }
 
-func opGlfwSetInputMode(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetInputMode(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SetInputMode(glfw.InputMode(inputs[1].Get_i32(prgrm)), int(inputs[2].Get_i32(prgrm)))
 }
 
-func opGlfwGetCursorPos(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetCursorPos(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	x, y := cxfxWindowGet(inputs[0].Get_i32(prgrm)).GetCursorPos()
 	outputs[0].Set_f64(prgrm, x)
 	outputs[1].Set_f64(prgrm, y)
 }
 
-func opGlfwGetKey(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetKey(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_i32(prgrm, int32(cxfxWindowGet(inputs[0].Get_i32(prgrm)).GetKey(glfw.Key(inputs[1].Get_i32(prgrm)))))
 }
 
 // VIOLATION STRHOT-170: B, hands the window title to GLFW, #432.
-func opGlfwCreateWindow(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwCreateWindow(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	window, err := glfw.CreateWindow(int(inputs[0].Get_i32(prgrm)), int(inputs[1].Get_i32(prgrm)),
 		util.ProgramTextStringView(ast.ProgramStringBytesRead(prgrm, &inputs[2])), nil, nil)
 	if err != nil {
@@ -64,56 +64,56 @@ func opGlfwCreateWindow(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []as
 	outputs[0].Set_i32(prgrm, cxfxWindowAdd(window))
 }
 
-func opGlfwGetWindowContentScale(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetWindowContentScale(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	xscale, yscale := cxfxWindowGet(inputs[0].Get_i32(prgrm)).GetContentScale()
 	outputs[0].Set_f32(prgrm, xscale)
 	outputs[1].Set_f32(prgrm, yscale)
 }
 
-func opGlfwGetMonitorContentScale(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetMonitorContentScale(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	xscale, yscale := glfw.GetPrimaryMonitor().GetContentScale()
 	outputs[0].Set_f32(prgrm, xscale)
 	outputs[1].Set_f32(prgrm, yscale)
 }
 
-func opGlfwSetWindowPos(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetWindowPos(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SetPos(int(inputs[1].Get_i32(prgrm)), int(inputs[2].Get_i32(prgrm)))
 }
 
-func opGlfwShouldClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwShouldClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_bool(prgrm, cxfxWindowGet(inputs[0].Get_i32(prgrm)).ShouldClose())
 }
 
-func opGlfwGetFramebufferSize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetFramebufferSize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	width, height := cxfxWindowGet(inputs[0].Get_i32(prgrm)).GetFramebufferSize()
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
 }
 
-func opGlfwGetWindowPos(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetWindowPos(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	x, y := cxfxWindowGet(inputs[0].Get_i32(prgrm)).GetPos()
 	outputs[0].Set_i32(prgrm, int32(x))
 	outputs[1].Set_i32(prgrm, int32(y))
 }
 
-func opGlfwGetWindowSize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetWindowSize(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	width, height := cxfxWindowGet(inputs[0].Get_i32(prgrm)).GetSize()
 	outputs[0].Set_i32(prgrm, int32(width))
 	outputs[1].Set_i32(prgrm, int32(height))
 }
 
-func opGlfwSwapInterval(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSwapInterval(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	glfw.SwapInterval(int(inputs[0].Get_i32(prgrm)))
 }
 
-func opGlfwPollEvents(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwPollEvents(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	if cxfxState.CxfxGlfwInitialized {
 		glfw.PollEvents()
 	}
 	PollEvents(prgrm)
 }
 
-func opGlfwGetTime(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwGetTime(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_f64(prgrm, glfw.GetTime())
 }
 
@@ -136,65 +136,65 @@ func glfwSetMouseButtonCallback(window *glfw.Window, eventType EventType) {
 	})
 }
 
-func opGlfwSetKeyCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // TODO : to deprecate
+func OpGlfwSetKeyCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // TODO : to deprecate
 	glfwSetKeyCallback(cxfxWindowGet(inputs[0].Get_i32(prgrm)))
 	cxfxAppCallbackSet(prgrm, APP_KEYBOARD, inputs)
 }
 
-func opGlfwSetCursorPosCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // TODO : to deprecate
+func OpGlfwSetCursorPosCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // TODO : to deprecate
 	glfwSetCursorPosCallback(cxfxWindowGet(inputs[0].Get_i32(prgrm)), APP_CURSOR_POS)
 	cxfxAppCallbackSet(prgrm, APP_CURSOR_POS, inputs)
 }
 
-func opGlfwSetMouseButtonCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // TODO : to deprecate
+func OpGlfwSetMouseButtonCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) { // TODO : to deprecate
 	glfwSetMouseButtonCallback(cxfxWindowGet(inputs[0].Get_i32(prgrm)), APP_MOUSE_BUTTON)
 	cxfxAppCallbackSet(prgrm, APP_MOUSE_BUTTON, inputs)
 }
 
-func opGlfwSetKeyboardCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetKeyboardCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	glfwSetKeyCallback(cxfxWindowGet(inputs[0].Get_i32(prgrm)))
 	cxfxAppCallbackSet(prgrm, APP_KEYBOARD, inputs)
 }
 
-func opGlfwSetMouseCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetMouseCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	window := cxfxWindowGet(inputs[0].Get_i32(prgrm))
 	glfwSetCursorPosCallback(window, APP_MOUSE)
 	glfwSetMouseButtonCallback(window, APP_MOUSE)
 	cxfxAppCallbackSet(prgrm, APP_MOUSE, inputs)
 }
 
-func opGlfwSetFramebufferSizeCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetFramebufferSizeCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SetFramebufferSizeCallback(func(w *glfw.Window, width int, height int) {
 		PushFramebufferSizeEvent(float64(width), float64(height)) // TODO : to deprecate, use float64
 	})
 	cxfxAppCallbackSet(prgrm, APP_FRAMEBUFFER_SIZE, inputs)
 }
 
-func opGlfwSetWindowSizeCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetWindowSizeCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SetSizeCallback(func(w *glfw.Window, width int, height int) {
 		PushWindowSizeEvent(float64(width), float64(height)) // TODO : to deprecate, use float64
 	})
 	cxfxAppCallbackSet(prgrm, APP_WINDOW_SIZE, inputs)
 }
 
-func opGlfwSetWindowPosCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetWindowPosCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SetPosCallback(func(w *glfw.Window, x int, y int) {
 		PushWindowPositionEvent(float64(x), float64(y)) // TODO to deprecate, use float64
 	})
 	cxfxAppCallbackSet(prgrm, APP_WINDOW_POSITION, inputs)
 }
 
-func opGlfwSetStartCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetStartCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm))
 	cxfxAppCallbackSet(prgrm, APP_START, inputs)
 	PushEvent(APP_START)
 }
 
-func opGlfwSetStopCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetStopCallback(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm))
 	cxfxAppCallbackSet(prgrm, APP_STOP, inputs)
 }
 
-func opGlfwSetShouldClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpGlfwSetShouldClose(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	cxfxWindowGet(inputs[0].Get_i32(prgrm)).SetShouldClose(inputs[1].Get_bool(prgrm))
 }

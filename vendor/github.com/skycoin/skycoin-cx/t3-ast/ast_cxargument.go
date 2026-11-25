@@ -424,15 +424,14 @@ func argumentDebugAlloc(prgrm *CXProgram, fileName SourceFileGid, fileLine int) 
 }
 
 // CXArgumentDebugFileLine returns the file name and line that gid names in
-// prgrm, the name as text for diagnostics. A native parameter has none and
-// gets "" and -1, as Param gave it.
-// VIOLATION STRHOT-229: P, builds the text of a printed value, #412.
-func CXArgumentDebugFileLine(prgrm *CXProgram, gid CXArgumentDebugGid) (string, int) {
+// prgrm, the name viewed from the string pool. A native parameter has none
+// and gets an empty name and -1, as Param gave it.
+func CXArgumentDebugFileLine(prgrm *CXProgram, gid CXArgumentDebugGid) ([]byte, int) {
 	if gid == CXArgumentDebugGidNil {
-		return "", -1
+		return nil, -1
 	}
 	details := prgrm.CxIrState.CXArgumentDebugMng.CXArgumentDebugGet(gid)
-	return prgrm.CXProgramSourceFileText(details.FileName), details.FileLine
+	return prgrm.CXProgramSourceFileBytes(details.FileName), details.FileLine
 }
 
 // cxArgumentPointerField reports whether the field access arg is a pointer,

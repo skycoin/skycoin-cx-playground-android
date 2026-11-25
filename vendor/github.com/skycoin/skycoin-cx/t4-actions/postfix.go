@@ -358,7 +358,7 @@ func PostfixExpressionNative(prgrm *ast.CXProgram, typeCode types.Code, opStrCod
 	// Now a constructor call, site S1145.
 	var expr *ast.CXExpression
 	if ok {
-		expr = ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[native.NativeNameEntryCode])
+		expr = ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, native.NativeNameEntryCode))
 	} else {
 		// The call of a missing native is typed by a stand in, see invalidFunctionIndex.
 		expr = ast.MakeAtomicOperatorExpression(prgrm, nil)
@@ -440,7 +440,7 @@ func PostfixExpressionEmptyFunCall(prgrm *ast.CXProgram, prevExprs []ast.CXExpre
 			prgrm.CXAtomicOps[firstPrevExpressionIdx].Outputs = nil
 			// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 			// Now an arena insert, site S1154.
-			opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[native.NativeNameEntryCode])
+			opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, native.NativeNameEntryCode))
 			prgrm.CXAtomicOps[firstPrevExpressionIdx].Operator = opIdx
 		}
 
@@ -508,7 +508,7 @@ func PostfixExpressionFunCall(prgrm *ast.CXProgram, prevExprs []ast.CXExpression
 			prgrm.CXAtomicOps[firstPrevExpressionIdx].Outputs = nil
 			// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 			// Now an arena insert, site S1159.
-			opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[native.NativeNameEntryCode])
+			opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, native.NativeNameEntryCode))
 			prgrm.CXAtomicOps[firstPrevExpressionIdx].Operator = opIdx
 		}
 
@@ -539,11 +539,11 @@ func PostfixExpressionIncDec(prgrm *ast.CXProgram, prevExprs []ast.CXExpression,
 	if isInc {
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S1161.
-		expr = ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_ADD])
+		expr = ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_ADD))
 	} else {
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S1162.
-		expr = ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_SUB])
+		expr = ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_SUB))
 	}
 
 	lastPrevExpression, err := prgrm.GetCXAtomicOpFromExpressions(prevExprs, len(prevExprs)-1)

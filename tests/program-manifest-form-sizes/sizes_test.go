@@ -96,3 +96,47 @@ func BenchmarkSignatureVerify(b *testing.B) {
 		programblocks.ParseHeader(envelope)
 	}
 }
+
+// BenchmarkSumBlock hashes one 512-byte block, the unit of a manifest.
+func BenchmarkSumBlock(b *testing.B) {
+	block := make([]byte, programblocks.DefaultBlockSize)
+	b.SetBytes(int64(len(block)))
+	for b.Loop() {
+		programblocks.Sum(block)
+	}
+}
+
+// BenchmarkManifestBuild hashes every block and file of the 64 KB program
+// and the Merkle hashes over them.
+func BenchmarkManifestBuild(b *testing.B) {
+	files := program64KB()
+	for b.Loop() {
+		if _, _, err := programblocks.Build(files, programblocks.DefaultBlockSize, time.Unix(1795478400, 0)); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkManifestVerifyFiles checks every block and file of the 64 KB
+// program against its decoded manifest, as a client does after the fetch.
+func BenchmarkManifestVerifyFiles(b *testing.B) {
+	files := program64KB()
+	m, pack, err := programblocks.Build(files, programblocks.DefaultBlockSize, time.Unix(1795478400, 0))
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.SetBytes(int64(len(pack)))
+	for b.Loop() {
+		for _, block := range m.Blocks {
+			p := m.Packing[block.BlockID-1]
+			if programblocks.Sum(pack[p.PackOffset:p.PackOffset+uint64(p.BlockLength)]) != block.BlockHash {
+				b.Fatal("block hash")
+			}
+		}
+		for _, f := range m.Files {
+			if programblocks.Sum(pack[f.PackOffset:f.PackOffset+f.FileLength]) != f.FileHash {
+				b.Fatal("file hash")
+			}
+		}
+	}
+}

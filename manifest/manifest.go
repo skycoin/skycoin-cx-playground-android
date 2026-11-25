@@ -1,12 +1,11 @@
 // Package manifest describes a CX app: its metadata file, MetaFile, in the
 // text form, and its files, each split into fixed size chunks addressed by
-// their SHA-256, so every byte can be checked on arrival. The bundle and
+// their BLAKE3-256 hash, so every byte can be checked on arrival. The bundle and
 // the network identify an app by its programblocks manifest address.
 package manifest
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +14,8 @@ import (
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/skycoin/skycoin-cx/t0-cxhash"
 )
 
 // Version is the manifest format version written by Build.
@@ -28,12 +29,12 @@ const DefaultChunkSize = 64 << 10
 // read by Build and is not itself listed in the manifest.
 const MetaFile = "cxapp.txt"
 
-// Hash is a hex encoded SHA-256 digest.
+// Hash is a hex encoded digest of the hash of CX, BLAKE3-256 (D23).
 type Hash string
 
 // Sum returns the hash of b.
 func Sum(b []byte) Hash {
-	s := sha256.Sum256(b)
+	s := cxhash.CxHashOfBytes(b)
 	return Hash(hex.EncodeToString(s[:]))
 }
 

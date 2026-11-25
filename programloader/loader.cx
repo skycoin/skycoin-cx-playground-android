@@ -42,8 +42,8 @@ func fail(message str) {
 	os.Exit(1)
 }
 
-// contentHash is the hash that names blocks, files and manifests, the one
-// function decision D23 changes.
+// contentHash is the hash that names blocks, files and manifests, the hash
+// of CX, BLAKE3-256 (D23), the same as programblocks.Sum.
 func contentHash(data []ui8) (digest []ui8) {
 	digest = cipher.HashOfBytes(data)
 }
@@ -298,9 +298,9 @@ func verifyEnvelope(envelope []ui8, address []ui8) (text []ui8) { global signerH
 	}
 	var compressed bool
 	var header str = string.StringOfBytes(sliceOf(envelope, 0, ends[0]))
-	if string.EqualityByByteValue(header, "CXPM 2 #lz") {
+	if string.EqualityByByteValue(header, "CXPM 3 #lz") {
 		compressed = true
-	} else if !string.EqualityByByteValue(header, "CXPM 2") {
+	} else if !string.EqualityByByteValue(header, "CXPM 3") {
 		fail(sprintf("envelope header %s", header))
 	}
 	var signature []ui8

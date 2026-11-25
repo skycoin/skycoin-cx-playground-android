@@ -6,9 +6,10 @@ require (
 	github.com/0magnet/gio v0.10.4-0.20261113210149-b0467ff35c7e
 	github.com/pierrec/lz4/v4 v4.1.34
 	github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5
-	github.com/skycoin/skycoin-cx v0.0.0-20261124125939-d1a9862a4ae2
+	github.com/skycoin/skycoin-cx v0.0.0-20261125032418-3077d716ccc2
 	github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76
 	go.etcd.io/bbolt v1.5.0
+	lukechampine.com/blake3 v1.5.3
 )
 
 require (
@@ -19,6 +20,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.4 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/jinzhu/copier v0.4.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/madelynnblue/go-dsp v1.0.0 // indirect
 	github.com/skycoin/gltext v0.0.0-20200425002731-afdd8ff94e14 // indirect
 	golang.org/x/exp/shiny v0.0.0-20261121134650-e1094eeca1b5 // indirect

@@ -35,6 +35,7 @@ import (
 	"github.com/skycoin/skycoin-cx-playground-android/apprun"
 	"github.com/skycoin/skycoin-cx-playground-android/cxrun"
 	"github.com/skycoin/skycoin-cx-playground-android/manifest"
+	"github.com/skycoin/skycoin-cx-playground-android/programblocks"
 	"github.com/skycoin/skycoin-cx-playground-android/programloader"
 	"github.com/skycoin/skycoin-cx-playground-android/store"
 )
@@ -448,7 +449,7 @@ func (u *ui) topBar(gtx layout.Context, done bool) layout.Dimensions {
 				return u.text(gtx, dim, state, false)
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return u.text(gtx, dim, "sha256 "+string(u.cur.Hash), true)
+				return u.text(gtx, dim, programblocks.HashName+" "+string(u.cur.Hash), true)
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				s := fmt.Sprintf("%s  %s  %d files  %d bytes", kind, m.Entry, len(m.Files), size)

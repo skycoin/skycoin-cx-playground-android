@@ -19,7 +19,6 @@ import (
 	globals "github.com/skycoin/skycoin-cx/t2-globals"
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
-	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
 	cxnet "github.com/skycoin/skycoin-cx/t5-cxnet"
 	cxos "github.com/skycoin/skycoin-cx/t5-cxos"
 	cxinit "github.com/skycoin/skycoin-cx/t7-init"
@@ -104,9 +103,10 @@ func init() {
 func resetCompiler() {
 	actions.AST = cxinit.MakeProgram()
 	cxinit.RegisterPackages(actions.AST)
-	opcodes.RegisterOpcodes(actions.AST)
 	register(actions.AST)
-	cxast.OpcodeHandlers[opcodes.OpcodeNumber("os.Exit")] = opExit
+	cxast.NativeFunctionHost = hostNativeFunction
+	exit, _ := cxast.NativeNames.NativeNameIndexText("os.Exit")
+	cxast.OpcodeDispatch = hostDispatch(cxast.OpcodeDispatch, exit.NativeNameEntryCode)
 	globals.FoundCompileErrors = false
 	actions.LineNo = 0
 	actions.TemporaryVariableCounter = 0

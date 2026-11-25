@@ -2917,7 +2917,7 @@ yydefault:
 			exprCXLine := actions.MakeCXLineExpressionCurrent(actions.AST)
 			// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 			// Now a constructor call, site S1503.
-			expr := ast.MakeAtomicOperatorExpression(actions.AST, ast.Natives[constants.OP_GOTO])
+			expr := ast.MakeAtomicOperatorExpression(actions.AST, ast.NativeFunctionOf(actions.AST, constants.OP_GOTO))
 			expressionIdx := expr.Index
 			actions.AST.CXAtomicOps[expressionIdx].Package = ast.CXPackageIndex(pkg.Index)
 			actions.AST.CXAtomicOps[expressionIdx].Label = actions.AST.CXProgramNameIntern(yyDollar[2].tok)

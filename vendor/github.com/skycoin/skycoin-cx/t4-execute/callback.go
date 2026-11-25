@@ -9,14 +9,9 @@ import (
 	"github.com/skycoin/skycoin-cx/t3-ast"
 )
 
-//TODO: Define Function Pointers and deprecate Callback
-
-// What calls Callback?ex
-// Callback is only called from opHttpHandle, can probably be removed
-// TODO: Delete and delete call from opHTTPHandle
-// TODO: We probably dont need this? HTTPHandle can work in another way
-// TODO: Is Callback actually "CallFunction" ?
-func Callback(cxprogram *ast.CXProgram, fn *ast.CXFunction, inputs [][]byte) (outputs [][]byte) {
+// Callback runs fn with inputs written to its frame in a nested loop, for
+// the callbacks of t6-cxfx. Its results are left in the frame.
+func Callback(cxprogram *ast.CXProgram, fn *ast.CXFunction, inputs [][]byte) {
 	line := cxprogram.CallStack[cxprogram.CallCounter].Line
 	previousCall := cxprogram.CallCounter
 	cxprogram.CallCounter++
@@ -42,30 +37,16 @@ func Callback(cxprogram *ast.CXProgram, fn *ast.CXFunction, inputs [][]byte) (ou
 
 	var maxOps = 0
 
-	// The nested loop has its own operand buffers, as the outer loop is in the
-	// middle of an opcode with its own.
-	// VIOLATION VMALLOC-021: the nested buffers grow on the first opcodes, #407.
-	var nestedInputs, nestedOutputs []ast.CXValue
-	err := runLoop(cxprogram, true, maxOps, previousCall, &nestedInputs, &nestedOutputs)
+	// The nested loop has its own operand buffers, sized before the run, as
+	// the outer loop is in the middle of an opcode with its own (#407).
+	values := cxprogram.RunCallbackValues(cxprogram.ProgramCallbackDepth)
+	cxprogram.ProgramCallbackDepth++
+	err := runLoop(cxprogram, true, maxOps, previousCall, &values.CallbackValuesInputs, &values.CallbackValuesOutputs)
+	cxprogram.ProgramCallbackDepth--
 	if err != nil {
 		os.Exit(types.CX_INTERNAL_ERROR)
 	}
 
 	cxprogram.CallCounter = previousCall
 	cxprogram.CallStack[cxprogram.CallCounter].Line = line
-
-	fnOutputs := fn.GetOutputs(cxprogram)
-	for _, outputIdx := range fnOutputs {
-		// OBJMODEL: state.CXTypeSignatureMng.CXTypeSignatureGet(gid), phase 5 #332.
-		// Now an arena getter, site S1248.
-		output := cxprogram.GetCXTypeSignatureFromArray(outputIdx)
-
-		// Making a copy of the bytes, so if we modify the bytes being held by `outputs`
-		// we don't modify the program memory.
-		mem := types.GetSlice_byte(cxprogram.Memory, ast.GetFinalOffset(cxprogram, newFP, nil, output), output.GetSize(cxprogram, false))
-		cop := make([]byte, len(mem))
-		copy(cop, mem)
-		outputs = append(outputs, cop)
-	}
-	return outputs
 }

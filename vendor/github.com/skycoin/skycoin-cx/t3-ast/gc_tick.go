@@ -14,13 +14,36 @@ func GarbageCollectorCheck(prgrm *CXProgram) bool {
 	return prgrm.Heap.Pressure > prgrm.Heap.PressureLimit
 }
 
+// GarbageCollectorPrepare builds the roots of the globals and of every
+// function and allocates the scratch of the collector and the frames of the
+// root table for the heap cap, once before the run (D42). It allocates
+// nothing for a program it prepared.
+// GCREACH: builds the root table and the collector scratch,
+// see docs/GarbageCollector.md.
+func GarbageCollectorPrepare(prgrm *CXProgram) {
+	heap := &prgrm.Heap
+	cache := gcTypeCache(prgrm)
+	gcGlobalRoots(prgrm)
+	if cache.GCTypeCacheFunctions != len(prgrm.CXFunctions) {
+		for i := range prgrm.CXFunctions {
+			gcFrameRoots(prgrm, &prgrm.CXFunctions[i])
+		}
+		cache.GCTypeCacheFunctions = len(prgrm.CXFunctions)
+	}
+	if cap(heap.Roots.GCRootTableFrames) < len(prgrm.CallStack) {
+		heap.Roots.GCRootTableFrames = make([]gc.GCRootFrame, 0, len(prgrm.CallStack))
+	}
+	memorySize := types.Cast_int_to_ptr(cap(prgrm.Memory))
+	gc.GCStatePrepare(&heap.Collector, memorySize-heap.StartsAt, memorySize)
+}
+
 // GarbageCollectorTrigger collects the heap at a safe point of the old loop,
 // between two steps, where every root is in a global or a frame slot. It
 // hands the collector a root table and the heap, then resizes the heap to
-// keep MIN_HEAP_FREE_RATIO to MAX_HEAP_FREE_RATIO of it free.
+// keep MIN_HEAP_FREE_RATIO to MAX_HEAP_FREE_RATIO of it free. It allocates
+// nothing, as GarbageCollectorPrepare built the roots and the scratch.
 // GCREACH: builds the root table and runs the collector,
 // see docs/GarbageCollector.md.
-// VIOLATION VMALLOC-011: the CX collector builds its root table and type cache in Go memory, #407.
 func GarbageCollectorTrigger(prgrm *CXProgram) {
 	heap := &prgrm.Heap
 	roots := &heap.Roots
@@ -40,7 +63,7 @@ func GarbageCollectorTrigger(prgrm *CXProgram) {
 	heap.Pointer = gc.GarbageCollectorCollect(prgrm.Memory, heap.StartsAt, heap.Pointer, roots, &heap.Collector)
 	heapFreeRatioKeep(prgrm)
 	heap.Pressure = 0
-	heap.PressureLimit = heap.Size - heap.Pointer
+	heap.PressureLimit = heapPressureLimit(prgrm)
 }
 
 // heapFreeRatioKeep grows the heap when less than MIN_HEAP_FREE_RATIO of it

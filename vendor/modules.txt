@@ -87,6 +87,9 @@ github.com/golang/freetype/truetype
 # github.com/jinzhu/copier v0.4.0
 ## explicit; go 1.13
 github.com/jinzhu/copier
+# github.com/klauspost/cpuid/v2 v2.0.9
+## explicit; go 1.13
+github.com/klauspost/cpuid/v2
 # github.com/madelynnblue/go-dsp v1.0.0
 ## explicit; go 1.25.5
 github.com/madelynnblue/go-dsp/wav
@@ -109,9 +112,10 @@ github.com/skycoin/skycoin/src/cipher/encoder
 github.com/skycoin/skycoin/src/cipher/ripemd160
 github.com/skycoin/skycoin/src/cipher/secp256k1-go
 github.com/skycoin/skycoin/src/cipher/secp256k1-go/secp256k1-go2
-# github.com/skycoin/skycoin-cx v0.0.0-20261124125939-d1a9862a4ae2
+# github.com/skycoin/skycoin-cx v0.0.0-20261125032418-3077d716ccc2
 ## explicit; go 1.27.3
 github.com/skycoin/skycoin-cx/t0-cx-core-assert
+github.com/skycoin/skycoin-cx/t0-cx-core-floatparse
 github.com/skycoin/skycoin-cx/t0-cxhash
 github.com/skycoin/skycoin-cx/t0-packages
 github.com/skycoin/skycoin-cx/t0-textsections
@@ -129,15 +133,16 @@ github.com/skycoin/skycoin-cx/t3-ast
 github.com/skycoin/skycoin-cx/t3-cx-runtime-vm
 github.com/skycoin/skycoin-cx/t4-actions
 github.com/skycoin/skycoin-cx/t4-cx-compiler-lower
+github.com/skycoin/skycoin-cx/t4-cx-runtime-printer
+github.com/skycoin/skycoin-cx/t4-cxos-core
 github.com/skycoin/skycoin-cx/t4-execute
 github.com/skycoin/skycoin-cx/t4-opcodes
+github.com/skycoin/skycoin-cx/t4-regexp
 github.com/skycoin/skycoin-cx/t5-cipher
-github.com/skycoin/skycoin-cx/t5-cx-runtime-printer
+github.com/skycoin/skycoin-cx/t5-cx-runtime-core
 github.com/skycoin/skycoin-cx/t5-cxnet
 github.com/skycoin/skycoin-cx/t5-cxos
-github.com/skycoin/skycoin-cx/t5-cxos-core
 github.com/skycoin/skycoin-cx/t5-cxpartialparsing
-github.com/skycoin/skycoin-cx/t5-regexp
 github.com/skycoin/skycoin-cx/t6-cxfx
 github.com/skycoin/skycoin-cx/t7-init
 github.com/skycoin/skycoin-cx/t8-cxparsingcompletor
@@ -201,3 +206,8 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
+# lukechampine.com/blake3 v1.5.3
+## explicit; go 1.23
+lukechampine.com/blake3
+lukechampine.com/blake3/bao
+lukechampine.com/blake3/guts

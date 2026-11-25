@@ -229,8 +229,8 @@ func (s *state) printfType(signatureIndex ast.CXTypeSignatureIndex) types.Code {
 	return arg.Type
 }
 
-// printfPrintableType returns the type GetPrintableValue prints with
-// readAtomic, the only case of %v the machine prints. Whole arrays and
+// printfPrintableType returns the type AppendPrintableValue prints with
+// appendAtomic, the only case of %v the machine prints. Whole arrays and
 // structs, pointers and addresses stay outside.
 func (s *state) printfPrintableType(signatureIndex ast.CXTypeSignatureIndex) (types.Code, ReasonCode) {
 	prgrm := s.statePrgrm

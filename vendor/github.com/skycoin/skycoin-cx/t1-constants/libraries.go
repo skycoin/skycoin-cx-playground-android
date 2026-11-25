@@ -201,3 +201,30 @@ func LibraryFunctionLiveByNumber(library int, number int) (LibraryFunctionLifecy
 	}
 	return LibraryFunctionLifecycle{}, false
 }
+
+// LibraryFunctionLiveNameBytes returns the name of the live function number
+// of library without building a string, nil when there is none. The caller
+// must not write to it.
+func LibraryFunctionLiveNameBytes(library int, number int) []byte {
+	for i := range LibraryFunctionLifecycleTable {
+		row := &LibraryFunctionLifecycleTable[i]
+		if row.LibraryNumber == library && row.Number == number && row.VersionDeprecated == 0 {
+			return libraryFunctionLifecycleNames[i]
+		}
+	}
+	return nil
+}
+
+// libraryFunctionLifecycleNames holds the Name of each row of
+// LibraryFunctionLifecycleTable as bytes, built while the package
+// initializes.
+var libraryFunctionLifecycleNames = libraryFunctionLifecycleNamesMake()
+
+func libraryFunctionLifecycleNamesMake() [][]byte {
+	names := make([][]byte, len(LibraryFunctionLifecycleTable))
+	for i := range LibraryFunctionLifecycleTable {
+		names[i] = []byte(LibraryFunctionLifecycleTable[i].Name)
+		names[i] = names[i][:len(names[i]):len(names[i])]
+	}
+	return names
+}

@@ -29,7 +29,7 @@ This section defines the words the rest of the document uses.
   files. Every file and every block is an offset and length range in it.
 - A *manifest* is the signed description of a set of files: their hashes,
   lengths, blocks, and where each block sits in the linear packing.
-- The *manifest address* is the SHA-256 hash that names a manifest. It is
+- The *manifest address* is the BLAKE3-256 hash that names a manifest. It is
   what a list of manifests holds, and what every request names. It is the
   content address (the standard term is content identifier, CID).
 - A *signer* is the holder of the secp256k1 key that signs a manifest. The
@@ -76,19 +76,22 @@ as they follow, with no JSON anywhere (D25).
 A manifest is sent and stored as an envelope of four lines and the data:
 
 ```
-CXPM 2
+CXPM 3
 <signature, 130 lower case hex digits>
 <hash, 64 lower case hex digits>
 <length of the data, decimal>
 <data>
 ```
 
-- The first line is the header, `CXPM 2`, or `CXPM 2 #lz` when the data is
+- The first line is the header, `CXPM 3`, or `CXPM 3 #lz` when the data is
   one LZ4 block (the block format of lz4, with no frame) of the text form.
-- The hash is the SHA-256 of the data bytes as they follow, the LZ4 bytes
-  when the header says `#lz` and the text otherwise. It is the *manifest
-  address*. The hash function is one function, `programblocks.Sum` with
-  `HashName`, so decision D23 changes it in one place.
+- The hash is the BLAKE3-256 hash (BLAKE3 with a 256 bit output, D23) of
+  the data bytes as they follow, the LZ4 bytes when the header says `#lz`
+  and the text otherwise. It is the *manifest address*. The hash function is
+  one function, `programblocks.Sum` with `HashName`, which is the hash of CX,
+  `cxhash.CxHashOfBytes` of skycoin-cx, the same function `cipher.HashOfBytes`
+  gives the loader. Version 3 of the envelope is BLAKE3-256. Version 2 was
+  SHA-256 and is not read.
 - The signature is a compact secp256k1 signature of 65 bytes with its
   recovery byte (D22), `cipher.SignHash(hash, secret key)` of the Skycoin
   `cipher` package, and in CX `cipher.SignatureSign` of skycoin-cx.
@@ -138,21 +141,21 @@ and its second block starts at offset 657 of the linear packing, not at a
 multiple of 512.
 
 ```
-CXPM 2
-90bbff17cf56b01c3583ee6a84582ad2130bdc565ccf89e66797681930eec97a2873372099b830a67a3a7e56f7f4761d3953da6151ca3a698dc2a5899cf9270101
-f59c0e52771611f0a17085854a3b26d2558973177226da82dbc88988e7e05ea4
+CXPM 3
+fd68f766d5e5776b5547cade23074b3bd6ac4f5e87fccbbf3071ddf87a18cf6b0b6a08a20bd392d67f97993ec7d57e428b6232e3e731edc59c2bd9eb32044ad301
+f05574335ba50614d43614d7bffa1938f45cce3909e05f753ee69436c7e76575
 699
 [manifest] date pack_length merkle_hash
-1795478400 818 91a183d90c771d505b8cd0189e804e8ee9e3a13e0d00a634759b228c4a18c50f
+1795478400 818 2e75b6c25506f1fb8465edf545770bbfd891be262556be61c4557e3cc8418944
 
 [files] file_hash size block_size merkle_hash path
-2e40baeaa7dbbbb0483eaa7113421b7a91d3d55aba4e4f479bde83918193184d 145 512 2e40baeaa7dbbbb0483eaa7113421b7a91d3d55aba4e4f479bde83918193184d cxapp.txt
-aa24c98456232ee3a7d1f898e3eb1146caa23779dbd6cb2f2c55c1d61beda91f 673 512 adaea5e4a6e79ec088ec23db8c02c40594b78975ec68a5b0f5b636fbb142d48b main.cx
+2184f8aeaed559ce529cef63754dc02bcb64f37bbb5960a2d6299b84d0883882 145 512 2184f8aeaed559ce529cef63754dc02bcb64f37bbb5960a2d6299b84d0883882 cxapp.txt
+d5d012befa599d555a5abb3de7c7f05a96dd3e2acb692296b5eff21c003dece7 673 512 b07594a9da237dc6e4d3daee09fca88284ed2a17e83f7fb1ecd3bc1d5a6d432b main.cx
 
 [blocks] block_hash size
-2e40baeaa7dbbbb0483eaa7113421b7a91d3d55aba4e4f479bde83918193184d 145
-d431f9aa898ad795ac4d3fdda0c34a8db75f9ec07d47b7e90158222c02db5a93 512
-44f5c83df84986299209e4083f376d8c5694df314fd8ece10c48da6d2bd9f017 161
+2184f8aeaed559ce529cef63754dc02bcb64f37bbb5960a2d6299b84d0883882 145
+f555f65599413fd113f90e0b74b899abc1f106d166d1fd4a908ee2d84b745216 512
+7bad17e0f71662a3c4a1ee8e4e735f649cdd84237833786b8c1e7cbfc63b11fe 161
 ```
 
 Sizes, measured by `tests/program-manifest-form-sizes`:
@@ -213,15 +216,15 @@ be larger than one packet.
 This section defines the Merkle hash, which lets a client check a complete
 set of block hashes against one signed value.
 
-- A leaf is a block hash, the plain SHA-256 of the block bytes.
-- An inner node is the SHA-256 of 65 bytes: the byte 0x01, the left child
+- A leaf is a block hash, the plain BLAKE3-256 of the block bytes.
+- An inner node is the BLAKE3-256 of 65 bytes: the byte 0x01, the left child
   and the right child.
 - The leaves are paired from the left. When a level has an odd number of
   nodes, the last node moves up to the next level unchanged. It is not paired
   with itself, which avoids the duplicate-leaf ambiguity of the Bitcoin tree
   (CVE-2012-2459).
 - A tree with one leaf has that leaf as its root, and the root of an empty
-  list is the SHA-256 of zero bytes.
+  list is the BLAKE3-256 of zero bytes.
 - The header holds the root over all blocks of the manifest, and every file
   entry holds the root over its own blocks, so one file can be checked
   without the others.
@@ -231,10 +234,10 @@ set of block hashes against one signed value.
 This section lists the checks a client makes on the blocks and files, after
 the manifest is verified.
 
-- A block is accepted only when its SHA-256 matches its block list entry and
+- A block is accepted only when its BLAKE3-256 hash matches its block list entry and
   its length matches.
 - A file is accepted only when all its blocks are in, its length matches and
-  the SHA-256 of the whole file matches its file list entry.
+  the BLAKE3-256 of the whole file matches its file list entry.
 - The program is accepted only when every file is accepted.
 
 ### Relation to the JSON manifest
@@ -671,7 +674,8 @@ that hands the result over.
 - It parses the text form and fetches the named program's envelope as a
   file of the manifest list, so every block of it is checked against the
   list, then each file of the program, checking every block and every file
-  hash. The hash is one CX function, `contentHash`, for D23.
+  hash. The hash is one CX function, `contentHash`, which calls
+  `cipher.HashOfBytes`, BLAKE3-256 (D23).
 - It hands each verified file to the runner with
   `app.ProgramFile(path, data) (accepted bool)`, prints the address, the
   signer and the counts, and ends. `programloader.Load` runs it with only
@@ -1234,6 +1238,10 @@ D23 ProgramBlockHashFunctionDecision
 - Recommendation: option a, because the ESP32 has SHA-256 hardware, the
   existing code uses it, and a 512-byte block costs little to hash either
   way.
+- Decided 2026-11-24 by moe on the lead's answer "Blake 256": BLAKE3 with a
+  256 bit output for every CX hash, blocks, files, arrays, manifests and the
+  execution records of skycoin-cx. The envelope is version 3 and the ESP32
+  loses its SHA-256 hardware for these hashes.
 
 D24 ProgramManifestEncodingDecision
 - What exists now: `manifest.Manifest` is JSON, encoded with

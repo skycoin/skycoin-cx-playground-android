@@ -903,7 +903,8 @@ func (machine *Machine) slow() Stop {
 		if !machine.MachineImage.ImageLibraryEnabled[in.InstrM] {
 			return machine.slowStop(StopLibraryDisabled)
 		}
-		LibraryFunctionVmHandlers[in.InstrM][in.InstrN](mem, machine.MachineStackPointer)
+		// The lowering emits the call only for a vm form of a linked library.
+		LibraryDispatchesVm[in.InstrM](in.InstrN, mem, machine.MachineStackPointer)
 	case ir.OpcodePrintValue:
 		machine.MachineOutput = printValue(machine.MachineOutput, mem, a, types.Code(in.InstrM), byte(in.InstrN))
 	case ir.OpcodeTestEqual:

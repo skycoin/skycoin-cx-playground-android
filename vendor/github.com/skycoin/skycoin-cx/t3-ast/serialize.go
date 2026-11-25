@@ -385,6 +385,7 @@ func serializeProgramFields(prgrm *CXProgram, encoder *serializeEncoder) error {
 	encoder.serializeEncoderPointer(prgrm.Heap.Size)
 	encoder.serializeEncoderPointer(prgrm.Heap.StartsAt)
 	encoder.serializeEncoderPointer(prgrm.Heap.Pointer)
+	encoder.serializeEncoderPointer(prgrm.Heap.Max)
 
 	names := make([]stringpool.StringGid, 0, len(prgrm.Packages))
 	for name := range prgrm.Packages {
@@ -443,6 +444,7 @@ func deserializeProgramFields(prgrm *CXProgram, decoder *serializeDecoder) []ser
 	prgrm.Heap.Size = decoder.serializeDecoderPointer()
 	prgrm.Heap.StartsAt = decoder.serializeDecoderPointer()
 	prgrm.Heap.Pointer = decoder.serializeDecoderPointer()
+	prgrm.Heap.Max = decoder.serializeDecoderPointer()
 
 	if length := decoder.serializeDecoderLength(2); length >= 0 {
 		prgrm.Packages = make(map[stringpool.StringGid]CXPackageIndex, length)

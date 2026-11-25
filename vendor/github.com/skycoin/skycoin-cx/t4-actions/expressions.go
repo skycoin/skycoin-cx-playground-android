@@ -39,7 +39,7 @@ func IterationExpressions(prgrm *ast.CXProgram,
 	conditionExprs []ast.CXExpression,
 	incrementExprs []ast.CXExpression,
 	statementExprs []ast.CXExpression) []ast.CXExpression {
-	jmpFn := ast.Natives[constants.OP_JMP]
+	jmpFn := ast.NativeFunctionOf(prgrm, constants.OP_JMP)
 
 	pkg, err := prgrm.GetCurrentPackage()
 	if err != nil {
@@ -210,7 +210,7 @@ func trueJmpExpressions(prgrm *ast.CXProgram, opcode int) []ast.CXExpression {
 	exprCXLine := MakeCXLineExpressionCurrent(prgrm)
 	// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 	// Now a constructor call, site S0626.
-	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[opcode])
+	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, opcode))
 	expressionIdx := expr.Index
 
 	trueArg := WritePrimary(prgrm, types.BOOL, encoder.Serialize(true), false)
@@ -256,7 +256,7 @@ func SelectionExpressions(prgrm *ast.CXProgram, conditionExprs []ast.CXExpressio
 	DefineNewScope(thenExprs)
 	DefineNewScope(elseExprs)
 
-	jmpFn := ast.Natives[constants.OP_JMP]
+	jmpFn := ast.NativeFunctionOf(prgrm, constants.OP_JMP)
 	pkg, err := prgrm.GetCurrentPackage()
 	if err != nil {
 		panic(err)
@@ -494,7 +494,7 @@ func OperatorExpression(prgrm *ast.CXProgram, leftExprs []ast.CXExpression, righ
 	exprCXLine := MakeCXLineExpressionCurrent(prgrm)
 	// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 	// Now a constructor call, site S0671.
-	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[opcode])
+	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, opcode))
 	expressionIdx := expr.Index
 
 	// we can't know the type until we compile the full function
@@ -659,7 +659,7 @@ func shortCircuitExpressions(prgrm *ast.CXProgram, exprs []ast.CXExpression, lef
 	}
 
 	jmpCXLine := MakeCXLineExpressionCurrent(prgrm)
-	jmpExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_JMP])
+	jmpExpr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_JMP))
 	jmpOp := &prgrm.CXAtomicOps[jmpExpr.Index]
 	jmpOp.Package = ast.CXPackageIndex(pkg.Index)
 	jmpOp.AddInput(prgrm, shortCircuitOperandCopy(prgrm, leftTypeSigIdx))
@@ -727,7 +727,7 @@ func shortCircuitOperandExpression(prgrm *ast.CXProgram, exprIdx int) *ast.CXFun
 
 	operandOp.ThenLines = shortCircuitLinesPending
 	operandOp.ElseLines = shortCircuitLinesPending
-	identityIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_IDENTITY])
+	identityIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 	operandOp.Operator = identityIdx
 	return prgrm.GetFunctionFromArray(identityIdx)
 }
@@ -853,7 +853,7 @@ func UnaryExpression(prgrm *ast.CXProgram, op string, prevExprs []ast.CXExpressi
 			if pkg, err := prgrm.GetCurrentPackage(); err == nil {
 				// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 				// Now a constructor call, site S0683.
-				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BOOL_NOT])
+				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BOOL_NOT))
 				// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 				// Now an arena getter, site S0684.
 				expression, err := prgrm.GetCXAtomicOp(expr.Index)
@@ -876,7 +876,7 @@ func UnaryExpression(prgrm *ast.CXProgram, op string, prevExprs []ast.CXExpressi
 			if pkg, err := prgrm.GetCurrentPackage(); err == nil {
 				// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 				// Now a constructor call, site S0688.
-				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_NEG])
+				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_NEG))
 				// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 				// Now an arena getter, site S0689.
 				expression, err := prgrm.GetCXAtomicOp(expr.Index)
@@ -910,7 +910,7 @@ func UnaryExpression(prgrm *ast.CXProgram, op string, prevExprs []ast.CXExpressi
 			if pkg, err := prgrm.GetCurrentPackage(); err == nil {
 				// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 				// Now a constructor call, site S0693.
-				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_BOOL_NOT])
+				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_BOOL_NOT))
 				// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 				// Now an arena getter, site S0694.
 				expression, err := prgrm.GetCXAtomicOp(expr.Index)
@@ -931,7 +931,7 @@ func UnaryExpression(prgrm *ast.CXProgram, op string, prevExprs []ast.CXExpressi
 			if pkg, err := prgrm.GetCurrentPackage(); err == nil {
 				// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 				// Now a constructor call, site S0696.
-				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_NEG])
+				expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_NEG))
 				// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 				// Now an arena getter, site S0697.
 				expression, err := prgrm.GetCXAtomicOp(expr.Index)
@@ -1087,7 +1087,7 @@ func AssociateReturnExpressions(prgrm *ast.CXProgram, idx int, retExprs []ast.CX
 	if lastExpressionOperator == nil {
 		// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 		// Now an arena insert, site S0715.
-		opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_IDENTITY])
+		opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		lastExpression.Operator = opIdx
 
 		lastExpression.Inputs = lastExpression.Outputs
@@ -1116,7 +1116,7 @@ func AssociateReturnExpressions(prgrm *ast.CXProgram, idx int, retExprs []ast.CX
 		exprCXLine := MakeCXLineExpressionCurrent(prgrm)
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S0717.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_IDENTITY])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 		// Now an arena getter, site S0718.
 		expression, err := prgrm.GetCXAtomicOp(expr.Index)
@@ -1177,7 +1177,7 @@ func AddJmpToReturnExpressions(prgrm *ast.CXProgram, exprs ReturnExpressions) []
 	// expression to jump to the end of the embedding function
 	// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 	// Now a constructor call, site S0720.
-	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_GOTO])
+	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_GOTO))
 	// OBJMODEL: state.CXAtomicOperatorMng.CXAtomicOperatorGet(gid), phase 5 #342.
 	// Now an arena getter, site S0721.
 	expression, err := prgrm.GetCXAtomicOp(expr.Index)
@@ -1272,7 +1272,7 @@ func unaryOperatorOnValue(prgrm *ast.CXProgram, op string, prevExprs []ast.CXExp
 	if op == "!" {
 		opcode = constants.OP_BOOL_NOT
 	}
-	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[opcode])
+	expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, opcode))
 	prgrm.CXAtomicOps[expr.Index].Package = ast.CXPackageIndex(pkg.Index)
 	prgrm.CXAtomicOps[expr.Index].AddInput(prgrm, prgrm.CXAtomicOps[lastIdx].GetOutputs(prgrm)[0])
 	return append(operand, *expr), true

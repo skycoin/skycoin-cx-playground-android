@@ -14,7 +14,7 @@ import (
 // GCREACH: allocates on the heap, which adds to the GC pressure,
 // see docs/GarbageCollector.md.
 // VIOLATION STRHOT-196: B, reads the file at a program path, #432.
-func opAlLoadWav(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpAlLoadWav(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	file, fileError := ast.ProgramSandboxFileOpen(prgrm, &inputs[0])
 	if fileError != nil {
 		panic(fileError.FileErrorMessage)

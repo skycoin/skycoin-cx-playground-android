@@ -23,7 +23,7 @@ import (
 
 var seed = []byte("program loader cx matches go")
 
-func programs(t *testing.T) map[string]map[string][]byte {
+func programs(t testing.TB) map[string]map[string][]byte {
 	out := map[string]map[string][]byte{}
 	for name, dir := range map[string]string{"fib-and-primes": "../program-manifest-round-trip/program", "benchmarks": "../../apps/benchmarks"} {
 		files, err := programblocks.ReadProgramDirectory(dir)
@@ -45,7 +45,7 @@ func serve(t *testing.T, catalog *programblocks.Catalog, size int) string {
 	return server.LocalAddr().String()
 }
 
-func load(t *testing.T, args ...string) (map[string][]byte, string, error) {
+func load(t testing.TB, args ...string) (map[string][]byte, string, error) {
 	var out bytes.Buffer
 	files, err := programloader.Load(map[string][]byte{programloader.Entry: programloader.Source}, programloader.Entry, args, cxrun.Options{}, &out)
 	return files, out.String(), err

@@ -26,7 +26,7 @@ func processGlobalInitializer(prgrm *ast.CXProgram, initializer []ast.CXExpressi
 		prgrm.CXAtomicOps[initializerExpressionIdx].AddOutput(prgrm, glblIdx)
 		// OBJMODEL: state.CXFunctionMng.CXFunctionAlloc(), phase 4 #351.
 		// Now an arena insert, site S1210.
-		opIdx := prgrm.AddNativeFunctionInArray(ast.Natives[constants.OP_IDENTITY])
+		opIdx := prgrm.AddNativeFunctionInArray(ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		prgrm.CXAtomicOps[initializerExpressionIdx].Operator = opIdx
 
 		//add intialization statements, to array
@@ -325,7 +325,7 @@ func processLocalInitialization(prgrm *ast.CXProgram, pkg *ast.CXPackage, initia
 		// with the declared variable
 		// OBJMODEL: state.CXExpressionMng.CXExpressionAlloc(), phase 4 #346.
 		// Now a constructor call, site S1231.
-		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.Natives[constants.OP_IDENTITY])
+		expr := ast.MakeAtomicOperatorExpression(prgrm, ast.NativeFunctionOf(prgrm, constants.OP_IDENTITY))
 		cxExprAtomicOpIdx := expr.Index
 		prgrm.CXAtomicOps[cxExprAtomicOpIdx].Package = ast.CXPackageIndex(pkg.Index)
 

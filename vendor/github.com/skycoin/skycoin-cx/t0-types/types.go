@@ -97,6 +97,12 @@ func (t Code) Name() string {
 	return definitions[t].name
 }
 
+// NameBytes returns the bytes of Name without building a string, for
+// printing on the run path (#412). The caller must not write to them.
+func (t Code) NameBytes() []byte {
+	return definitionNames[t]
+}
+
 func (t Code) Size() Pointer {
 	//	panicIf(!definitions[t].size.IsValid(), CX_RUNTIME_INVALID_ARGUMENT)
 	return definitions[t].size
@@ -457,4 +463,17 @@ func TotalLength(lengths []Pointer) Pointer {
 	}
 
 	return total
+}
+
+// definitionNames holds the name of each definition as bytes. It is built
+// while the package initializes, so AppendName reads no string.
+var definitionNames = definitionNamesMake()
+
+func definitionNamesMake() [][]byte {
+	names := make([][]byte, len(definitions))
+	for i, definition := range definitions {
+		names[i] = []byte(definition.name)
+		names[i] = names[i][:len(names[i]):len(names[i])]
+	}
+	return names
 }

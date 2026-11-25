@@ -28,12 +28,17 @@ type HeapSegmentStruct struct {
 	Size     types.Pointer // This field stores the size of a CX program's heap
 	StartsAt types.Pointer // Offset at which the heap starts in a CX program's memory (normally the stack size)
 	Pointer  types.Pointer // At what offset a CX program can insert a new object to the heap
+	// Max is the heap cap, the most bytes the heap grows to (D42). It is
+	// set when the program is compiled from -heap-max and stored in a built
+	// program. EnsureMinimumHeapSize allocates memory for it once.
+	Max types.Pointer
 	// Pressure is the bytes allocated since the last collection.
 	Pressure types.Pointer
 	// PressureLimit is the free heap after the last collection. The next
 	// GarbageCollectorCheck past it asks for a collection.
 	PressureLimit types.Pointer
-	// Types holds the GCTypes of the roots, built by the first collection.
+	// Types holds the GCTypes of the roots, built before the run by
+	// GarbageCollectorPrepare.
 	Types *GCTypeCache
 	// Roots is the root table of the collection running, kept for reuse.
 	Roots gc.GCRootTable

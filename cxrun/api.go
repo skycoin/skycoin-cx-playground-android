@@ -6,7 +6,6 @@ import (
 	types "github.com/skycoin/skycoin-cx/t0-types"
 	cxast "github.com/skycoin/skycoin-cx/t3-ast"
 	actions "github.com/skycoin/skycoin-cx/t4-actions"
-	opcodes "github.com/skycoin/skycoin-cx/t4-opcodes"
 )
 
 // Opcode numbers for the app package. skycoin-cx only registers the opcodes
@@ -158,21 +157,64 @@ func opRune(p *cxast.CXProgram, in []cxast.CXValue, out []cxast.CXValue) {
 	out[0].Set_str(p, string(rune(in[0].Get_i32(p))))
 }
 
-// registerHost is opcodes.RegisterOpCode without its check that code is a row
-// of constants.OpcodeLifecycleTable.
+// hostOpcode is one opcode of the app package, outside the opcode table of
+// skycoin-cx.
+type hostOpcode struct {
+	hostHandler handler
+	hostInputs  []*cxast.CXArgument
+	hostOutputs []*cxast.CXArgument
+}
+
+// hostOpcodes holds the app opcodes by code minus opcodeBase.
+var hostOpcodes []hostOpcode
+
+// registerHost adds an app opcode. cxast.NativeFunctionHost gives the
+// compiler its native and hostDispatch runs it.
 func registerHost(p *cxast.CXProgram, code int, name string, h handler, inputs, outputs []*cxast.CXArgument) {
-	if code >= len(cxast.OpcodeHandlers) {
-		cxast.OpcodeHandlers = append(cxast.OpcodeHandlers, make([]cxast.OpcodeHandler, code+1-len(cxast.OpcodeHandlers))...)
-	}
-	cxast.OpcodeHandlers[code] = h
-	cxast.NativeNames.NativeNameIndexAdd(code, name)
 	if inputs == nil {
 		inputs = []*cxast.CXArgument{}
 	}
 	if outputs == nil {
 		outputs = []*cxast.CXArgument{}
 	}
-	cxast.Natives[code] = opcodes.MakeNativeFunction(p, code, inputs, outputs)
+	for len(hostOpcodes) <= code-opcodeBase {
+		hostOpcodes = append(hostOpcodes, hostOpcode{})
+	}
+	hostOpcodes[code-opcodeBase] = hostOpcode{hostHandler: h, hostInputs: inputs, hostOutputs: outputs}
+	cxast.NativeNames.NativeNameIndexAdd(code, name)
+}
+
+// hostOpcodeOf returns the app opcode code names, or nil.
+func hostOpcodeOf(code int) *hostOpcode {
+	if code < opcodeBase || code-opcodeBase >= len(hostOpcodes) || hostOpcodes[code-opcodeBase].hostHandler == nil {
+		return nil
+	}
+	return &hostOpcodes[code-opcodeBase]
+}
+
+// hostNativeFunction is cxast.NativeFunctionHost for the app opcodes.
+func hostNativeFunction(p *cxast.CXProgram, code int) *cxast.CXNativeFunction {
+	op := hostOpcodeOf(code)
+	if op == nil {
+		return nil
+	}
+	return &cxast.CXNativeFunction{AtomicOPCode: code, Inputs: op.hostInputs, Outputs: op.hostOutputs}
+}
+
+// hostDispatch returns the opcode switch of cx with os.Exit stopping the run
+// loop and the app opcodes added.
+func hostDispatch(core cxast.OpcodeDispatchFunction, exitCode int) cxast.OpcodeDispatchFunction {
+	return func(p *cxast.CXProgram, code int, in []cxast.CXValue, out []cxast.CXValue) bool {
+		if code == exitCode {
+			opExit(p, in, out)
+			return true
+		}
+		if op := hostOpcodeOf(code); op != nil {
+			op.hostHandler(p, in, out)
+			return true
+		}
+		return core(p, code, in, out)
+	}
 }
 
 // programFile receives the files app.ProgramFile hands over during a run,

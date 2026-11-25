@@ -12,11 +12,8 @@ import (
 )
 
 // buildString appends the text printf and sprintf make of inputs to res and
-// returns it. Only %v and the extra arguments of a short format go through
-// Go strings, the printed values of GetPrintableValue.
-// VIOLATION STRHOT-086: P, %v and extra arguments append the text of a printed value, #412.
+// returns it. %v appends the value with ast.AppendPrintableValue.
 // VIOLATION VMALLOC-022: appending grows the format buffer past its size, once, #407.
-// VIOLATION VMALLOC-015: %v and extra arguments build the Go string of a printed value, #407.
 func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, res []byte) []byte {
 	fmtStr := inputs[0].Get_str_bytes(prgrm)
 
@@ -77,7 +74,7 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, res []byte) []byte 
 					res = strconv.AppendFloat(res, inp.Get_f64(prgrm), 'f', 16, 64)
 				}
 			case 'v':
-				res = append(res, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature)...)
+				res = ast.AppendPrintableValue(res, prgrm, inp.FramePointer, inp.TypeSignature)
 			case 'b':
 				res = strconv.AppendBool(res, inp.Get_bool(prgrm))
 			}
@@ -93,9 +90,9 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, res []byte) []byte 
 		lInps := len(inputs[specifiersCounter+1:])
 		for c := 0; c < lInps; c++ {
 			inp := &inputs[specifiersCounter+1+c]
-			res = append(res, inp.TypeSignature.GetValueTypeName(prgrm)...)
+			res = inp.TypeSignature.AppendValueTypeName(res, prgrm)
 			res = append(res, '=')
-			res = append(res, ast.GetPrintableValue(prgrm, inp.FramePointer, inp.TypeSignature)...)
+			res = ast.AppendPrintableValue(res, prgrm, inp.FramePointer, inp.TypeSignature)
 			if c != lInps-1 {
 				res = append(res, ", "...)
 			}
@@ -106,13 +103,13 @@ func buildString(prgrm *ast.CXProgram, inputs []ast.CXValue, res []byte) []byte 
 	return res
 }
 
-func opSprintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpSprintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	formatted := buildString(prgrm, inputs, formatBuffer(prgrm))
 	outputs[0].Set_str_bytes(prgrm, formatted)
 	formatBufferKeep(prgrm, formatted)
 }
 
-func opPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpPrintf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	formatted := buildString(prgrm, inputs, formatBuffer(prgrm))
 	os.Stdout.Write(formatted)
 	formatBufferKeep(prgrm, formatted)

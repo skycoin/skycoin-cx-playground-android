@@ -93,16 +93,16 @@ func assert(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) (
 	return same
 }
 
-func opAssertValue(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpAssertValue(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	same := assert(prgrm, inputs, outputs)
 	outputs[0].Set_bool(prgrm, same)
 }
 
-func opTest(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpTest(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	assert(prgrm, inputs, outputs)
 }
 
-func opPanic(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpPanic(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	if !assert(prgrm, inputs, outputs) {
 		panic(types.CX_ASSERT)
 	}
@@ -119,16 +119,16 @@ func panicIf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue, 
 }
 
 // panic with CX_ASSERT exit code if condition is true
-func opPanicIf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpPanicIf(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	panicIf(prgrm, inputs, outputs, true)
 }
 
 // panic with CX_ASSERT exit code if condition is false
-func opPanicIfNot(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpPanicIfNot(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	panicIf(prgrm, inputs, outputs, false)
 }
 
 // VIOLATION STRHOT-120: B, the text of an error code, #412.
-func opStrError(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
+func OpStrError(prgrm *ast.CXProgram, inputs []ast.CXValue, outputs []ast.CXValue) {
 	outputs[0].Set_str(prgrm, ast.ErrorString(int(inputs[0].Get_i32(prgrm))))
 }
