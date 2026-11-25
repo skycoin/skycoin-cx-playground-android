@@ -29,12 +29,8 @@ github.com/skycoin/gltext v0.0.0-20200425002731-afdd8ff94e14 h1:A3h5e2AIp7vQTrJG
 github.com/skycoin/gltext v0.0.0-20200425002731-afdd8ff94e14/go.mod h1:Zy/QpZ0lNGam8oqDXU0wMeNe6yZbTnMueJrz8CeAzt8=
 github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5 h1:2uKlusxY1QPcd308PI7pB6UCEtqTBnZg1Chv+UowcHY=
 github.com/skycoin/skycoin v0.28.8-0.20261119210838-81b60ec8a9b5/go.mod h1:GTD5BEZxmxfJCJ1FBzJtM9og00ziZq/RSPkUPMb/rk8=
-github.com/skycoin/skycoin-cx v0.0.0-20261124125939-d1a9862a4ae2 h1:OIXMN8sREvBhxx/45ZIMRzk9NqWTMh1ieLWxKW5gfd4=
-github.com/skycoin/skycoin-cx v0.0.0-20261124125939-d1a9862a4ae2/go.mod h1:RXBzKKWHNIdmN1qAQQ2ef3P+pZoEUY8vFOU19v9pq3A=
-github.com/skycoin/skycoin-cx v0.0.0-20261125030948-6d873f8f7cf2 h1:izX+NU48EWyfPfQrQen7ul4/JTcmO0HKRStNK+1ct+Y=
-github.com/skycoin/skycoin-cx v0.0.0-20261125030948-6d873f8f7cf2/go.mod h1:E4lVtTM8aL2OYNMlVJRJa+DpSpqCpAwUTeK8PCqnGHY=
-github.com/skycoin/skycoin-cx v0.0.0-20261125032418-3077d716ccc2 h1:C4dKy/5gg1E7DlrzjuBIr4QLX+BQTu+Cg5xDHypF44E=
-github.com/skycoin/skycoin-cx v0.0.0-20261125032418-3077d716ccc2/go.mod h1:E4lVtTM8aL2OYNMlVJRJa+DpSpqCpAwUTeK8PCqnGHY=
+github.com/skycoin/skycoin-cx v0.0.0-20261125042950-3c3a41e41aa1 h1:JTWtEZrklWyAMqTF0l7eNqC+txoi516Pe0ySjY3BvKU=
+github.com/skycoin/skycoin-cx v0.0.0-20261125042950-3c3a41e41aa1/go.mod h1:E4lVtTM8aL2OYNMlVJRJa+DpSpqCpAwUTeK8PCqnGHY=
 github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76 h1:yTQDVvkIh2QzNdIgEYLP3i54P9sR/wWtlju2scjipTY=
 github.com/skycoin/skycoin-cx-forth v0.0.0-20261122010033-ec543b8edd76/go.mod h1:Uiq5ZN/VCq/fF2nu9RFtxA7iPWNA4LUug9DjspmGNYQ=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=

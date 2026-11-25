@@ -99,8 +99,11 @@ func init() {
 }
 
 // resetCompiler starts from a new program with every native registered again,
-// the way skycoin-cx's own tests run many programs in one process.
+// the way skycoin-cx's own tests run many programs in one process. The last
+// program leaves its memory to the next, so a load does not allocate the heap
+// cap again.
 func resetCompiler() {
+	cxast.ProgramMemoryRelease(actions.AST)
 	actions.AST = cxinit.MakeProgram()
 	cxinit.RegisterPackages(actions.AST)
 	register(actions.AST)

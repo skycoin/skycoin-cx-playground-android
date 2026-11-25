@@ -1,8 +1,11 @@
 package ast
 
 import (
+	"sync"
+
 	"github.com/skycoin/skycoin-cx/t0-types"
 	"github.com/skycoin/skycoin-cx/t1-constants"
+	gc "github.com/skycoin/skycoin-cx/t2-cx-runtime-gc"
 )
 
 // MinHeapSize is the initial heap of a program with the heap cap
@@ -35,6 +38,9 @@ func HeapCap(prgrm *CXProgram) types.Pointer {
 // GCREACH: sets the GC pressure and its limit and prepares the collector,
 // see docs/GarbageCollector.md.
 func (cxprogram *CXProgram) EnsureMinimumHeapSize() {
+	if cxprogram.Memory == nil {
+		panic("ast: the memory of the program was released")
+	}
 	heap := &cxprogram.Heap
 	heap.Max = min(HeapCap(cxprogram), constants.ESCAPE_OFFSET_FLAG/2)
 	heapMemoryReserve(cxprogram)
@@ -51,14 +57,74 @@ func (cxprogram *CXProgram) EnsureMinimumHeapSize() {
 }
 
 // heapMemoryReserve gives prgrm.Memory the capacity of the stack, the data
-// and the heap cap, which the heap grows into without allocating.
+// and the heap cap, which the heap grows into without allocating. It takes
+// the memory a released program left in the reserve when it is big enough.
+// The heap clears what it grows into, so the reserved bytes are not cleared.
 func heapMemoryReserve(prgrm *CXProgram) {
 	size := max(prgrm.Heap.StartsAt+HeapCap(prgrm), types.Cast_int_to_ptr(len(prgrm.Memory)))
 	if types.Cast_int_to_ptr(cap(prgrm.Memory)) < size {
-		memory := make([]byte, len(prgrm.Memory), size)
-		copy(memory, prgrm.Memory)
-		prgrm.Memory = memory
+		memory := memoryReserveTake(prgrm, size)
+		if memory == nil {
+			memory = make([]byte, 0, size)
+		}
+		prgrm.Memory = append(memory, prgrm.Memory...)
 	}
+}
+
+// memoryReserve is the memory and the collector scratch of the last program
+// that ProgramMemoryRelease released, kept for the next program to prepare
+// (D106).
+type memoryReserve struct {
+	memoryReserveLock      sync.Mutex
+	memoryReserveMemory    []byte
+	memoryReserveCollector gc.GCState
+}
+
+var programMemoryReserve memoryReserve
+
+// memoryReserveTake returns the reserved memory, emptied, when it holds size
+// bytes, or nil. It gives prgrm the reserved collector scratch when prgrm has
+// none.
+// GCREACH: hands over the collector scratch, see docs/GarbageCollector.md.
+func memoryReserveTake(prgrm *CXProgram, size types.Pointer) []byte {
+	reserve := &programMemoryReserve
+	reserve.memoryReserveLock.Lock()
+	defer reserve.memoryReserveLock.Unlock()
+	if prgrm.Heap.Collector.GCStateStarts == nil {
+		prgrm.Heap.Collector = reserve.memoryReserveCollector
+		reserve.memoryReserveCollector = gc.GCState{}
+	}
+	memory := reserve.memoryReserveMemory
+	if types.Cast_int_to_ptr(cap(memory)) < size {
+		return nil
+	}
+	reserve.memoryReserveMemory = nil
+	return memory[:0]
+}
+
+// ProgramMemoryRelease gives the memory and the collector scratch of prgrm
+// to the next program that RunPrepare sizes, so programs loaded one after
+// another in a process allocate the heap cap once (D106). prgrm must not run
+// or be read again, as its memory is gone.
+// GCREACH: takes the collector scratch, see docs/GarbageCollector.md.
+func ProgramMemoryRelease(prgrm *CXProgram) {
+	if prgrm == nil {
+		return
+	}
+	reserve := &programMemoryReserve
+	reserve.memoryReserveLock.Lock()
+	defer reserve.memoryReserveLock.Unlock()
+	if cap(prgrm.Memory) > cap(reserve.memoryReserveMemory) {
+		reserve.memoryReserveMemory = prgrm.Memory[:0]
+	}
+	collector := prgrm.Heap.Collector
+	if !collector.GCStateCollecting && len(collector.GCStateSlots) > len(reserve.memoryReserveCollector.GCStateSlots) {
+		clear(collector.GCStateTypes)
+		collector.GCStateTypes = collector.GCStateTypes[:0]
+		reserve.memoryReserveCollector = collector
+	}
+	prgrm.Memory = nil
+	prgrm.Heap.Collector = gc.GCState{}
 }
 
 // ResizeMemory sets the heap of prgrm to newMemSize bytes, at most its cap.

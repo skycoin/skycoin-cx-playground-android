@@ -112,7 +112,7 @@ github.com/skycoin/skycoin/src/cipher/encoder
 github.com/skycoin/skycoin/src/cipher/ripemd160
 github.com/skycoin/skycoin/src/cipher/secp256k1-go
 github.com/skycoin/skycoin/src/cipher/secp256k1-go/secp256k1-go2
-# github.com/skycoin/skycoin-cx v0.0.0-20261125032418-3077d716ccc2
+# github.com/skycoin/skycoin-cx v0.0.0-20261125042950-3c3a41e41aa1
 ## explicit; go 1.27.3
 github.com/skycoin/skycoin-cx/t0-cx-core-assert
 github.com/skycoin/skycoin-cx/t0-cx-core-floatparse

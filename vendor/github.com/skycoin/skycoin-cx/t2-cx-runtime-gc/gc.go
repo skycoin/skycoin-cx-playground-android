@@ -107,6 +107,9 @@ type GCState struct {
 	// GCStateWorkOverflow is set when an object did not fit GCStateWork
 	// and was left gcMarkPending.
 	GCStateWorkOverflow bool
+	// GCStateCollecting is set while a collection runs. A collection that did
+	// not finish leaves the bitmaps dirty, so the scratch is not reused.
+	GCStateCollecting bool
 	// GCStateViews holds the pointers into an object, and those to an object
 	// already queued with another type, that the mark has yet to follow.
 	GCStateViews []GCVisit
@@ -170,6 +173,7 @@ type gcCollection struct {
 // GCStatePrepare for the heap and memory.
 func GarbageCollectorCollect(memory []byte, heapStartsAt types.Pointer, heapPointer types.Pointer, roots *GCRootTable, state *GCState) types.Pointer {
 	collection := gcCollection{memory: memory, heapStartsAt: heapStartsAt, heapPointer: heapPointer, state: state}
+	state.GCStateCollecting = true
 	collection.gcObjectStartsBuild()
 	state.GCStateWork = state.GCStateWork[:0]
 	state.GCStateViews = state.GCStateViews[:0]
@@ -217,6 +221,7 @@ func GarbageCollectorCollect(memory []byte, heapStartsAt types.Pointer, heapPoin
 		object += size
 	}
 	clear(state.GCStateStarts[:heapPointer/64+1])
+	state.GCStateCollecting = false
 	return forward
 }
 
