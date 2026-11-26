@@ -366,6 +366,10 @@ suite at once with that many runs.
 
 ## Desktop tests
 
+[docs/PlatformMatrix.md](docs/PlatformMatrix.md) is the matrix of every
+capability on desktop, wasm, the browser and Android, with the test of each
+cell.
+
 `desktoptests/` runs the same kinds of checks on a desktop host against the
 published `cx` and not the one the app links. `desktoptests/run-tests.sh`
 takes `CX`, or downloads the release archive of the skycoin-cx version that
